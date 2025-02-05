@@ -5,3 +5,8 @@ edition = "2021"
 
 [dependencies]
 shared = { path = "../shared" }
+rspotify = { version = "0.14.0", default-features = false, features = [
+  "env-file",
+  "client-ureq",
+  "ureq-rustls-tls",
+] }

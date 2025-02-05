@@ -5,8 +5,7 @@ use super::{Youtube, models::YoutubeSearchResult};
 use ngrammatic::{Pad, CorpusBuilder};
 use slug::slugify;
 use async_trait::async_trait;
-use fuzzy_matcher::FuzzyMatcher;
-use invidious::{reqwest::asynchronous::Client, structs::{universal::Search, hidden::SearchItem}};
+use invidious::{hidden::SearchItem, universal::Search, ClientAsync, ClientAsyncTrait};
 
 #[async_trait]
 pub trait Matcher {
@@ -51,7 +50,7 @@ impl Matcher for Youtube {
 
     async fn get_results(&self, search_query: String) -> Option<Search> {
 
-        let client = Client::new(String::from("https://vid.puffyan.us"));
+        let client = ClientAsync::default();
         let search_results = client
             .search(Some(format!("q={}&type=video", search_query).as_str()))
             .await;
@@ -89,30 +88,24 @@ impl Matcher for Youtube {
         corpus.add_text(slugify(search_query.clone()).as_str());
 
         for item in search_results.items {
-            if let SearchItem::Video {
-                title,
-                id,
-                length,
-                author,
-                ..
-            } = item {
+            if let SearchItem::Video(video) = item {
 
                 // apply pattern to video infos
-                let applied_pattern = self.apply_pattern(pattern.clone(), title.clone(), author.clone());
+                let applied_pattern = self.apply_pattern(pattern.clone(), video.title.clone(), video.author.clone());
 
                 // compare the title with the track and get a matching score
                 let result = corpus.search(&applied_pattern, 0.75);
 
                 if result.first().is_some() {
                     let youtube_search_result = YoutubeSearchResult {
-                        title: title.clone(),
-                        duration: length as i32,
-                        channel: author,
-                        url: format!("https://www.youtube.com/watch?v={}", id),
+                        title: video.title.clone(),
+                        duration: video.length as i32,
+                        channel: video.author,
+                        url: format!("https://www.youtube.com/watch?v={}", video.id),
                         score: result.first().unwrap().similarity as f32,
                     };
                     weighted_results.push(youtube_search_result);
-                    println!("[{}] vs [{}] = {}", title.clone(), search_query, result.first().unwrap().similarity);
+                    println!("[{}] vs [{}] = {}", video.title.clone(), search_query, result.first().unwrap().similarity);
                 }
             }
         };

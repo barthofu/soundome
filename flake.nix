@@ -14,15 +14,18 @@
       {
         defaultPackage = naersk-lib.buildPackage ./.;
         devShell = with pkgs; mkShell {
-          buildInputs = [ 
-            cargo rustc 
-            rustfmt 
-            pre-commit 
+          buildInputs = [
+            cargo rustc
+            rustfmt
+            pre-commit
             rustPackages.clippy
-            # rustPackages.rust-analyzer
             rust-analyzer
+
+            pkg-config
+            openssl
           ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
+          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
         };
       }
     );

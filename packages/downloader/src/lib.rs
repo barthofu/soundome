@@ -2,9 +2,10 @@ pub mod youtube;
 
 use std::path::PathBuf;
 use async_trait::async_trait;
-use crate::models::track::Track;
-use super::errors::Error;
+use shared::models::track::Track;
+use shared::errors::Error;
 
+// this is the trait that all downloaders must implement
 #[async_trait]
 pub trait Provider {
 

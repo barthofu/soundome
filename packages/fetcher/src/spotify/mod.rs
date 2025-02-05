@@ -1,16 +1,16 @@
 pub mod mappers;
 
 use rspotify::{Credentials, ClientCredsSpotify, model::{SearchType, SearchResult, TrackId, PlaylistId, ArtistId, AlbumId}, prelude::BaseClient};
+use shared::{models::{track::Track, artist::Artist, album::Album, playlist::PlaylistTrack}, errors::Error};
 
-use crate::{models::{track::Track, artist::Artist, album::Album, playlist::PlaylistTrack}, utils::{errors::Error, source::Source}};
+use crate::Fetcher;
 
 pub struct Spotify {
-
-    client: ClientCredsSpotify,    
+    client: ClientCredsSpotify,
 }
 
 impl Spotify {
-    
+
     pub fn new() -> Result<Self, Error> {
 
         let credentials = Credentials::from_env().ok_or(Error::Config)?;
@@ -48,16 +48,16 @@ impl Spotify {
     }
 }
 
-impl Source for Spotify {
+impl Fetcher for Spotify {
 
     fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
 
         match TrackId::from_id(&self.url_to_id(url)) {
             Ok(id) => {
-                
-                let track = self.client.track(id);
+
+                let track = self.client.track(id, None);
                 match track {
-                    Ok(track) => Ok(track.into()),
+                    Ok(track) => Ok(mappers::convert_track(&track)),
                     Err(_) => Err(Error::NotFound),
                 }
             }
@@ -68,15 +68,15 @@ impl Source for Spotify {
     fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
 
         let res = self.client.search(query, SearchType::Track, None, None, Some(20), Some(0));
-    
+
         match res {
             Ok(res) => match res {
                 SearchResult::Tracks(tracks) => {
-                    Ok(tracks.items.into_iter().map(|track| track.into()).collect())
+                    Ok(tracks.items.into_iter().map(|track| mappers::convert_track(&track)).collect())
                 }
                 _ => Ok(vec![]),
             },
-            Err(e) => Err(Error::from(e)),
+            Err(e) => Err(mappers::convert_error(e)),
         }
     }
 
@@ -84,7 +84,7 @@ impl Source for Spotify {
 
         match PlaylistId::from_id(&self.url_to_id(url)) {
             Ok(id) => {
-                
+
                 let playlist = self.client.playlist(id, None, None);
                 match playlist {
                     Ok(playlist) => {
@@ -92,9 +92,9 @@ impl Source for Spotify {
                         let items = playlist.tracks;
                         let tracks: Vec<PlaylistTrack> = items.items
                             .into_iter()
-                            .map(|item| PlaylistTrack::from(item))
+                            .map(|item| PlaylistTrack::from(mappers::convert_playlist_item(&item)))
                             .collect();
-                        
+
                         Ok(tracks)
 
                         // Ok(tracks.items.into_iter().map(|item| item.track.unwrap().into()).collect())
@@ -107,12 +107,12 @@ impl Source for Spotify {
     }
 
     fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
-        
+
         match ArtistId::from_id(&self.url_to_id(url)) {
             Ok(id) => {
-                
+
                 match self.client.artist(id) {
-                    Ok(artist) => Ok(artist.into()),
+                    Ok(full_artist) => Ok(mappers::convert_full_artist(&full_artist)),
                     Err(_) => Err(Error::NotFound),
                 }
             }
@@ -121,27 +121,27 @@ impl Source for Spotify {
     }
 
     fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
-        
+
         let res = self.client.search(search, SearchType::Artist, None, None, Some(20), Some(0));
-    
+
         match res {
             Ok(res) => match res {
                 SearchResult::Artists(artists) => {
-                    Ok(artists.items.into_iter().map(|artist| artist.into()).collect())
+                    Ok(artists.items.into_iter().map(|full_artist| mappers::convert_full_artist(&full_artist)).collect())
                 }
                 _ => Ok(vec![]),
             },
-            Err(e) => Err(Error::from(e)),
+            Err(e) => Err(mappers::convert_error(e)),
         }
     }
 
     fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
-        
+
         match AlbumId::from_id(&self.url_to_id(url)) {
             Ok(id) => {
-                
-                match self.client.album(id) {
-                    Ok(album) => Ok(album.into()),
+
+                match self.client.album(id, None) {
+                    Ok(full_album) => Ok(mappers::convert_full_album(&full_album)),
                     Err(_) => Err(Error::NotFound),
                 }
             }
@@ -150,17 +150,17 @@ impl Source for Spotify {
     }
 
     fn get_albums_from_query(&self, search: &str) -> Result<Vec<Album>, Error> {
-        
+
         let res = self.client.search(search, SearchType::Album, None, None, Some(20), Some(0));
-    
+
         match res {
             Ok(res) => match res {
                 SearchResult::Albums(albums) => {
-                    Ok(albums.items.into_iter().map(|album| album.into()).collect())
+                    Ok(albums.items.into_iter().map(|simplified_album| mappers::convert_simplified_album(&simplified_album)).collect())
                 }
                 _ => Ok(vec![]),
             },
-            Err(e) => Err(Error::from(e)),
+            Err(e) => Err(mappers::convert_error(e)),
         }
     }
 

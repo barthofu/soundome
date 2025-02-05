@@ -11,6 +11,8 @@ target/
 .idea/
 
 # data
+data/
+!data/.gitkeep
 
 # misc
 tmp/

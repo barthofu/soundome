@@ -6,7 +6,7 @@ lto = true
 resolver = "2"
 members = [
     "apps/server",
-    "packages/core", "packages/database",
+    "packages/shared", "packages/database",
     "packages/downloader",
     "packages/fetcher", "packages/orchestrator",
     "packages/tagger"

@@ -9,7 +9,9 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use serde_json::Value;
 use tokio::{time::timeout, process::Command, io::AsyncReadExt};
 
-use crate::{utils::{provider::Provider, errors::Error}, models::track::Track};
+use shared::{errors::Error, models::track::Track};
+use crate::Provider;
+
 use self::{models::YoutubeSearchResult, matcher::Matcher, downloader::Downloader};
 
 pub struct Youtube {
