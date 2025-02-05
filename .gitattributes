@@ -1,0 +1,3 @@
+# hide diff output for these files
+pnpm-lock.yaml -diff
+package-lock.json -diff

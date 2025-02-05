@@ -1,0 +1,13 @@
+[profile.release]
+strip = true
+lto = true
+
+[workspace]
+resolver = "2"
+members = [
+    "apps/server",
+    "packages/core", "packages/database",
+    "packages/downloader",
+    "packages/fetcher", "packages/orchestrator",
+    "packages/tagger"
+]

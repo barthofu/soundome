@@ -1,0 +1,16 @@
+# env
+.direnv
+
+# build
+target/
+
+# secrets
+.env
+
+# ide
+.idea/
+
+# data
+
+# misc
+tmp/

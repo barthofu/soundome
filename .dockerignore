@@ -1,0 +1,6 @@
+target/
+.editorconfig
+.gitignore
+.git/
+node_modules
+README.md
