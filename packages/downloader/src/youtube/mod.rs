@@ -1,33 +1,29 @@
 pub mod models;
 pub mod matcher;
-pub mod downloader;
 
-use std::{path::PathBuf, process::Stdio};
+use std::{path::{Path, PathBuf}, process::Stdio};
 
 use async_trait::async_trait;
-use fuzzy_matcher::skim::SkimMatcherV2;
 use serde_json::Value;
 use tokio::{time::timeout, process::Command, io::AsyncReadExt};
 
 use shared::{errors::Error, models::track::Track};
 use crate::Provider;
 
-use self::{models::YoutubeSearchResult, matcher::Matcher, downloader::Downloader};
+use self::{models::YoutubeSearchResult, matcher::Matcher};
 
 pub struct Youtube {
-    fuzzy_matcher: SkimMatcherV2,
     patterns: Vec<String>,
     excluded_words: Vec<String>,
     treshold: f32,
     duration_offset_percentage: i32,
-    yt_dlp: Option<PathBuf>
 }
 
 impl Youtube {
 
     pub fn new () -> Self {
         Self {
-            fuzzy_matcher: SkimMatcherV2::default(),
+            // fuzzy_matcher: SkimMatcherV2::default(),
             patterns: vec![
                 String::from("{{title}}"),
                 String::from("{{title}} {{channel}}"),
@@ -47,7 +43,7 @@ impl Youtube {
             ],
             treshold: 0.75,
             duration_offset_percentage: 50,
-            yt_dlp: None
+            // yt_dlp: None
         }
     }
 
@@ -95,21 +91,23 @@ impl Provider for Youtube {
         result.map(|r| r.url)
     }
 
-    async fn download(&mut self, url: &str) -> Result<PathBuf, Error> {
+    async fn download(&mut self, url: &str, base_dir: &Path) -> Result<PathBuf, Error> {
 
-        let youtube_dl_path = Youtube::get_downloader();
-        let mut child = Command::new(youtube_dl_path)
+        let mut child = Command::new("yt-dlp")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .args(&[
                 url,
-                "-j",
-                "--ffmpeg-location", "core/drivers/ffmpeg",
-                "-f", "bestaudio[ext=webm]/bestaudio",
+                "--print-json",
+                "-f", "ba",
                 "-x",
                 "--audio-format", "mp3",
                 "--audio-quality", "0",
-                "-o", "tmp/%(title)s.%(ext)s"
+                "--embed-thumbnail",
+                "--embed-metadata",
+                "--add-metadata",
+                "--metadata-from-title", "%(artist)s - %(title)s",
+                "--output", &format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap())
             ])
             .spawn()?;
 

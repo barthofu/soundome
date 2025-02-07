@@ -1,6 +1,6 @@
 pub mod youtube;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 use shared::models::track::Track;
 use shared::errors::Error;
@@ -10,5 +10,5 @@ use shared::errors::Error;
 pub trait Provider {
 
     async fn search(&self, track: Track) -> Option<String>;
-    async fn download(&mut self, url: &str) -> Result<PathBuf, Error>;
+    async fn download(&mut self, url: &str, base_dir: &Path) -> Result<PathBuf, Error>;
 }

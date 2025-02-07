@@ -1,0 +1,46 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug CLI",
+            "initCommands":["settings set target.disable-aslr false"],
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=cli",
+                    "--package=cli"
+                ],
+                "filter": {
+                    "name": "cli",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Server",
+            "initCommands":["settings set target.disable-aslr false"],
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=server",
+                    "--package=server"
+                ],
+                "filter": {
+                    "name": "server",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+    ]
+}

@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+shared = { path = "../shared" }
+downloader = { path = "../downloader" }
+fetcher = { path = "../fetcher" }
+
+tokio = { version = "1.43.0", features = ["time", "process", "io-util"] }

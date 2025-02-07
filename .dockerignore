@@ -1,6 +1,8 @@
 target/
+.git/
+node_modules/
+data/
+.direnv/
 .editorconfig
 .gitignore
-.git/
-node_modules
 README.md
