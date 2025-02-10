@@ -1,10 +1,10 @@
 #[derive(Debug)]
 pub enum Error {
-    
+
     // API errors
     NotFound,
     BadURL,
-    InternalServer, 
+    InternalServer,
     Network, // the network is the cause of the error
 
     // CLI parsing

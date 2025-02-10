@@ -52,7 +52,7 @@ impl Youtube {
 impl Provider for Youtube {
 
     /// find a matching youtube video from a track
-    async fn search(&self, track: Track) -> Option<String> {
+    async fn search(&self, track: &Track) -> Option<String> {
 
         // 1. create search query
         let search_query = self.create_search_query(track.clone());
@@ -103,9 +103,9 @@ impl Provider for Youtube {
                 "--audio-format", "mp3",
                 "--audio-quality", "0",
                 "--embed-thumbnail",
-                "--embed-metadata",
-                "--add-metadata",
-                "--metadata-from-title", "%(artist)s - %(title)s",
+                // "--embed-metadata",
+                // "--add-metadata",
+                // "--metadata-from-title", "%(artist)s - %(title)s",
                 "--output", &format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap())
             ])
             .spawn()?;
@@ -132,14 +132,20 @@ impl Provider for Youtube {
 
         if exit_code.success() {
 
-            // let decoded_stdout = std::str::from_utf8(&stdout).expect("invalid utf-8 output");
-
-            // println!("stdout: {:?}", decoded_stdout);
             let value: Value = serde_json::from_reader(stdout.as_slice())?;
 
             let path = value["_filename"].as_str();
-
-            return Ok(path.unwrap().into());
+            // we need to replace the extension with mp3 (because it will be .webm most of the time)
+            match path {
+                Some(path) => {
+                    let path = match path.rsplit_once('.') {
+                        Some((base, _)) => format!("{}.mp3", base),
+                        None => format!("{}.mp3", path), // if there is no extension, just append .mp3
+                    };
+                    return Ok(path.into());
+                },
+                None => return Err(Error::NotFound),
+            }
 
         } else {
 

@@ -9,6 +9,6 @@ use shared::errors::Error;
 #[async_trait]
 pub trait Provider {
 
-    async fn search(&self, track: Track) -> Option<String>;
+    async fn search(&self, track: &Track) -> Option<String>;
     async fn download(&mut self, url: &str, base_dir: &Path) -> Result<PathBuf, Error>;
 }

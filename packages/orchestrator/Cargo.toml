@@ -8,5 +8,6 @@ shared = { path = "../shared" }
 config = { path = "../config" }
 downloader = { path = "../downloader" }
 fetcher = { path = "../fetcher" }
+tagger = { path = "../tagger" }
 
 tokio = { version = "1.43.0", features = ["time", "process", "io-util"] }
