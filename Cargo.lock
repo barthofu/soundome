@@ -228,6 +228,8 @@ dependencies = [
 name = "cli"
 version = "0.1.0"
 dependencies = [
+ "config 0.1.0",
+ "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "orchestrator",
  "shared",
  "tokio",
@@ -238,6 +240,7 @@ name = "config"
 version = "0.1.0"
 dependencies = [
  "config 0.15.7",
+ "serde",
 ]
 
 [[package]]
@@ -558,6 +561,24 @@ name = "dotenvy"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
+
+[[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "git+https://github.com/allan2/dotenvy#86c0d6dd2938e615135813df9e3274bf8f42c455"
+dependencies = [
+ "dotenvy-macros",
+]
+
+[[package]]
+name = "dotenvy-macros"
+version = "0.15.7"
+source = "git+https://github.com/allan2/dotenvy#86c0d6dd2938e615135813df9e3274bf8f42c455"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
 
 [[package]]
 name = "downloader"
@@ -1607,6 +1628,7 @@ dependencies = [
 name = "orchestrator"
 version = "0.1.0"
 dependencies = [
+ "config 0.1.0",
  "downloader",
  "fetcher",
  "shared",
@@ -2124,7 +2146,7 @@ checksum = "97e4f3254b449534ab3891331881d922d50ec36bd07c155147253a747fa5d475"
 dependencies = [
  "base64 0.22.1",
  "chrono",
- "dotenvy",
+ "dotenvy 0.15.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "getrandom 0.2.15",
  "log",
  "maybe-async",
@@ -2491,7 +2513,6 @@ name = "soundome-server"
 version = "0.1.0"
 dependencies = [
  "diesel",
- "dotenvy",
  "libsqlite3-sys",
  "okapi",
  "rocket",

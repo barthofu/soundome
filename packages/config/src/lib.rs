@@ -1,21 +1,33 @@
-use std::collections::HashMap;
-use config::Config;
+use config::{Config, ConfigError};
+use serde::Deserialize;
 
-pub fn get_config() {
-    let settings = Config::builder()
-        // Add in `./Settings.toml`
-        .add_source(config::File::with_name("config.toml"))
-        // Add in settings from the environment (with a prefix of APP)
-        // Eg.. `APP_DEBUG=1 ./target/app` would set the `debug` key
-        .add_source(config::Environment::with_prefix("SOUNDOME").separator("_"))
-        .build()
-        .unwrap();
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct SpotifyConfig {
+    pub client_id: String,
+    pub client_secret: String,
+}
 
-    // Print out our settings (as a HashMap)
-    // println!(
-    //     "{:?}",
-    //     settings
-    //         .try_deserialize::<HashMap<String, String>>()
-    //         .unwrap()
-    // );
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct AppConfig {
+    pub spotify: SpotifyConfig,
+    pub base_dir: String,
+}
+
+impl AppConfig {
+    pub fn new() -> Result<Self, ConfigError> {
+
+        // get config toml dir from env, with default
+        let config_dir = std::env::var("SOUNDOME_CONFIG_DIR").unwrap_or_else(|_| String::from("config.toml"));
+
+        let config = Config::builder()
+            // Add in `./Settings.toml`
+            .add_source(config::File::with_name(&config_dir))
+            // Add in settings from the environment (with a prefix of SOUNDOME)
+            .add_source(config::Environment::with_prefix("SOUNDOME").separator("__"))
+            .build()?;
+
+        config.try_deserialize()
+    }
 }

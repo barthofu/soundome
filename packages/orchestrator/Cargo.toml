@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 shared = { path = "../shared" }
+config = { path = "../config" }
 downloader = { path = "../downloader" }
 fetcher = { path = "../fetcher" }
 

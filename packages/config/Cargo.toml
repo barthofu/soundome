@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 config = "0.15.7"
+serde = { version = "1.0.217", features = ["derive"] }

@@ -11,9 +11,9 @@ pub struct Spotify {
 
 impl Spotify {
 
-    pub fn new() -> Result<Self, Error> {
+    pub fn new(client_id: &str, client_secret: &str) -> Result<Self, Error> {
 
-        let credentials = Credentials::from_env().ok_or(Error::Config)?;
+        let credentials = Credentials::new(client_id, client_secret);
         let client = ClientCredsSpotify::new(credentials);
 
         match client.request_token() {

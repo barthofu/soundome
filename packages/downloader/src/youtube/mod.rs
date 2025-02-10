@@ -46,7 +46,6 @@ impl Youtube {
             // yt_dlp: None
         }
     }
-
 }
 
 #[async_trait]
