@@ -1,0 +1,121 @@
+vars: {
+    d2-config: {
+        layout-engine: dagre
+        # Terminal theme code
+        theme-id: 200
+    }
+}
+
+user: "User" {
+    shape: person
+}
+
+fetcher: "Fetcher" {
+    get_track_info_from_url: "Get track info from URL" {
+        shape: oval
+        style.fill: "darkseagreen"
+    }
+}
+
+downloader: "Downloader" {
+    search_track: "Search track" {
+        shape: oval
+        style.fill: "darkseagreen"
+    }
+    download_track: "Download track" {
+        shape: oval
+        style.fill: "darkseagreen"
+    }
+}
+
+tagger: "Tagger" {
+    get_metadata_from_music_brainz: "Get metadata from MusicBrainz" {
+        shape: oval
+    }
+    score_matching: "Score matching" {
+        shape: diamond
+    }
+    tag_track: "Tag track" {
+        shape: oval
+        style.fill: "darkseagreen"
+    }
+    get_metadata_from_file: "Get metadata from file" {
+        shape: oval
+    }
+    web_validation: "Web validation log interface"
+
+    get_metadata_from_music_brainz -> score_matching: "metadata"
+    get_metadata_from_file -> get_metadata_from_music_brainz: "track object"
+    score_matching -> tag_track: "best metadata"
+    score_matching -> web_validation: "if score low"
+}
+
+organizer: "Organizer" {
+    duplicate_detection: "Duplicate detection" {
+        shape: diamond
+    }
+    quality_comparison: "Quality comparison" {
+        shape: diamond
+    }
+    move_track: "Move track" {
+        shape: oval
+    }
+    save_track_info_to_db: "Save track info to database" {
+        shape: oval
+    }
+    artist_similarity_detection: "Artist similarity detection" {
+        shape: diamond
+    }
+    merge_artists: "Merge artists" {
+        shape: oval
+    }
+
+    artist_web_validation: "Artist web validation interface"
+
+    # Branche de détection de duplicata
+    duplicate_detection -> move_track: "if unique"
+    duplicate_detection -> quality_comparison: "if duplicate"
+    quality_comparison -> move_track: "if new version better"
+
+    # Après ajout, mise à jour de la bibliothèque et base de données
+    move_track -> save_track_info_to_db: "track object"
+
+    # Détection d’artistes similaires
+    move_track -> artist_similarity_detection: "post-addition"
+    artist_similarity_detection -> artist_web_validation: "if similar artist detected"
+    artist_web_validation -> merge_artists: "confirm merge"
+    merge_artists -> quality_comparison: "compare songs"
+}
+
+stop: {
+    shape: circle
+}
+
+fs_cache: "Filesystem download cache" {
+    shape: cylinder
+}
+
+fs_ingest: "Filesystem ingest" {
+    shape: cylinder
+}
+
+fs_library: "Filesystem library" {
+    shape: cylinder
+}
+
+db: "Database" {
+    shape: stored_data
+}
+
+# Relations
+
+user -> fetcher.get_track_info_from_url: "url"
+fetcher.get_track_info_from_url -> downloader.search_track: "track object"
+downloader.search_track -> downloader.download_track: "download url"
+downloader.download_track -> fs_cache: "write"
+downloader.download_track -> tagger.get_metadata_from_music_brainz: "track object"
+fs_ingest -> tagger.get_metadata_from_file: "get"
+tagger.tag_track -> organizer.duplicate_detection: "track object"
+organizer.move_track -> fs_library: "write"
+organizer.save_track_info_to_db -> db: "write"
+organizer.quality_comparison -> stop: "if new version worse"
