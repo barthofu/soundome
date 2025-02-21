@@ -13,6 +13,7 @@ pub struct SpotifyConfig {
 pub struct AppConfig {
     pub spotify: SpotifyConfig,
     pub base_dir: String,
+    pub database_url: String,
 }
 
 impl AppConfig {

@@ -1,14 +1,15 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use diesel::{Connection, SqliteConnection};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[macro_use]
+extern crate diesel;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub mod schema;
+pub mod macros;
+pub mod repositories;
+pub mod models;
+
+pub fn get_connection(database_url: &str) -> SqliteConnection {
+    // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    SqliteConnection::establish(&database_url)
+        .expect(&format!("Error connecting to {}", database_url))
 }

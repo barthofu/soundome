@@ -1,4 +1,5 @@
 use config::AppConfig;
+use diesel::SqliteConnection;
 use downloader::{youtube::Youtube, Provider};
 use fetcher::{spotify::Spotify, Fetcher};
 use tagger::tag_track;
@@ -6,7 +7,7 @@ use std::path::PathBuf;
 
 use shared::errors::Error;
 
-pub async fn download_spotify_track(url: &str, config: &AppConfig) -> Result<PathBuf, Error> {
+pub async fn download_spotify_track(url: &str, conn: &SqliteConnection, config: &AppConfig) -> Result<PathBuf, Error> {
     let spotify = Spotify::new(&config.spotify.client_id, &config.spotify.client_secret)
         .map_err(|_| Error::Config)?;
     let mut youtube = Youtube::new();

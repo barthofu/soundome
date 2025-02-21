@@ -7,6 +7,7 @@ edition = "2021"
 shared = { path = "../../packages/shared" }
 config = { path = "../../packages/config" }
 orchestrator = { path = "../../packages/orchestrator" }
+database = { path = "../../packages/database" }
 
 tokio = { version = "1.43.0", features = ["full"] }
 dotenvy = { git = "https://github.com/allan2/dotenvy", features = ["macros"] }

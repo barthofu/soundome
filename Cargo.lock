@@ -249,6 +249,7 @@ name = "cli"
 version = "0.1.0"
 dependencies = [
  "config 0.1.0",
+ "database",
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "orchestrator",
  "shared",
@@ -463,6 +464,17 @@ dependencies = [
 [[package]]
 name = "database"
 version = "0.1.0"
+dependencies = [
+ "diesel",
+ "libsqlite3-sys",
+ "okapi",
+ "rocket",
+ "rocket_okapi",
+ "schemars",
+ "serde",
+ "serde_json",
+ "shared",
+]
 
 [[package]]
 name = "deranged"
@@ -1711,6 +1723,8 @@ name = "orchestrator"
 version = "0.1.0"
 dependencies = [
  "config 0.1.0",
+ "database",
+ "diesel",
  "downloader",
  "fetcher",
  "shared",

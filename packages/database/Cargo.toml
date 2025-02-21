@@ -4,3 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+shared = { path = "../shared" }
+
+diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }
+libsqlite3-sys = { version = "0.31.0", features = ["bundled"] }
+rocket = { version = "0.5.1", features = ["json"] }
+rocket_okapi = { version = "0.9.0", features = ["swagger"] }
+okapi = { version = "0.7.0" }
+schemars = "0.8.21"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"

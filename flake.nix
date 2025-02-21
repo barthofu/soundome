@@ -15,21 +15,24 @@
         defaultPackage = naersk-lib.buildPackage ./.;
         devShell = with pkgs; mkShell {
           buildInputs = [
-            cargo rustc
+            cargo
+            rustc
             rustfmt
             pre-commit
             rustPackages.clippy
             rust-analyzer
 
             pkg-config
+            sqlite
             openssl
             d2
+            beets
           ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
           PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
 
           shellHook = ''
-            export PATH=$PWD/assets/bin:$PATH
+            export PATH=$PWD/assets/bin:$HOME/.cargo/bin:$PATH
           '';
         };
       }
