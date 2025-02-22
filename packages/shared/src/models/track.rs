@@ -29,33 +29,41 @@ impl Weights {
 
 impl Track {
 
+    pub fn display(&self) {
+        println!("{} by {} ({})",
+            self.title,
+            self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>().join(", "),
+            self.date.clone().unwrap_or("Unknown".to_string())
+        );
+    }
+
     /**
      * Returns a normalized similarity score (between 0 and 1) of the match between two tracks
      */
-    pub fn compare(&self, track1: &Track, track2: &Track) -> f64 {
+    pub fn compare(&self, other_track: &Track) -> f64 {
         let mut score = 0.0;
         let mut total_weight = 0.0;
 
         // title
-        score += Weights::TITLE * string_similarity(&track1.title, &track2.title);
+        score += Weights::TITLE * string_similarity(&self.title, &other_track.title);
         total_weight += Weights::TITLE;
 
         // artists
-        let mut track1_artists: Vec<String> = track1.artists.iter().map(|artist| artist.name.clone()).collect();
+        let mut track1_artists: Vec<String> = self.artists.iter().map(|artist| artist.name.clone()).collect();
         track1_artists.sort();
-        let mut track2_artists: Vec<String> = track2.artists.iter().map(|artist| artist.name.clone()).collect();
+        let mut track2_artists: Vec<String> = other_track.artists.iter().map(|artist| artist.name.clone()).collect();
         track2_artists.sort();
         score += Weights::ARTISTS * string_similarity(track1_artists.join("; ").as_str(), track2_artists.join("; ").as_str());
         total_weight += Weights::ARTISTS;
 
         // album
-        if let (Some(album1), Some(album2)) = (&track1.album, &track2.album) {
+        if let (Some(album1), Some(album2)) = (&self.album, &other_track.album) {
             score += Weights::ALBUM * string_similarity(&album1.title, &album2.title);
             total_weight += Weights::ALBUM;
         }
 
         // duration
-        if let (Some(duration1), Some(duration2)) = (&track1.duration, &track2.duration) {
+        if let (Some(duration1), Some(duration2)) = (&self.duration, &other_track.duration) {
             let diff = (duration1 - duration2 / 1000).abs();
             if diff <= 2 {
                 score += Weights::DURATION;
@@ -67,7 +75,7 @@ impl Track {
         }
 
         // release date
-        if let (Some(date1), Some(date2)) = (&track1.date, &track2.date) {
+        if let (Some(date1), Some(date2)) = (&self.date, &other_track.date) {
             if date1 == date2 {
                 score += Weights::RELEASE_DATE;
                 total_weight += Weights::RELEASE_DATE;

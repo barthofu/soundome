@@ -2,7 +2,7 @@ use config::AppConfig;
 use diesel::SqliteConnection;
 use downloader::{youtube::Youtube, Provider};
 use fetcher::{spotify::Spotify, Fetcher};
-use tagger::TagWriter;
+use tagger::file::tag_file_with_track;
 use std::path::PathBuf;
 
 use shared::errors::Error;
@@ -26,8 +26,7 @@ pub async fn download_spotify_track(url: &str, conn: &SqliteConnection, config: 
 
     println!("Downloaded track to: {}", file_path.to_str().unwrap_or("Invalid path"));
 
-    let file_tagger = tagger::providers::file::File::new();
-    file_tagger.write(&file_path, &track)
+    tag_file_with_track(&file_path, &track)
         .map_err(|_| Error::InternalServer)?;
 
     Ok(file_path)

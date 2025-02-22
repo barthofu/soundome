@@ -31,9 +31,11 @@ downloader: "Downloader" {
 tagger: "Tagger" {
     get_metadata_from_music_brainz: "Get metadata from MusicBrainz" {
         shape: oval
+        style.fill: "darkseagreen"
     }
     score_matching: "Score matching" {
         shape: diamond
+        style.fill: "darkseagreen"
     }
     tag_track: "Tag track" {
         shape: oval
@@ -41,11 +43,21 @@ tagger: "Tagger" {
     }
     get_metadata_from_file: "Get metadata from file" {
         shape: oval
+        style.fill: "darkseagreen"
+    }
+    get_metadata_from_filename: "Get metadata from filename" {
+        shape: oval
+    }
+    sufficient_metadata: "Sufficient metadata in file tags" {
+        shape: diamond
     }
     web_validation: "Web validation log interface"
 
     get_metadata_from_music_brainz -> score_matching: "metadata"
     get_metadata_from_file -> get_metadata_from_music_brainz: "track object"
+    get_metadata_from_filename -> get_metadata_from_music_brainz: "track object"
+    sufficient_metadata -> get_metadata_from_file: "if enough"
+    sufficient_metadata -> get_metadata_from_filename: "if not enough"
     score_matching -> tag_track: "best metadata"
     score_matching -> web_validation: "if score low"
 }
@@ -114,7 +126,7 @@ fetcher.get_track_info_from_url -> downloader.search_track: "track object"
 downloader.search_track -> downloader.download_track: "download url"
 downloader.download_track -> fs_cache: "write"
 downloader.download_track -> tagger.get_metadata_from_music_brainz: "track object"
-fs_ingest -> tagger.get_metadata_from_file: "get"
+fs_ingest -> tagger.sufficient_metadata: "get"
 tagger.tag_track -> organizer.duplicate_detection: "track object"
 organizer.move_track -> fs_library: "write"
 organizer.save_track_info_to_db -> db: "write"
