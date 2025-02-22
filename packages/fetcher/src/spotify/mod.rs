@@ -164,7 +164,7 @@ impl Fetcher for Spotify {
         }
     }
 
-    fn get_album_tracks_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {
+    fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {
         todo!()
     }
 }

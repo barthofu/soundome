@@ -53,6 +53,7 @@ pub fn convert_track(track: &FullTrack) -> Track {
     Track {
         title: track.name.clone(),
         artists,
+        album: Some(convert_simplified_album(album)),
         genre: None, // TODO: get genre from artist
         duration: Some((track.duration.num_seconds() & 0xffffffff) as i32),
         url: track.external_urls.get("spotify").cloned(),
@@ -61,7 +62,6 @@ pub fn convert_track(track: &FullTrack) -> Track {
         label: None,
         date: album.release_date.clone(),
         cover: album.images.get(0).map(|image| image.url.clone()),
-        album: Some(convert_simplified_album(album)),
     }
 }
 

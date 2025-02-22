@@ -42,5 +42,24 @@
             "args": [],
             "cwd": "${workspaceFolder}"
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Tests",
+            "initCommands":["settings set target.disable-aslr false"],
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=tests",
+                    "--package=tests"
+                ],
+                "filter": {
+                    "name": "tests",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }
