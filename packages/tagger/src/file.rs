@@ -21,6 +21,71 @@ pub fn get_track_from_file(file_path: &PathBuf) -> Result<Track, Error> {
 }
 
 /**
+ * Infer Track object from filename.
+ */
+pub fn get_track_from_filename(file_path: &PathBuf) -> Option<Track> {
+    let file_name = file_path.file_name().unwrap().to_str().unwrap();
+    let patterns = vec![
+        // Matches: "Artist - Title.mp3"
+        r"(?P<artist>.+?)\s*-\s*(?P<title>.+?)\.\w+$",
+        // Matches: "Artist - Album - Title.mp3"
+        r"(?P<artist>.+?)\s*-\s*(?P<album>.+?)\s*-\s*(?P<title>.+?)\.\w+$",
+        // Matches: "01. Artist - Title.mp3" (with track number at the start)
+        r"\d+\.\s*(?P<artist>.+?)\s*-\s*(?P<title>.+?)\.\w+$",
+        // Matches: "Bohemian Rhapsody (Queen).mp3" (title first, artist in parentheses)
+        r"(?P<title>.+?)\s*\((?P<artist>.+?)\)\.\w+$",
+    ];
+
+    for pattern in patterns {
+        let re = regex::Regex::new(pattern);
+        match re {
+            Ok(re) => {
+                let captures = re.captures(file_name);
+                if let Some(captures) = captures {
+                    let title = captures.name("title").map(|m| m.as_str().trim().to_string());
+                    let album = captures.name("album").map(|m| m.as_str().trim().to_string());
+                    let artist = captures.name("artist").map(|m| m.as_str().trim().to_string());
+
+                    let track = Track {
+                        title: title.unwrap_or("Unknown".to_string()),
+                        artists: vec![Artist {
+                            name: artist.unwrap_or("Unknown".to_string()),
+                            url: None,
+                            icon: None
+                        }],
+                        album: album.map(|album| Album {
+                            title: album,
+                            artists: vec![Artist {
+                                name: captures.name("artist").map(|m| m.as_str().trim().to_string()).unwrap_or("Unknown".to_string()),
+                                url: None,
+                                icon: None
+                            }],
+                            date: None,
+                            url: None,
+                            cover: None
+                        }),
+                        genre: None,
+                        date: None,
+                        cover: None,
+                        disc_number: None,
+                        track_number: None,
+                        duration: None,
+                        label: None,
+                        url: None
+                    };
+                    return Some(track);
+                }
+            }
+            Err(e) => {
+                println!("Error compiling regex: {:?}", e);
+            }
+        }
+    }
+
+    None
+}
+
+/**
  * Tag an audio file with the provided track information.
  */
 pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> Result<(), Error> {

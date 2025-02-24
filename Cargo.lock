@@ -2906,6 +2906,7 @@ dependencies = [
  "chrono",
  "id3",
  "musicbrainz_rs",
+ "regex",
  "shared",
 ]
 
