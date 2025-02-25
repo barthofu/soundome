@@ -5,12 +5,12 @@ use std::{path::{Path, PathBuf}, process::Stdio};
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tokio::{time::timeout, process::Command, io::AsyncReadExt};
+use tokio::{process::Command, io::AsyncReadExt};
 
 use shared::{errors::Error, models::track::Track};
 use crate::Provider;
 
-use self::{models::YoutubeSearchResult, matcher::Matcher};
+use self::matcher::Matcher;
 
 pub struct Youtube {
     patterns: Vec<String>,
@@ -51,46 +51,30 @@ impl Youtube {
 #[async_trait]
 impl Provider for Youtube {
 
-    /// find a matching youtube video from a track
+    /// Find a matching YouTube video from a track
     async fn search(&self, track: &Track) -> Option<String> {
-
-        // 1. create search query
+        // 1. Create search query
         let search_query = self.create_search_query(track.clone());
 
-        // 2. search on youtube
-        let search_results = self.get_results(search_query.clone()).await;
-        if search_results.is_none() {
-            return None;
-        }
+        // 2. Search on YouTube
+        let search_results = self.get_results(search_query.clone()).await?;
 
-        let mut result: Option<YoutubeSearchResult> = None;
+        // 3. Process each pattern to find the best match
+        self.patterns.iter()
+            .find_map(|pattern| {
+                // 3.1 Match results
+                let weighted_results = self.match_results(search_results.clone(), search_query.clone(), pattern.clone());
 
-        // 3. process each result by matching them with the track
-        for pattern in &self.patterns {
+                // 3.2 Order results
+                let ordered_results = self.order_results(weighted_results);
 
-            // 3.1 match results
-            let weighted_results = self.match_results(search_results.clone().unwrap(), search_query.clone(), pattern.clone());
-            if weighted_results.is_empty() {
-                continue;
-            }
-
-            // 3.2 order results
-            let ordered_results = self.order_results(weighted_results);
-
-            // 3.3 get the best result
-            let best_result = self.get_best_result(ordered_results, track.clone());
-
-            // 3.4 check if the best result is good enough
-            if best_result.is_some() {
-                result = Some(best_result.unwrap().clone());
-                break;
-            }
-        }
-
-        result.map(|r| r.url)
+                // 3.3 Get the best result if available
+                self.get_best_result(ordered_results, track.clone()).map(|r| r.url)
+            })
     }
 
     async fn download(&mut self, url: &str, base_dir: &Path) -> Result<PathBuf, Error> {
+        let output_path = format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap());
 
         let mut child = Command::new("yt-dlp")
             .stdout(Stdio::piped())
@@ -103,66 +87,41 @@ impl Provider for Youtube {
                 "--audio-format", "mp3",
                 "--audio-quality", "0",
                 "--embed-thumbnail",
-                // "--embed-metadata",
-                // "--add-metadata",
-                // "--metadata-from-title", "%(artist)s - %(title)s",
-                "--output", &format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap())
+                "--output", &output_path,
             ])
             .spawn()?;
 
-        // Continually read from stdout so that it does not fill up with large output and hang forever.
-        // We don't need to do this for stderr since only stdout has potentially giant JSON.
+        // Read stdout asynchronously to prevent buffer overflow
         let mut stdout = Vec::new();
-        let child_stdout = child.stdout.take();
-        tokio::io::copy(&mut child_stdout.unwrap(), &mut stdout).await?;
+        if let Some(mut child_stdout) = child.stdout.take() {
+            tokio::io::copy(&mut child_stdout, &mut stdout).await?;
+        }
 
-        let exit_code = if let Some(duration) = None { // TODO: timeout
-            match timeout(duration, child.wait()).await {
-                Ok(n) => n?,
-                Err(_) => {
-                    child.kill().await?;
-                    return Err(Error::ProcessTimeout);
-                }
-            }
-        } else {
-            child.wait().await?
-        };
+        // TODO: Implement timeout handling
+        let exit_code = child.wait().await?;
 
-        println!("exit code: {:?}", exit_code);
-
-        if exit_code.success() {
-
-            let value: Value = serde_json::from_reader(stdout.as_slice())?;
-
-            let path = value["_filename"].as_str();
-            // we need to replace the extension with mp3 (because it will be .webm most of the time)
-            match path {
-                Some(path) => {
-                    let path = match path.rsplit_once('.') {
-                        Some((base, _)) => format!("{}.mp3", base),
-                        None => format!("{}.mp3", path), // if there is no extension, just append .mp3
-                    };
-                    return Ok(path.into());
-                },
-                None => return Err(Error::NotFound),
-            }
-
-        } else {
-
-            let mut stderr = vec![];
-
+        if !exit_code.success() {
+            let mut stderr = Vec::new();
             if let Some(mut reader) = child.stderr {
                 reader.read_to_end(&mut stderr).await?;
             }
-
-            let stderr = String::from_utf8(stderr).unwrap_or_default();
-
             return Err(Error::ExitCode {
                 code: exit_code.code().unwrap_or(1),
-                stderr,
+                stderr: String::from_utf8_lossy(&stderr).into_owned(),
             });
         }
 
+        // Parse JSON output
+        let value: Value = serde_json::from_slice(&stdout)?;
+        let path = value["_filename"].as_str().ok_or(Error::NotFound)?;
+
+        // Replace extension with .mp3
+        let final_path = PathBuf::from(match path.rsplit_once('.') {
+            Some((base, _)) => format!("{}.mp3", base),
+            None => format!("{}.mp3", path),
+        });
+
+        Ok(final_path)
     }
 
 }

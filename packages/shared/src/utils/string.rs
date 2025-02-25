@@ -1,10 +1,17 @@
 use strsim::{jaro_winkler, damerau_levenshtein, sorensen_dice};
 use unicode_normalization::UnicodeNormalization;
 
+pub enum SimilarityAlgorithm {
+    Smart,
+    JaroWinkler,
+    DamerauLevenshtein,
+    SorensenDice,
+}
+
 /**
  * Computes a similarity score between two strings, ranging from 0 to 100.
  *
- * This function combines three different string similarity metrics:
+ * This function can either return a result based on a unique algorithm, or combines all three in a "Smart" mode:
  * - **Jaro-Winkler (50%)**: Gives higher importance to matching prefixes,
  *   making it useful for handling typos and small variations.
  * - **Normalized Damerau-Levenshtein (30%)**: Accounts for insertions, deletions,
@@ -14,7 +21,7 @@ use unicode_normalization::UnicodeNormalization;
  *
  * The final score is a weighted average of these three metrics, scaled to a 0-100 range.
  */
-pub fn string_similarity(s1: &str, s2: &str) -> f64 {
+pub fn string_similarity(s1: &str, s2: &str, similarity_algorithm: SimilarityAlgorithm) -> f64 {
     let normalized_s1 = normalize_string(s1);
     let normalized_s2 = normalize_string(s2);
 
@@ -22,13 +29,20 @@ pub fn string_similarity(s1: &str, s2: &str) -> f64 {
         return 1.0;
     }
 
-    let jaro = jaro_winkler(&normalized_s1, &normalized_s2);
-    let damerau = normalized_damerau_levenshtein(&normalized_s1, &normalized_s2);
-    let dice = sorensen_dice(&normalized_s1, &normalized_s2);
+    match similarity_algorithm {
+        SimilarityAlgorithm::Smart => {
+            let jaro = jaro_winkler(&normalized_s1, &normalized_s2);
+            let damerau = normalized_damerau_levenshtein(&normalized_s1, &normalized_s2);
+            let dice = sorensen_dice(&normalized_s1, &normalized_s2);
 
-    // Weighted average
-    let score = (0.50 * jaro) + (0.30 * damerau) + (0.20 * dice);
-    score
+            // Weighted average
+            let score = (0.50 * jaro) + (0.30 * damerau) + (0.20 * dice);
+            score
+        },
+        SimilarityAlgorithm::JaroWinkler => jaro_winkler(&normalized_s1, &normalized_s2),
+        SimilarityAlgorithm::DamerauLevenshtein => normalized_damerau_levenshtein(&normalized_s1, &normalized_s2),
+        SimilarityAlgorithm::SorensenDice => sorensen_dice(&normalized_s1, &normalized_s2),
+    }
 }
 
 /**
@@ -69,7 +83,7 @@ mod tests {
         let s2 = "Hello";
 
         // Test for identical strings, similarity should be 100
-        let similarity = string_similarity(s1, s2);
+        let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
         assert_eq!(similarity, 1.0, "Identical strings should have a similarity of 100.");
     }
 
@@ -79,7 +93,7 @@ mod tests {
         let s2 = "";
 
         // Test for empty strings, similarity should be 100
-        let similarity = string_similarity(s1, s2);
+        let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
         assert_eq!(similarity, 1.0, "Empty strings should have a similarity of 100.");
     }
 
@@ -89,7 +103,7 @@ mod tests {
         let s2 = "helo"; // Small typo
 
         // Test for small typos, similarity should still be high
-        let similarity = string_similarity(s1, s2);
+        let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
         assert!(similarity > 0.8, "Strings with small typos should have high similarity.");
     }
 
@@ -99,7 +113,7 @@ mod tests {
         let s2 = "holle"; // Adjacent transposition
 
         // Test for transposition, similarity should still be reasonable
-        let similarity = string_similarity(s1, s2);
+        let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
         assert!(similarity >= 0.5 && similarity < 0.8, "Strings with adjacent transpositions should have medium similarity.");
     }
 
@@ -109,7 +123,7 @@ mod tests {
         let s2 = "orange";
 
         // Test for completely different strings, similarity should be low
-        let similarity = string_similarity(s1, s2);
+        let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
         assert!(similarity < 0.5, "Completely different strings should have low similarity.");
     }
 

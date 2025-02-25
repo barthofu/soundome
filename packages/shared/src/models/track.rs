@@ -1,6 +1,4 @@
-use crate::utils::string::string_similarity;
-
-use super::{artist::Artist, album::Album};
+use crate::{utils::string::{string_similarity, SimilarityAlgorithm}, models::{album::Album, artist::Artist}};
 
 #[derive(Debug, Clone)]
 pub struct Track {
@@ -17,7 +15,7 @@ pub struct Track {
     pub label: Option<String>,
 }
 
-struct Weights {}
+struct Weights;
 
 impl Weights {
     const TITLE: f64 = 1.0;
@@ -28,53 +26,53 @@ impl Weights {
 }
 
 impl Track {
-
+    /// Display a track in a user-friendly format
     pub fn display(&self) {
-        println!("{} by {} ({})",
-            self.title,
-            self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>().join(", "),
-            self.date.clone().unwrap_or("Unknown".to_string())
-        );
+        let artists = self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>().join(", ");
+        let date = self.date.clone().unwrap_or_else(|| "Unknown".to_string());
+        println!("{} by {} ({})", self.title, artists, date);
     }
 
-    /**
-     * Returns a normalized similarity score (between 0 and 1) of the match between two tracks
-     */
+    /// Returns a normalized similarity score (between 0 and 1) of the match between two tracks
     pub fn compare(&self, other_track: &Track) -> f64 {
         let mut score = 0.0;
         let mut total_weight = 0.0;
 
-        // title
-        score += Weights::TITLE * string_similarity(&self.title, &other_track.title);
+        // Title comparison
+        score += Weights::TITLE * string_similarity(&self.title, &other_track.title, SimilarityAlgorithm::Smart);
         total_weight += Weights::TITLE;
 
-        // artists
-        let mut track1_artists: Vec<String> = self.artists.iter().map(|artist| artist.name.clone()).collect();
-        track1_artists.sort();
-        let mut track2_artists: Vec<String> = other_track.artists.iter().map(|artist| artist.name.clone()).collect();
-        track2_artists.sort();
-        score += Weights::ARTISTS * string_similarity(track1_artists.join("; ").as_str(), track2_artists.join("; ").as_str());
+        // Artists comparison (sort artists to handle different order)
+        let self_artists = self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>();
+        let other_artists = other_track.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>();
+        score += Weights::ARTISTS * string_similarity(
+            &self_artists.join("; "),
+            &other_artists.join("; "),
+            SimilarityAlgorithm::Smart
+        );
         total_weight += Weights::ARTISTS;
 
-        // album
+        // Album comparison (if both tracks have an album)
         if let (Some(album1), Some(album2)) = (&self.album, &other_track.album) {
-            score += Weights::ALBUM * string_similarity(&album1.title, &album2.title);
+            score += Weights::ALBUM * string_similarity(&album1.title, &album2.title, SimilarityAlgorithm::Smart);
             total_weight += Weights::ALBUM;
         }
 
-        // duration
+        // Duration comparison (within tolerance ranges)
         if let (Some(duration1), Some(duration2)) = (&self.duration, &other_track.duration) {
             let diff = (duration1 - duration2 / 1000).abs();
-            if diff <= 2 {
-                score += Weights::DURATION;
-                total_weight += Weights::DURATION;
-            } else if diff <= 5 {
-                score += Weights::DURATION / 2.0;
-                total_weight += Weights::DURATION / 2.0;
-            }
+            let duration_score = if diff <= 2000 {  // <= 2 seconds tolerance
+                Weights::DURATION
+            } else if diff <= 5000 {  // <= 5 seconds tolerance
+                Weights::DURATION / 2.0
+            } else {
+                0.0
+            };
+            score += duration_score;
+            total_weight += if duration_score > 0.0 { Weights::DURATION } else { 0.0 };
         }
 
-        // release date
+        // Release date comparison (exact match)
         if let (Some(date1), Some(date2)) = (&self.date, &other_track.date) {
             if date1 == date2 {
                 score += Weights::RELEASE_DATE;
@@ -82,10 +80,11 @@ impl Track {
             }
         }
 
+        // Return normalized score (0.0 if no valid comparison)
         if total_weight == 0.0 {
-            return 0.0;
+            0.0
+        } else {
+            score / total_weight
         }
-
-        score / total_weight
     }
 }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use config::AppConfig;
 use database::get_connection;
 use fetcher::{spotify::Spotify, Fetcher};
-use shared::{errors::Error, utils::string::string_similarity};
+use shared::{errors::Error, utils::{enums::Match, string::string_similarity}};
 use tagger::{file::get_track_from_file, TagProvider};
 
 #[dotenvy::load(path = "./.env", required = true)]
@@ -19,8 +19,9 @@ async fn main() {
     };
     // let conn = get_connection(config.database_url.as_str());
 
-    let track = get_track_from_file(&PathBuf::from("tmp/library/NecromatiK.mp3"));
-    println!("Track: {:#?}", track.unwrap());
+
+    // let track = get_track_from_file(&PathBuf::from("tmp/library/NecromatiK.mp3"));
+    // println!("Track: {:#?}", track.unwrap());
 
     // let url = "https://open.spotify.com/track/5gT5lvU5TyTnsPO4bCUOaH?si=8c52751de3bd4e12";
 
@@ -35,7 +36,20 @@ async fn main() {
     // println!("Matching score: {}", matching_score_tmp);
 
 
-    // let musicbrainz_provider = tagger::providers::musicbrainz::MusicBrainz::new();
+    let musicbrainz_provider = tagger::providers::musicbrainz::MusicBrainz::new();
+    let track = musicbrainz_provider.get_match_from_query("Baleines zinée").await;
+    match track {
+        Match::Exact(track) => {
+            println!("Exact match: {:#?}", track);
+        },
+        Match::Partial(track) => {
+            println!("Partial match: {:#?}", track);
+        },
+        Match::None => {
+            println!("No match found");
+        }
+    }
+    // println!("Results: {:#?}", results.iter().map(|track| track.title.clone()).collect::<Vec<String>>());
     // let result = musicbrainz_provider.get(&track).await;
     // println!("Results: {:?}", results);
 
