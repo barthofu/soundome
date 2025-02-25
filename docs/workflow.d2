@@ -29,9 +29,13 @@ downloader: "Downloader" {
 }
 
 tagger: "Tagger" {
-    get_metadata_from_music_brainz: "Get metadata from MusicBrainz" {
+    get_music_brainz_metadata_from_track_object: "Get MusicBrainz metadata from Track object" {
         shape: oval
         style.fill: "darkseagreen"
+    }
+    get_music_brainz_metadata_from_query: "Get MusicBrainz metadata from query" {
+        shape: oval
+        # style.fill: "darkseagreen"
     }
     score_matching: "Score matching" {
         shape: diamond
@@ -45,21 +49,19 @@ tagger: "Tagger" {
         shape: oval
         style.fill: "darkseagreen"
     }
-    get_metadata_from_filename: "Get metadata from filename" {
-        shape: oval
-    }
     sufficient_metadata: "Sufficient metadata in file tags" {
         shape: diamond
     }
     web_validation: "Web validation log interface"
 
-    get_metadata_from_music_brainz -> score_matching: "metadata"
-    get_metadata_from_file -> get_metadata_from_music_brainz: "track object"
-    get_metadata_from_filename -> get_metadata_from_music_brainz: "track object"
+    get_music_brainz_metadata_from_track_object -> score_matching: "metadata"
+    get_metadata_from_file -> get_music_brainz_metadata_from_track_object: "track object"
     sufficient_metadata -> get_metadata_from_file: "if enough"
-    sufficient_metadata -> get_metadata_from_filename: "if not enough"
+    sufficient_metadata -> get_music_brainz_metadata_from_query: "if not enough\nuse filename as query"
     score_matching -> tag_track: "best metadata"
     score_matching -> web_validation: "if score low"
+    get_music_brainz_metadata_from_query -> web_validation: "track object"
+    web_validation -> tag_track: "confirm"
 }
 
 organizer: "Organizer" {
@@ -125,7 +127,7 @@ user -> fetcher.get_track_info_from_url: "url"
 fetcher.get_track_info_from_url -> downloader.search_track: "track object"
 downloader.search_track -> downloader.download_track: "download url"
 downloader.download_track -> fs_cache: "write"
-downloader.download_track -> tagger.get_metadata_from_music_brainz: "track object"
+downloader.download_track -> tagger.get_music_brainz_metadata_from_track_object: "track object"
 fs_ingest -> tagger.sufficient_metadata: "get"
 tagger.tag_track -> organizer.duplicate_detection: "track object"
 organizer.move_track -> fs_library: "write"
