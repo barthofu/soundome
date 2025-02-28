@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 shared = { path = "../shared" }
+config = { path = "../config" }
 
 serde = "1.0.217"
 serde_json = "1.0.138"

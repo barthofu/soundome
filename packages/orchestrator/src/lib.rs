@@ -1,1 +1,85 @@
-pub mod workflows;
+use config::model::AppConfig;
+// On suppose que ces modules existent dans le monorepo et exposent les fonctions nécessaires.
+use fetcher;
+use downloader;
+use shared::{errors::Error, models::track::{Track, TrackSource}};
+
+pub struct Orchestrator {
+    config: AppConfig,
+}
+
+impl Orchestrator {
+    pub fn new(config: AppConfig) -> Self {
+        Self { config }
+    }
+
+    pub async fn download_track_from_url(&self, url: &str) -> Result<Track, Error> {
+        println!("===========\nDownloading track from {:?}\n------", url);
+        // Fetch track metadata
+        let mut track = fetcher::get_track_from_url(url, &self.config)?;
+        println!("Fetched track from {}: {}", track.source.clone().unwrap_or(TrackSource::Unknown).as_ref(), track.display());
+
+        // Download the track
+        track = self.download_track(track).await?;
+        Ok(track)
+    }
+
+    pub async fn download_playlist_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {
+        println!("====================\nDownloading playlist from {:?}\n---------", url);
+        // Fetch playlist metadata
+        let playlist_items = fetcher::get_playlist_tracks_from_url(url, &self.config)?;
+
+        let mut tracks = vec![];
+        for playlist_item in playlist_items {
+            if let Some(playlist_track) = playlist_item.track {
+                let title = playlist_track.display();
+                let track = self.download_track(playlist_track).await;
+                match track {
+                    Ok(t) => {
+                        println!("Downloaded track from playlist: {}", &t.display());
+                        tracks.push(t);
+                    }
+                    Err(e) => {
+                        eprintln!("Error downloading track {}: {:?}", title, e);
+                    }
+                }
+            }
+        }
+
+        Ok(tracks)
+    }
+
+    async fn download_track(&self, track: Track) -> Result<Track, Error> {
+        let mut downloaded_track = track;
+
+        // Get the best download URL
+        let (provider, provider_url) = downloader::search(&downloaded_track, &self.config).await.ok_or(Error::NotFound)?;
+        println!("Found download URL from {:?}: {:?}", provider, provider_url);
+        downloaded_track.provider = provider.into();
+        downloaded_track.provider_url = provider_url.clone().into();
+
+        // // Download the track
+        // let file_path = downloader::download(&provider_url, &downloaded_track.source.clone().unwrap_or(TrackSource::Unknown), &self.config).await?;
+        // println!("Downloaded track to {:?}", file_path);
+        // downloaded_track.file_path = file_path.clone().into();
+
+        // // Get MusicBrainz metadata
+        // let musicbrainz = tagger::providers::musicbrainz::MusicBrainz::new();
+        // let best_match = musicbrainz.get_best_match_from_track(&downloaded_track).await;
+        // if let Match::Exact(matched_track) = best_match {
+        //     println!("Exact match found from MusicBrainz");
+        //     downloaded_track.transpose_metadata(&matched_track);
+        // } else if let Match::Partial(_) = best_match {
+        //     // TODO: Handle partial match
+        //     println!("Partial match found from MusicBrainz");
+        // } else {
+        //     println!("No match found from MusicBrainz");
+        // }
+
+        // tagger::file::tag_file_with_track(&file_path.clone(), &downloaded_track)?;
+        // println!("Tagged file with downloaded_track metadata");
+
+        Ok(downloaded_track)
+    }
+
+}

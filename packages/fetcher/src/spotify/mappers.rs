@@ -1,5 +1,5 @@
 use rspotify::model::{FullTrack, SimplifiedArtist, FullArtist, SimplifiedAlbum, FullAlbum, PlaylistItem, PlayableItem};
-use shared::{models::{track::Track, artist::Artist, album::Album, playlist::PlaylistTrack}, errors::Error};
+use shared::{errors::Error, models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::{Track, TrackSource}}};
 
 /// Converts an rspotify ClientError into a shared Error.
 pub fn convert_error(err: rspotify::ClientError) -> Error {
@@ -61,7 +61,11 @@ pub fn convert_track(track: &FullTrack) -> Track {
         album: Some(convert_simplified_album(album)),
         genre: None, // TODO: get genre from artist
         duration: Some(track.duration.num_seconds() as i32),
-        url: track.external_urls.get("spotify").cloned(),
+        file_path: None,
+        source: Some(TrackSource::Spotify),
+        source_url: track.external_urls.get("spotify").cloned(),
+        provider: None,
+        provider_url: None,
         track_number: Some(track.track_number as i32),
         disc_number: Some(track.disc_number as i32),
         label: None,

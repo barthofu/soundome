@@ -1,26 +1,13 @@
 use config::{Config, ConfigError};
-use serde::Deserialize;
+use model::AppConfig;
 
-#[derive(Debug, Deserialize)]
-#[allow(unused)]
-pub struct SpotifyConfig {
-    pub client_id: String,
-    pub client_secret: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(unused)]
-pub struct AppConfig {
-    pub spotify: SpotifyConfig,
-    pub base_dir: String,
-    pub database_url: String,
-}
+pub mod model;
 
 impl AppConfig {
     pub fn new() -> Result<Self, ConfigError> {
 
         // get config toml dir from env, with default
-        let config_dir = std::env::var("SOUNDOME_CONFIG_DIR").unwrap_or_else(|_| String::from("config.toml"));
+        let config_dir = std::env::var("SOUNDOME__CONFIG_DIR").unwrap_or_else(|_| String::from("config.toml"));
 
         let config = Config::builder()
             // Add in `./Settings.toml`

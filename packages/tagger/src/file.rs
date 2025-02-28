@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr};
 use audiotags::{AudioTag, Tag};
-use shared::{errors::Error, models::{album::Album, artist::Artist, track::Track}};
+use shared::{errors::Error, models::{album::Album, artist::Artist, track::{Track, TrackProvider, TrackSource}}};
 
 /**
  * Reads the tag from a file and returns a converted Track object.
@@ -24,9 +24,6 @@ pub fn get_track_from_file(file_path: &PathBuf) -> Result<Track, Error> {
  * Tag an audio file with the provided track information.
  */
 pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> Result<(), Error> {
-    println!("Tagging track: {:?}", track.display());
-    println!("File path: {:?}", file_path);
-
     let mut tag = Tag::new().read_from_path(file_path)
         .map_err(|e| {
             println!("Error reading tag: {:?}", e);
@@ -67,7 +64,9 @@ fn convert_track_to_tag(tag: &mut Box<dyn AudioTag + Send + Sync>, track: &Track
 
     tag.set_comment(
         "Downloaded by Soundome\n---".to_string() +
-        &track.url.as_ref().map(|url| "\nSource: ".to_string() + url.as_str()).unwrap_or("".to_string()));
+        "\nSource: " + track.source.as_ref().unwrap_or(&TrackSource::Unknown).as_ref() +
+        "\nProvider: " + track.provider.as_ref().unwrap_or(&TrackProvider::Unknown).as_ref()
+    );
 }
 
 fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
@@ -110,6 +109,10 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
         track_number: tag.track_number().map(|track_number| track_number as i32),
         duration: tag.duration().map(|duration| duration as i32),
         label: None,
-        url: None
+        file_path: None,
+        source: None,
+        source_url: None,
+        provider: None,
+        provider_url: None
     }
 }

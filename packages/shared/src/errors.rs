@@ -4,6 +4,7 @@ pub enum Error {
     // API errors
     NotFound,
     BadURL,
+    InvalidUrl,
     InternalServer,
     Network, // the network is the cause of the error
 

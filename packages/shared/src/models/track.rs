@@ -1,10 +1,28 @@
+use std::path::PathBuf;
+
+use strum::AsRefStr;
+
 use crate::{utils::string::{string_similarity, SimilarityAlgorithm}, models::{album::Album, artist::Artist}};
+
+#[derive(Debug, Clone, AsRefStr)]
+pub enum TrackSource {
+    Local,
+    Spotify,
+    Youtube,
+    Unknown
+}
+
+#[derive(Debug, Clone, AsRefStr)]
+pub enum TrackProvider {
+    Youtube,
+    Unknown
+}
 
 #[derive(Debug, Clone)]
 pub struct Track {
+    // Audio metadata
     pub title: String,
     pub artists: Vec<Artist>,
-    pub url: Option<String>,
     pub album: Option<Album>,
     pub date: Option<String>,
     pub genre: Option<String>,
@@ -13,6 +31,13 @@ pub struct Track {
     pub track_number: Option<i32>,
     pub disc_number: Option<i32>,
     pub label: Option<String>,
+
+    // Utils
+    pub file_path: Option<PathBuf>,
+    pub source: Option<TrackSource>,
+    pub source_url: Option<String>,
+    pub provider: Option<TrackProvider>,
+    pub provider_url: Option<String>,
 }
 
 struct Weights;
@@ -27,10 +52,10 @@ impl Weights {
 
 impl Track {
     /// Display a track in a user-friendly format
-    pub fn display(&self) {
+    pub fn display(&self) -> String {
         let artists = self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>().join(", ");
         let date = self.date.clone().unwrap_or_else(|| "Unknown".to_string());
-        println!("{} by {} ({})", self.title, artists, date);
+        format!("{} by {} ({})", self.title, artists, date)
     }
 
     /// Returns a normalized similarity score (between 0 and 1) of the match between two tracks
@@ -87,4 +112,19 @@ impl Track {
             score / total_weight
         }
     }
+
+    /// Transpose metadata from a source track to a destination track
+    pub fn transpose_metadata(&mut self, source_track: &Track) {
+        self.title = source_track.title.clone();
+        self.album = source_track.album.clone();
+        self.artists = source_track.artists.clone();
+        self.date = source_track.date.clone();
+        self.genre = source_track.genre.clone();
+        self.cover = source_track.cover.clone();
+        self.duration = source_track.duration.clone();
+        self.track_number = source_track.track_number.clone();
+        self.disc_number = source_track.disc_number.clone();
+        self.label = source_track.label.clone();
+    }
+
 }

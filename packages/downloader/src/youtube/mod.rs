@@ -1,9 +1,10 @@
 pub mod models;
 pub mod matcher;
 
-use std::{path::{Path, PathBuf}, process::Stdio};
+use std::{path::PathBuf, process::Stdio};
 
 use async_trait::async_trait;
+use invidious::{ClientAsync, MethodAsync};
 use serde_json::Value;
 use tokio::{process::Command, io::AsyncReadExt};
 
@@ -17,16 +18,16 @@ pub struct Youtube {
     excluded_words: Vec<String>,
     treshold: f32,
     duration_offset_percentage: i32,
+    client: ClientAsync,
 }
 
 impl Youtube {
 
-    pub fn new () -> Self {
+    pub fn new (invidious_instance: Option<String>) -> Self {
         Self {
-            // fuzzy_matcher: SkimMatcherV2::default(),
             patterns: vec![
+                String::from("{{channel}} {{title}}"),
                 String::from("{{title}}"),
-                String::from("{{title}} {{channel}}"),
             ],
             excluded_words: vec![
                 String::from("lyrics"),
@@ -43,7 +44,10 @@ impl Youtube {
             ],
             treshold: 0.75,
             duration_offset_percentage: 50,
-            // yt_dlp: None
+            client: ClientAsync::new(
+                invidious_instance.unwrap_or(invidious::INSTANCE.to_string()),
+                MethodAsync::default()
+            ),
         }
     }
 }
@@ -73,7 +77,7 @@ impl Provider for Youtube {
             })
     }
 
-    async fn download(&mut self, url: &str, base_dir: &Path) -> Result<PathBuf, Error> {
+    async fn download(&mut self, url: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
         let output_path = format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap());
 
         let mut child = Command::new("yt-dlp")
@@ -122,6 +126,10 @@ impl Provider for Youtube {
         });
 
         Ok(final_path)
+    }
+
+    fn is_valid_url(url: &str) -> bool {
+        url.starts_with("https://www.youtube.com/watch?v=")
     }
 
 }

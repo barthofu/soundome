@@ -26,6 +26,7 @@
             sqlite
             openssl
             d2
+            inkscape
           ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
           PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";

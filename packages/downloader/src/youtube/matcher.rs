@@ -5,7 +5,7 @@ use super::{Youtube, models::YoutubeSearchResult};
 use ngrammatic::{Pad, CorpusBuilder};
 use slug::slugify;
 use async_trait::async_trait;
-use invidious::{hidden::SearchItem, universal::Search, ClientAsync, ClientAsyncTrait};
+use invidious::{hidden::SearchItem, universal::Search, ClientAsyncTrait};
 
 #[async_trait]
 pub trait Matcher {
@@ -33,20 +33,23 @@ pub trait Matcher {
 impl Matcher for Youtube {
 
     fn create_search_query(&self, track: Track) -> String {
-        let artists = track
+        let artist = track
             .artists
-            .iter()
+            .first() // TODO: really keep only the first artist?
+                // because if just join each artist, it can fail like with this track: https://open.spotify.com/track/0qYLUdJQMhrCFA9dNZGcnm?si=509ca53b05c74629
             .map(|artist| artist.name.clone())
-            .collect::<Vec<_>>()
-            .join(" ");
+            .unwrap_or_default();
 
-        format!("{} {}", artists, track.title)
+        format!("{} {}", artist, track.title)
     }
 
     async fn get_results(&self, search_query: String) -> Option<Search> {
-        ClientAsync::default()
+        self.client
             .search(Some(&format!("q={}&type=video", search_query)))
             .await
+            .map_err(|e| {
+                eprintln!("Error searching on YouTube: {:?}", e);
+            })
             .ok()
     }
 

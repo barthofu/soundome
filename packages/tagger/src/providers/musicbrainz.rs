@@ -146,9 +146,13 @@ fn convert_to_track(recording: &Recording) -> Track {
         date: recording.first_release_date.as_ref().map(|date| format_date(&date, Format::DATE)),
         track_number: Some(track_number),
         disc_number: None,
-        url: None,
+        source: None,
+        source_url: None,
+        provider: None,
+        provider_url: None,
         cover: None,
         duration: recording.length.map(|length| length as i32),
         label: None,
+        file_path: None,
     }
 }
