@@ -8,16 +8,9 @@ use shared::{errors::Error, models::{album::Album, artist::Artist, track::{Track
 pub fn get_track_from_file(file_path: &PathBuf) -> Result<Track, Error> {
     println!("Reading tag from file: {:?}", file_path);
 
-    let tag = Tag::new().read_from_path(file_path);
-    match tag {
-        Ok(tag) => {
-            Ok(convert_tag_to_track(&tag))
-        }
-        Err(e) => {
-            println!("Error reading tag: {:?}", e);
-            Err(Error::InternalServer)
-        }
-    }
+    Tag::new().read_from_path(file_path)
+        .map(|tag| convert_tag_to_track(&tag))
+        .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))
 }
 
 /**
@@ -25,16 +18,10 @@ pub fn get_track_from_file(file_path: &PathBuf) -> Result<Track, Error> {
  */
 pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> Result<(), Error> {
     let mut tag = Tag::new().read_from_path(file_path)
-        .map_err(|e| {
-            println!("Error reading tag: {:?}", e);
-            Error::InternalServer
-        })?;
+        .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))?;
     convert_track_to_tag(&mut tag, track);
     tag.write_to_path(file_path.display().to_string().as_str())
-        .map_err(|e| {
-            println!("Error writing tag: {:?}", e);
-            Error::InternalServer
-        })
+        .map_err(|e| Error::Custom(format!("Error writing audio tags: {:?}", e)))
 }
 
 // ================================================================================================

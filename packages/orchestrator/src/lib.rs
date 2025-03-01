@@ -53,7 +53,7 @@ impl Orchestrator {
         let mut downloaded_track = track;
 
         // Get the best download URL
-        let (provider, provider_url) = downloader::search(&downloaded_track, &self.config).await.ok_or(Error::NotFound)?;
+        let (provider, provider_url) = downloader::search(&downloaded_track, &self.config).await?;
         println!("Found download URL from {:?}: {:?}", provider, provider_url);
         downloaded_track.provider = provider.into();
         downloaded_track.provider_url = provider_url.clone().into();

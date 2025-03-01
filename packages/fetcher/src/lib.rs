@@ -35,7 +35,7 @@ pub fn get_track_from_url(url: &str, config: &AppConfig) -> Result<Track, Error>
         //     let youtube = youtube::Youtube::new();
         //     youtube.get_track_from_url(url)
         // }
-        _ => Err(Error::InvalidUrl),
+        _ => Err(Error::InvalidUrl(format!("{} is not compatible with any 'source' available", url))),
     }
 }
 
@@ -49,6 +49,6 @@ pub fn get_playlist_tracks_from_url(url: &str, config: &AppConfig) -> Result<Vec
         //     let youtube = youtube::Youtube::new();
         //     youtube.get_playlist_tracks_from_url(url)
         // }
-        _ => Err(Error::InvalidUrl),
+        _ => Err(Error::InvalidUrl(format!("{} is not compatible with any 'source' available", url))),
     }
 }

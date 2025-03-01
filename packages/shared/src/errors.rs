@@ -1,30 +1,47 @@
-#[derive(Debug)]
+use thiserror::Error;
+
+#[derive(Error, Debug)]
 pub enum Error {
 
-    // API errors
-    NotFound,
-    BadURL,
-    InvalidUrl,
-    InternalServer,
-    Network, // the network is the cause of the error
+    // Generic
+    #[error("{0} not found")]
+    NotFound(String),
+    #[error("no match {0} found for {1}")]
+    NoMatch(String, String),
+    #[error("invalid url: {0}")]
+    InvalidUrl(String),
+    #[error("network error: {0}")]
+    Network(String),
+    #[error("internal error: {0}")]
+    Internal(String),
+    #[error("config error: {0}")]
+    Config(String),
 
-    // CLI parsing
+    // Other
+    #[error("custom error: {0}")]
+    Custom(String),
+    #[error("unknown error")]
+    Unknown,
+
+    // CLI Parsing
+    #[error("{0}")]
     Io(std::io::Error),
+    #[error("{0}")]
     Json(serde_json::Error),
+    #[error("parse error")]
     Parse,
+    #[error("missing argument")]
     MissingArg,
+    #[error("invalid argument")]
     InvalidArg,
+    #[error("process timeout")]
     ProcessTimeout,
+    #[error("process error")]
     ExitCode {
         code: i32,
         stderr: String,
     },
-
-    // Other
-    Config,
-    Other,
 }
-
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {

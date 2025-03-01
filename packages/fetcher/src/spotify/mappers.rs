@@ -5,8 +5,8 @@ use shared::{errors::Error, models::{album::Album, artist::Artist, playlist::Pla
 pub fn convert_error(err: rspotify::ClientError) -> Error {
     match err {
         rspotify::ClientError::ParseJson(e) => Error::Json(e),
-        rspotify::ClientError::Http(_) => Error::Network,
-        _ => Error::Other,
+        rspotify::ClientError::Http(e) => Error::Network(e.to_string()),
+        _ => Error::Unknown,
     }
 }
 

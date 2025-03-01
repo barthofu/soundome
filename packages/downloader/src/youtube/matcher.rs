@@ -1,11 +1,11 @@
-use shared::models::track::Track;
+use shared::{errors::Error, models::track::Track};
 
 use super::{Youtube, models::YoutubeSearchResult};
 
 use ngrammatic::{Pad, CorpusBuilder};
 use slug::slugify;
 use async_trait::async_trait;
-use invidious::{hidden::SearchItem, universal::Search, ClientAsyncTrait};
+use invidious::{hidden::SearchItem, universal::Search, ClientAsyncTrait, InvidiousError};
 
 #[async_trait]
 pub trait Matcher {
@@ -14,7 +14,7 @@ pub trait Matcher {
     fn create_search_query(&self, track: Track) -> String;
 
     /// search youtube for a track
-    async fn get_results(&self, search_query: String) -> Option<Search>;
+    async fn get_results(&self, search_query: String) -> Result<Search, Error>;
 
     // apply a pattern to a title and a channel
     fn apply_pattern(&self, pattern: String, title: String, channel: String) -> String;
@@ -43,14 +43,17 @@ impl Matcher for Youtube {
         format!("{} {}", artist, track.title)
     }
 
-    async fn get_results(&self, search_query: String) -> Option<Search> {
+    async fn get_results(&self, search_query: String) -> Result<Search, Error> {
         self.client
             .search(Some(&format!("q={}&type=video", search_query)))
             .await
-            .map_err(|e| {
-                eprintln!("Error searching on YouTube: {:?}", e);
+            .map_err(|err| {
+                match err {
+                    InvidiousError::ApiError { message, .. } => Error::Custom(message),
+                    InvidiousError::Fetch { error } => Error::Custom(error.to_string()),
+                    _ => Error::Custom("Unknown error from Invidious call".to_string()),
+                }
             })
-            .ok()
     }
 
     fn apply_pattern(&self, pattern: String, title: String, channel: String) -> String {

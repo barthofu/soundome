@@ -56,7 +56,7 @@ impl Youtube {
 impl Provider for Youtube {
 
     /// Find a matching YouTube video from a track
-    async fn search(&self, track: &Track) -> Option<String> {
+    async fn search(&self, track: &Track) -> Result<String, Error> {
         // 1. Create search query
         let search_query = self.create_search_query(track.clone());
 
@@ -75,6 +75,7 @@ impl Provider for Youtube {
                 // 3.3 Get the best result if available
                 self.get_best_result(ordered_results, track.clone()).map(|r| r.url)
             })
+            .ok_or(Error::NoMatch("youtube".to_string(), track.display()))
     }
 
     async fn download(&mut self, url: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
@@ -117,7 +118,7 @@ impl Provider for Youtube {
 
         // Parse JSON output
         let value: Value = serde_json::from_slice(&stdout)?;
-        let path = value["_filename"].as_str().ok_or(Error::NotFound)?;
+        let path = value["_filename"].as_str().ok_or(Error::NotFound("downloaded file path".to_string()))?;
 
         // Replace extension with .mp3
         let final_path = PathBuf::from(match path.rsplit_once('.') {
