@@ -117,6 +117,7 @@ fn convert_to_album(release: &Release) -> Album {
             .map(|a| a.iter().map(|artist| convert_to_artist(artist)).collect())
             .unwrap_or_default(),
         date: release.date.as_ref().map(|date| format_date(&date, Format::DATE)),
+        album_type: shared::models::album::AlbumType::Unknown,
         url: None,
         // cover: release.get_coverart().res_1200().execute().await.unwrap().
         cover: None

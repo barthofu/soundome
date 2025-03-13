@@ -85,6 +85,7 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
                     url: None,
                     icon: None
                 }).collect()).unwrap_or_default(),
+            album_type: shared::models::album::AlbumType::Unknown,
             date: date.clone(),
             url: None,
             cover: None

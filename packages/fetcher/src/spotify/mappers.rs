@@ -1,5 +1,5 @@
-use rspotify::model::{FullTrack, SimplifiedArtist, FullArtist, SimplifiedAlbum, FullAlbum, PlaylistItem, PlayableItem};
-use shared::{errors::Error, models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::{Track, TrackSource}}};
+use rspotify::model::{FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist};
+use shared::{errors::Error, models::{album::{Album, AlbumType}, artist::Artist, playlist::PlaylistTrack, track::{Track, TrackSource}}};
 
 /// Converts an rspotify ClientError into a shared Error.
 pub fn convert_error(err: rspotify::ClientError) -> Error {
@@ -32,10 +32,27 @@ pub fn convert_full_artist(artist: &FullArtist) -> Artist {
 pub fn convert_simplified_album(album: &SimplifiedAlbum) -> Album {
     Album {
         title: album.name.clone(),
-        url: album.external_urls.get("spotify").cloned(),
         artists: album.artists.iter().map(convert_artist).collect(),
+        album_type: album.album_type.as_ref().map(|album_type|
+            match album_type {
+                s if s == "album" => AlbumType::Album,
+                s if s == "single" => AlbumType::Single,
+                s if s == "compilation" => AlbumType::Compilation,
+                _ => AlbumType::Unknown,
+            }
+        ).unwrap_or(AlbumType::Unknown),
+        url: album.external_urls.get("spotify").cloned(),
         cover: album.images.get(0).map(|image| image.url.clone()),
         date: album.release_date.clone(),
+    }
+}
+
+fn convert_album_type(album_type: &rspotify::model::AlbumType) -> AlbumType {
+    match album_type {
+        rspotify::model::AlbumType::Album => AlbumType::Album,
+        rspotify::model::AlbumType::Single => AlbumType::Single,
+        rspotify::model::AlbumType::Compilation => AlbumType::Compilation,
+        _ => AlbumType::Unknown,
     }
 }
 
@@ -43,8 +60,9 @@ pub fn convert_simplified_album(album: &SimplifiedAlbum) -> Album {
 pub fn convert_full_album(album: &FullAlbum) -> Album {
     Album {
         title: album.name.clone(),
-        url: album.external_urls.get("spotify").cloned(),
         artists: album.artists.iter().map(convert_artist).collect(),
+        album_type: convert_album_type(&album.album_type),
+        url: album.external_urls.get("spotify").cloned(),
         cover: album.images.get(0).map(|image| image.url.clone()),
         date: Some(album.release_date.clone()),
     }
@@ -90,6 +108,6 @@ pub fn convert_playlist_item(item: &PlaylistItem) -> PlaylistTrack {
 // Utils
 // =========================================
 
-pub fn track_name_fixup(track: &FullTrack) -> String {
+pub fn track_name_fixup(_track: &FullTrack) -> String {
     String::from("")
 }

@@ -1,5 +1,4 @@
-pub mod models;
-pub mod matcher;
+mod matcher;
 
 use std::{path::PathBuf, process::Stdio};
 
@@ -56,7 +55,7 @@ impl Youtube<'_> {
         format!("{} {}", artist, track.title)
     }
 
-    async fn get_results(&self, search_query: String) -> Result<Search, Error> {
+    async fn get_results(&self, search_query: &str) -> Result<Search, Error> {
         self.client
             .search(Some(&format!("q={}&type=video", search_query)))
             .await
@@ -67,7 +66,7 @@ impl Youtube<'_> {
             }))
     }
 
-    fn convert_search_item_to_track(search_item: SearchItem) -> Option<Track> {
+    fn convert_search_item_to_track(&self, search_item: SearchItem) -> Option<Track> {
         match search_item {
             SearchItem::Video(video) => Some(Track {
                 title: video.title,
@@ -105,9 +104,9 @@ impl Provider for Youtube<'_> {
         println!("SEARCH QUERY: {}", search_query);
 
         // 2. Search on YouTube
-        let search_results: Vec<Track> = self.get_results(search_query.clone()).await?
+        let search_results: Vec<Track> = self.get_results(&search_query).await?
             .items.iter()
-            .map(|item| Self::convert_search_item_to_track(item.to_owned()))
+            .map(|item| self.convert_search_item_to_track(item.to_owned()))
             .filter(|track| track.is_some())
             .map(|track| track.unwrap())
             .collect();
@@ -169,7 +168,7 @@ impl Provider for Youtube<'_> {
     }
 
     fn is_valid_url(url: &str) -> bool {
-        url.starts_with("https://www.youtube.com/watch?v=")
+        url.contains("youtube.com/watch?v=")
     }
 
 }

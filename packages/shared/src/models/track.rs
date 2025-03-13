@@ -9,12 +9,14 @@ pub enum TrackSource {
     Local,
     Spotify,
     Youtube,
+    YoutubeMusic,
     Unknown
 }
 
 #[derive(Debug, Clone, AsRefStr)]
 pub enum TrackProvider {
     Youtube,
+    YoutubeMusic,
     Unknown
 }
 

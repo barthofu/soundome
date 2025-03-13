@@ -57,7 +57,7 @@ impl Matcher for Youtube<'_> {
 
         best_match
             .filter(|(score, _)| *score >= self.similarity_treshold)
-            .map(|(_, result)| result.title.clone())
+            .map(|(_, result)| result.provider_url.clone()).flatten()
     }
 }
 

@@ -1,5 +1,6 @@
 pub mod mappers;
 
+use async_trait::async_trait;
 use rspotify::{Credentials, ClientCredsSpotify, model::{SearchType, SearchResult, TrackId, PlaylistId, ArtistId, AlbumId}, prelude::BaseClient};
 use shared::{errors::Error, models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track}};
 
@@ -43,16 +44,17 @@ impl Spotify {
     }
 }
 
+#[async_trait]
 impl Source for Spotify {
 
-    fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
+    async fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
         let id = TrackId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let track = self.client.track(id, None).map_err(|_| Error::NotFound(format!("Spotify track from {}", url).to_string()))?;
         Ok(mappers::convert_track(&track))
     }
 
 
-    fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
+    async fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
         let res = self.client
             .search(query, SearchType::Track, None, None, Some(20), Some(0))
             .map_err(mappers::convert_error)?;
@@ -65,7 +67,7 @@ impl Source for Spotify {
     }
 
 
-    fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error> {
+    async fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error> {
         let id = PlaylistId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let playlist = self.client.playlist(id, None, None).map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
 
@@ -77,14 +79,14 @@ impl Source for Spotify {
         Ok(tracks)
     }
 
-    fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
+    async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
         let id = ArtistId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let full_artist = self.client.artist(id).map_err(|_| Error::NotFound(format!("Spotify artist from {}", url).to_string()))?;
 
         Ok(mappers::convert_full_artist(&full_artist))
     }
 
-    fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
+    async fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
         let res = self.client.search(search, SearchType::Artist, None, None, Some(20), Some(0))
             .map_err(mappers::convert_error)?;
 
@@ -95,15 +97,14 @@ impl Source for Spotify {
         }
     }
 
-
-    fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
+    async fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
         let id = AlbumId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let full_album = self.client.album(id, None).map_err(|_| Error::NotFound(format!("Spotify album from {}", url).to_string()))?;
 
         Ok(mappers::convert_full_album(&full_album))
     }
 
-    fn get_albums_from_query(&self, search: &str) -> Result<Vec<Album>, Error> {
+    async fn get_albums_from_query(&self, search: &str) -> Result<Vec<Album>, Error> {
         let res = self.client
             .search(search, SearchType::Album, None, None, Some(20), Some(0))
             .map_err(mappers::convert_error)?;
@@ -115,7 +116,7 @@ impl Source for Spotify {
         }
     }
 
-    fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {
+    async fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {
         todo!()
     }
 

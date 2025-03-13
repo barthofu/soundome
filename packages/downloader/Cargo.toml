@@ -17,3 +17,4 @@ invidious = { version = "0.7.6", default-features = false, features = [
     "reqwest_async"
 ]}
 tokio = { version = "1.43.0", features = ["time", "process", "io-util"] }
+rustypipe = "0.11.0"
