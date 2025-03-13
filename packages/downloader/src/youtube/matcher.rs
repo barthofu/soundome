@@ -1,136 +1,69 @@
-use shared::{errors::Error, models::track::Track};
+use std::{collections::HashMap, f64::consts::E};
 
-use super::{Youtube, models::YoutubeSearchResult};
+use shared::{models::track::Track, utils::string::{render_and_normalize_template, string_similarity, SimilarityAlgorithm}};
 
-use ngrammatic::{Pad, CorpusBuilder};
-use slug::slugify;
+use crate::Matcher;
+use super::Youtube;
 use async_trait::async_trait;
-use invidious::{hidden::SearchItem, universal::Search, ClientAsyncTrait, InvidiousError};
 
 #[async_trait]
-pub trait Matcher {
+impl Matcher for Youtube<'_> {
 
-    /// create a search query from a track
-    fn create_search_query(&self, track: Track) -> String;
+    fn match_results(&self, search_results: Vec<Track>, source_track: Track) -> Option<String> {
+        let best_match = self.patterns.iter().flat_map(|pattern| {
+            search_results.iter().filter_map(|result| {
 
-    /// search youtube for a track
-    async fn get_results(&self, search_query: String) -> Result<Search, Error>;
+                let video_author = result.artists.first().map_or("", |artist| artist.name.as_str());
+                let track_artist = &source_track.get_primary_artist().name;
+                let track_artists = source_track.artists
+                    .iter()
+                    .map(|artist| artist.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(", ");
 
-    // apply a pattern to a title and a channel
-    fn apply_pattern(&self, pattern: String, title: String, channel: String) -> String;
+                let context = HashMap::from([
+                    ("video_title", result.title.as_str()),
+                    ("video_author", video_author),
+                    ("track_title", &source_track.title),
+                    ("track_artist", track_artist),
+                    ("track_artists", &track_artists),
+                ]);
 
-    /// match results with a search query
-    fn match_results(&self, search_results: Search, search_query: String, pattern: String) -> Vec<YoutubeSearchResult>;
+                let rendered_track_title = render_and_normalize_template(pattern.1, &context, &self.excluded_words);
+                let rendered_video_title = render_and_normalize_template(pattern.0, &context, &self.excluded_words);
 
-    /// order results by score
-    fn order_results(&self, results: Vec<YoutubeSearchResult>) -> Vec<YoutubeSearchResult>;
+                let title_score = string_similarity(&rendered_track_title, &rendered_video_title, SimilarityAlgorithm::Smart) * 100.0;
+                let duration_score = duration_diff(source_track.duration.unwrap_or(0), result.duration.unwrap_or(0));
 
-    /// get the best result
-    fn get_best_result(&self, ordered_results: Vec<YoutubeSearchResult>, track: Track) -> Option<YoutubeSearchResult>;
+                println!("[{}] vs [{}] : title({:.2}) duration({}/{} : {:.2}) ({})", rendered_track_title, rendered_video_title, title_score, source_track.duration.unwrap_or(0), result.duration.unwrap_or(0), duration_score, result.provider_url.as_ref().unwrap());
+
+                if title_score < self.similarity_treshold || duration_score < 25.0 {
+                    return None;
+                }
+                if duration_score < 50.0 && title_score < 75.0 {
+                    return None;
+                }
+
+                let similarity_score = if title_score < 0.85 {
+                    (title_score + duration_score) / 2.0
+                } else {
+                    title_score
+                };
+
+                Some((similarity_score, result))
+            })
+        })
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+        best_match
+            .filter(|(score, _)| *score >= self.similarity_treshold)
+            .map(|(_, result)| result.title.clone())
+    }
 }
 
-#[async_trait]
-impl Matcher for Youtube {
 
-    fn create_search_query(&self, track: Track) -> String {
-        let artist = track
-            .artists
-            .first() // TODO: really keep only the first artist?
-                // because if just join each artist, it can fail like with this track: https://open.spotify.com/track/0qYLUdJQMhrCFA9dNZGcnm?si=509ca53b05c74629
-            .map(|artist| artist.name.clone())
-            .unwrap_or_default();
-
-        format!("{} {}", artist, track.title)
-    }
-
-    async fn get_results(&self, search_query: String) -> Result<Search, Error> {
-        self.client
-            .search(Some(&format!("q={}&type=video", search_query)))
-            .await
-            .map_err(|err| {
-                match err {
-                    InvidiousError::ApiError { message, .. } => Error::Custom(message),
-                    InvidiousError::Fetch { error } => Error::Custom(error.to_string()),
-                    _ => Error::Custom("Unknown error from Invidious call".to_string()),
-                }
-            })
-    }
-
-    fn apply_pattern(&self, pattern: String, title: String, channel: String) -> String {
-        let mut applied_pattern = pattern
-            .replace("{{title}}", &title)
-            .replace("{{channel}}", &channel)
-            .to_lowercase();
-
-        // remove excluded words
-        for word in &self.excluded_words {
-            applied_pattern = applied_pattern.replace(word, "");
-        }
-
-        applied_pattern
-    }
-
-    fn match_results(
-        &self,
-        search_results: Search,
-        search_query: String,
-        pattern: String,
-    ) -> Vec<YoutubeSearchResult> {
-        // Create a new text corpus with trigrams (arity = 2) and automatic padding
-        let mut corpus = CorpusBuilder::new().arity(2).pad_full(Pad::Auto).finish();
-        corpus.add_text(&slugify(&search_query));
-
-        // Iterate through search results and filter videos
-        search_results
-            .items
-            .into_iter()
-            .filter_map(|item| {
-                if let SearchItem::Video(video) = item {
-                    // Apply the pattern to the video's title and author
-                    let applied_pattern = self.apply_pattern(pattern.clone(), video.title.clone(), video.author.clone());
-
-                    // Compare the processed title with the search query and calculate a similarity score
-                    let result = corpus.search(&applied_pattern, 0.75);
-
-                    // If a match is found, create a YoutubeSearchResult and return it
-                    result.first().map(|match_result| {
-                        let search_result = YoutubeSearchResult {
-                            title: video.title.clone(),
-                            duration: video.length as i32,
-                            channel: video.author,
-                            url: format!("https://www.youtube.com/watch?v={}", video.id),
-                            score: match_result.similarity as f32,
-                        };
-
-                        println!("[{}] vs [{}] = {}", video.title, search_query, match_result.similarity);
-                        search_result
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    fn order_results(&self, mut results: Vec<YoutubeSearchResult>) -> Vec<YoutubeSearchResult> {
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-        results.to_vec()
-    }
-
-    fn get_best_result(&self, ordered_results: Vec<YoutubeSearchResult>, track: Track) -> Option<YoutubeSearchResult> {
-        let best_result = ordered_results.first()?;
-
-        if best_result.score < self.treshold {
-            return None;
-        }
-
-        if let Some(track_duration) = track.duration {
-            let offset = track_duration * self.duration_offset_percentage / 100;
-            if !(track_duration - offset..=track_duration + offset).contains(&best_result.duration) {
-                return None;
-            }
-        }
-
-        Some(best_result.clone())
-    }
+fn duration_diff(song_duration: i32, result_duration: i32) -> f64 {
+    let time_diff = (song_duration - result_duration).abs() as f64;
+    let score = E.powf(-0.1 * time_diff);
+    score * 100.0
 }

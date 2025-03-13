@@ -1,4 +1,5 @@
 pub mod youtube;
+// pub mod youtube_music;
 
 use std::path::PathBuf;
 use async_trait::async_trait;
@@ -12,6 +13,10 @@ pub trait Provider {
     async fn search(&self, track: &Track) -> Result<String, Error>;
     async fn download(&mut self, url: &str, base_dir: PathBuf) -> Result<PathBuf, Error>;
     fn is_valid_url(url: &str) -> bool;
+}
+
+pub trait Matcher {
+    fn match_results(&self, search_results: Vec<Track>, source_track: Track) -> Option<String>;
 }
 
 // ==============================

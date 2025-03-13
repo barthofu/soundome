@@ -4,7 +4,7 @@ pub struct YoutubeSearchResult {
     pub duration: i32,
     pub channel: String,
     pub url: String,
-    pub score: f32
+    pub similarity_score: f64
 }
 
 impl YoutubeSearchResult {
@@ -14,14 +14,14 @@ impl YoutubeSearchResult {
         duration: i32,
         channel: String,
         id: String,
-        score: f32
+        score: f64
     ) -> Self {
         Self {
             title,
             duration,
             channel,
             url: format!("https://www.youtube.com/watch?v={}", id),
-            score
+            similarity_score: score
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use strsim::{jaro_winkler, damerau_levenshtein, sorensen_dice};
 use unicode_normalization::UnicodeNormalization;
 
@@ -19,7 +21,7 @@ pub enum SimilarityAlgorithm {
  * - **Sorensen-Dice (20%)**: Uses bigram comparison, making it more tolerant
  *   to changes in word order (e.g., "Justin Bieber - Love Yourself" vs. "Love Yourself - Justin Bieber").
  *
- * The final score is a weighted average of these three metrics, scaled to a 0-100 range.
+ * The final score is a weighted average of these three metrics, scaled to a 0-1 range.
  */
 pub fn string_similarity(s1: &str, s2: &str, similarity_algorithm: SimilarityAlgorithm) -> f64 {
     let normalized_s1 = normalize_string(s1);
@@ -63,9 +65,47 @@ fn normalized_damerau_levenshtein(s1: &str, s2: &str) -> f64 {
  */
 pub fn normalize_string(s: &str) -> String {
     s.to_lowercase()                    // Convert to lowercase
-        .nfd()                           // Normalize using NFD (decomposing accented characters)
-        .filter(|c| c.is_ascii())         // Remove non-ASCII characters
-        .collect()                        // Collect into a new string
+        .nfd()                          // Normalize using NFD (decomposing accented characters)
+        .filter(|c| c.is_ascii())       // Remove non-ASCII characters
+        .collect()                      // Collect into a new string
+}
+
+/**
+ * Converts a string into a URL-friendly slug.
+ */
+pub fn slugify(s: &str) -> String {
+    return slug::slugify(s)
+}
+
+/**
+ * Applies a template to a context, replacing {placeholders}
+ * with values using tinytemplate
+ */
+pub fn render_template(template: &str, context: &HashMap<&str, &str>) -> String {
+    let mut tt = tinytemplate::TinyTemplate::new();
+    tt.add_template("template", template).unwrap();
+    tt.render("template", &context).unwrap()
+}
+
+/**
+ * Remove excluded words from a string.
+ */
+pub fn remove_excluded_words(s: &str, excluded_words: &Vec<&str>) -> String {
+    let mut result = s.to_string();
+    for word in excluded_words {
+        result = result.replace(word, "");
+    }
+    result
+}
+
+/**
+ * Composite function
+ */
+pub fn render_and_normalize_template(template: &str, context: &HashMap<&str, &str>, excluded_words: &Vec<&str>) -> String {
+    slugify(
+        &normalize_string(
+            &remove_excluded_words(
+                &render_template(template, context).to_lowercase(), excluded_words)))
 }
 
 

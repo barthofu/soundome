@@ -51,14 +51,27 @@ impl Weights {
 }
 
 impl Track {
-    /// Display a track in a user-friendly format
+
+    pub fn get_primary_artist(&self) -> Artist {
+        self.album
+            .as_ref()
+            .and_then(|a| a.artists.first())
+            .cloned()
+            .unwrap_or_else(|| self.artists.first().unwrap().clone())
+    }
+
+    /**
+     * Display a track in a user-friendly format
+     */
     pub fn display(&self) -> String {
         let artists = self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>().join(", ");
         let date = self.date.clone().unwrap_or_else(|| "Unknown".to_string());
         format!("{} by {} ({})", self.title, artists, date)
     }
 
-    /// Returns a normalized similarity score (between 0 and 1) of the match between two tracks
+    /**
+     * Returns a normalized similarity score (between 0 and 1) of the match between two tracks
+     */
     pub fn compare(&self, other_track: &Track) -> f64 {
         let mut score = 0.0;
         let mut total_weight = 0.0;
@@ -113,7 +126,9 @@ impl Track {
         }
     }
 
-    /// Transpose metadata from a source track to a destination track
+    /**
+     * Transpose metadata from a source track to a destination track
+     */
     pub fn transpose_metadata(&mut self, source_track: &Track) {
         self.title = source_track.title.clone();
         self.album = source_track.album.clone();

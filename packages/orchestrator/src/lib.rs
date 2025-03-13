@@ -28,11 +28,14 @@ impl Orchestrator {
         println!("====================\nDownloading playlist from {:?}\n---------", url);
         // Fetch playlist metadata
         let playlist_items = fetcher::get_playlist_tracks_from_url(url, &self.config)?;
+        println!("Found {} tracks in playlist", playlist_items.len());
 
         let mut tracks = vec![];
+        let mut error_count = 0;
         for playlist_item in playlist_items {
             if let Some(playlist_track) = playlist_item.track {
                 let title = playlist_track.display();
+                println!("===========\nDownloading track {}", title);
                 let track = self.download_track(playlist_track).await;
                 match track {
                     Ok(t) => {
@@ -40,11 +43,14 @@ impl Orchestrator {
                         tracks.push(t);
                     }
                     Err(e) => {
-                        eprintln!("Error downloading track {}: {:?}", title, e);
+                        error_count += 1;
+                        eprintln!("/!\\ Error downloading track {}: {}", title, e.to_string());
                     }
                 }
             }
         }
+
+        println!("Downloaded {} tracks from playlist, {} errors", tracks.len() - error_count, error_count);
 
         Ok(tracks)
     }
