@@ -93,15 +93,15 @@ pub fn convert_track(track: &FullTrack) -> Track {
 }
 
 /// Converts a Spotify playlist item to a shared PlaylistTrack.
-pub fn convert_playlist_item(item: &PlaylistItem) -> PlaylistTrack {
-    PlaylistTrack {
-        track: item.track.as_ref().and_then(|t| match t {
-            PlayableItem::Track(track) => Some(convert_track(track)),
-            PlayableItem::Episode(_) => None,
+pub fn convert_playlist_item(item: &PlaylistItem, pos: u32) -> Option<PlaylistTrack> {
+    item.track.as_ref().and_then(|t| match t {
+        PlayableItem::Track(track) => Some(PlaylistTrack {
+            track: convert_track(track),
+            added_at: item.added_at.clone(),
+            position: Some(pos),
         }),
-        added_at: item.added_at.clone(),
-        position: None,
-    }
+        PlayableItem::Episode(_) => None,
+    })
 }
 
 // =========================================

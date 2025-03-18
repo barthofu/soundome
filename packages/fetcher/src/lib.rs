@@ -1,9 +1,11 @@
 pub mod spotify;
 pub mod youtube_music;
+pub mod soundcloud;
 
 use config::model::AppConfig;
 use shared::models::{track::Track, artist::Artist, album::Album, playlist::PlaylistTrack};
 use shared::errors::Error;
+use soundcloud::Soundcloud;
 use spotify::Spotify;
 use youtube_music::YoutubeMusic;
 use async_trait::async_trait;
@@ -38,6 +40,10 @@ pub async fn get_track_from_url(url: &str, config: &AppConfig) -> Result<Track, 
             let youtube_music = YoutubeMusic::new();
             youtube_music.get_track_from_url(url).await
         }
+        _ if Soundcloud::is_valid_track_url(url) => {
+            let soundcloud = Soundcloud::new().await?;
+            soundcloud.get_track_from_url(url).await
+        }
         // _ if Youtube::is_valid_track_url(url) => {
         //     let youtube = youtube::Youtube::new();
         //     youtube.get_track_from_url(url)
@@ -55,6 +61,10 @@ pub async fn get_playlist_tracks_from_url(url: &str, config: &AppConfig) -> Resu
         _ if YoutubeMusic::is_valid_playlist_url(url) => {
             let youtube_music = YoutubeMusic::new();
             youtube_music.get_playlist_tracks_from_url(url).await
+        }
+        _ if Soundcloud::is_valid_playlist_url(url) => {
+            let soundcloud = Soundcloud::new().await?;
+            soundcloud.get_playlist_tracks_from_url(url).await
         }
         // _ if Youtube::is_valid_playlist_url(url) => {
         //     let youtube = youtube::Youtube::new();

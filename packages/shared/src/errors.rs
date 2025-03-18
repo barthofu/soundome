@@ -17,6 +17,10 @@ pub enum Error {
     #[error("config error: {0}")]
     Config(String),
 
+    // HTTP
+    #[error("{0} http error: {1}")]
+    Http(String, String),
+
     // Other
     #[error("custom error: {0}")]
     Custom(String),

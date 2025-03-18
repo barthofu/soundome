@@ -10,6 +10,7 @@ pub enum TrackSource {
     Spotify,
     Youtube,
     YoutubeMusic,
+    SoundCloud,
     Unknown
 }
 

@@ -33,3 +33,7 @@ pub struct SpotifyConfig {
 pub struct YoutubeConfig {
     pub invidious_instance: Option<String>,
 }
+
+pub struct SoundcloudConfig {
+    pub client_id: String,
+}

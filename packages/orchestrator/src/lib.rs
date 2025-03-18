@@ -34,19 +34,17 @@ impl Orchestrator {
         let mut tracks = vec![];
         let mut error_count = 0;
         for playlist_item in playlist_items {
-            if let Some(playlist_track) = playlist_item.track {
-                let title = playlist_track.display();
-                println!("===========\nDownloading track {}", title);
-                let track = self.download_track(playlist_track).await;
-                match track {
-                    Ok(t) => {
-                        println!("Downloaded track from playlist: {}", &t.display());
-                        tracks.push(t);
-                    }
-                    Err(e) => {
-                        error_count += 1;
-                        eprintln!("/!\\ Error downloading track {}: {}", title, e.to_string());
-                    }
+            let title = playlist_item.track.display();
+            println!("===========\nDownloading track {}", title);
+            let track = self.download_track(playlist_item.track).await;
+            match track {
+                Ok(t) => {
+                    println!("Downloaded track from playlist: {}", &t.display());
+                    tracks.push(t);
+                }
+                Err(e) => {
+                    error_count += 1;
+                    eprintln!("/!\\ Error downloading track {}: {}", title, e.to_string());
                 }
             }
         }

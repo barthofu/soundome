@@ -53,7 +53,6 @@ impl Source for Spotify {
         Ok(mappers::convert_track(&track))
     }
 
-
     async fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
         let res = self.client
             .search(query, SearchType::Track, None, None, Some(20), Some(0))
@@ -66,17 +65,17 @@ impl Source for Spotify {
         }
     }
 
-
     async fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error> {
-        let id = PlaylistId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
-        let playlist = self.client.playlist(id, None, None).map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
+        let id = PlaylistId::from_id(self.url_to_id(url))
+            .map_err(|_| Error::InvalidUrl(url.to_string()))?;
+        let playlist = self.client.playlist(id, None, None)
+            .map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
 
-        let tracks = playlist.tracks.items
-            .into_iter()
-            .map(|item| PlaylistTrack::from(mappers::convert_playlist_item(&item)))
-            .collect();
-
-        Ok(tracks)
+        Ok(playlist.tracks.items
+            .iter()
+            .enumerate()
+            .filter_map(|(i, track)| mappers::convert_playlist_item(track, i.try_into().unwrap_or(0)))
+            .collect())
     }
 
     async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
