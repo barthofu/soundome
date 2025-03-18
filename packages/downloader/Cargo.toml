@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 shared = { path = "../shared" }
 config = { path = "../config" }
+fetcher = { path = "../fetcher" }
 
 serde = "1.0.217"
 serde_json = "1.0.138"

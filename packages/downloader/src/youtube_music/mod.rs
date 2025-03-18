@@ -69,12 +69,11 @@ impl YoutubeMusic {
 #[async_trait]
 impl Provider for YoutubeMusic {
 
-    /// Find a matching YouTube video from a track
     async fn search(&self, track: &Track) -> Result<String, Error> {
         // 1. Create search query
         let search_query = self.create_search_query(track.clone());
 
-        // 2. Search on YouTube
+        // 2. Search on YouTube Music
         let search_results = self.get_results(&search_query).await?;
 
         // 3. Process each pattern to find the best match

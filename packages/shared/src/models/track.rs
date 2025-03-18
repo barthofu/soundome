@@ -18,6 +18,7 @@ pub enum TrackSource {
 pub enum TrackProvider {
     Youtube,
     YoutubeMusic,
+    SoundCloud,
     Unknown
 }
 
