@@ -100,3 +100,17 @@ pub fn convert_playlist_item(item: rsoundcloud::models::track::Track, pos: u32) 
         position: Some(pos),
     })
 }
+
+// =======================================================================
+// Processes
+// =======================================================================
+
+fn process_title(title: &str, artist_name: &str) -> String {
+    let title = title.trim();
+    let artist_name = artist_name.trim();
+    if title.to_lowercase().starts_with(artist_name.to_lowercase().as_str()) {
+        title.to_string()
+    } else {
+        format!("{} - {}", artist_name, title)
+    }
+}

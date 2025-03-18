@@ -13,9 +13,9 @@ rspotify = { version = "0.14.0", default-features = false, features = [
   "ureq-rustls-tls",
 ] }
 rustypipe = "0.11.0"
-rsoundcloud = { version = "0.2.2" }
+rsoundcloud = { version = "0.2.3" }
 # rsoundcloud = { path = "../../../rsoundcloud" } # for local testing purposes
 
 futures = "0.3.31"
 async-trait = "0.1.88"
-regex = "1.11.1"
+fancy-regex = "0.14.0"

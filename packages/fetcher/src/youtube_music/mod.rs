@@ -1,6 +1,7 @@
 pub mod mappers;
 
 use async_trait::async_trait;
+use fancy_regex::Regex;
 use futures::future::join_all;
 use mappers::convert_track;
 use rustypipe::{client::RustyPipe, model::{MusicArtist, TrackItem}};
@@ -41,30 +42,30 @@ impl YoutubeMusic {
     }
 
     /// Extracts the id from a youtube music track url (e.g: https://music.youtube.com/watch?v=U0ZoqmyGJo8&si=KsVobimXN6uao4s4 -> xxxxxxx)
-    fn get_id_from_url(&self, url: &str) -> String {
-        let re = regex::Regex::new(Self::TRACK_REGEX).unwrap(); // safe unwrap
-        let captures = re.captures(url).unwrap(); // safe unwrap
-        captures.get(1).unwrap().as_str().to_string() // safe unwrap
+    fn get_id_from_url(&self, url: &str) -> Option<String> {
+        let re = Regex::new(Self::TRACK_REGEX).ok()?;
+        let captures = re.captures(url).ok().flatten()?;
+        captures.get(1).map(|m| m.as_str().to_string())
     }
 
     /// Extracts the id from a youtube music artist url (e.g: https://music.youtube.com/channel/UCfeJiV0Xu-C4z4DApRcznig -> xxxxxxx)
     fn get_artist_id_from_url(&self, url: &str) -> Option<String> {
-        let re = regex::Regex::new(Self::ARTIST_REGEX).ok()?;
-        let captures = re.captures(url)?;
+        let re = Regex::new(Self::ARTIST_REGEX).ok()?;
+        let captures = re.captures(url).ok().flatten()?;
         captures.get(1).map(|m| m.as_str().to_string())
     }
 
     /// Extracts the id from a youtube music album url (e.g: https://music.youtube.com/playlist?list=OLAK5uy_nEnkIMbtqesDReZnKM61c9Xo24Sgos8hA -> xxxxxxx)
     fn get_album_id_from_url(&self, url: &str) -> Option<String> {
-        let re = regex::Regex::new(Self::PLAYLIST_REGEX).ok()?;
-        let captures = re.captures(url)?;
+        let re = Regex::new(Self::PLAYLIST_REGEX).ok()?;
+        let captures = re.captures(url).ok().flatten()?;
         captures.get(2).map(|m| m.as_str().to_string())
     }
 
     /// Extracts the id from a youtube music playlist url (e.g: https://music.youtube.com/watch?v=YvI_FNrczzQ&list=RDCLAK5uy_mHkFNBTuR8DZUj61H5XY2onS7nRujVFx8 -> xxxxxxx)
     fn get_playlist_id_from_url(&self, url: &str) -> Option<String> {
-        let re = regex::Regex::new(Self::PLAYLIST_REGEX).ok()?;
-        let captures = re.captures(url)?;
+        let re = Regex::new(Self::PLAYLIST_REGEX).ok()?;
+        let captures = re.captures(url).ok().flatten()?;
         captures.get(2).map(|m| m.as_str().to_string())
     }
 }
@@ -73,7 +74,8 @@ impl YoutubeMusic {
 impl Source for YoutubeMusic {
 
     async fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
-        let track = self.client.query().music_details(self.get_id_from_url(url)).await.map_err(|_| Error::NotFound(format!("Youtube Music track from {}", url).to_string()))?;
+        let track_id = self.get_id_from_url(url).ok_or(Error::InvalidUrl(url.to_string()))?;
+        let track = self.client.query().music_details(track_id).await.map_err(|_| Error::NotFound(format!("Youtube Music track from {}", url).to_string()))?;
         Ok(self.get_complete_track_from_music_track(track.track).await)
     }
 
@@ -153,12 +155,12 @@ impl Source for YoutubeMusic {
     }
 
     fn is_valid_track_url(url: &str) -> bool {
-        let re = regex::Regex::new(Self::TRACK_REGEX).unwrap(); // safe unwrap
-        re.is_match(url)
+        let re = Regex::new(Self::TRACK_REGEX).unwrap(); // safe unwrap
+        re.is_match(url).unwrap_or(false)
     }
 
     fn is_valid_playlist_url(url: &str) -> bool {
-        let re = regex::Regex::new(Self::PLAYLIST_REGEX).unwrap(); // safe unwrap
-        re.is_match(url)
+        let re = Regex::new(Self::PLAYLIST_REGEX).unwrap(); // safe unwrap
+        re.is_match(url).unwrap_or(false)
     }
 }
