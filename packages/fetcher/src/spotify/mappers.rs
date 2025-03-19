@@ -1,5 +1,15 @@
-use rspotify::model::{FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist};
-use shared::{errors::Error, models::{album::{Album, AlbumType}, artist::Artist, playlist::PlaylistTrack, track::{Track, TrackSource}}};
+use rspotify::model::{
+    FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist,
+};
+use shared::{
+    errors::Error,
+    models::{
+        album::{Album, AlbumType},
+        artist::Artist,
+        playlist::PlaylistTrack,
+        track::{Track, TrackSource},
+    },
+};
 
 /// Converts an rspotify ClientError into a shared Error.
 pub fn convert_error(err: rspotify::ClientError) -> Error {
@@ -33,14 +43,16 @@ pub fn convert_simplified_album(album: &SimplifiedAlbum) -> Album {
     Album {
         title: album.name.clone(),
         artists: album.artists.iter().map(convert_artist).collect(),
-        album_type: album.album_type.as_ref().map(|album_type|
-            match album_type {
+        album_type: album
+            .album_type
+            .as_ref()
+            .map(|album_type| match album_type {
                 s if s == "album" => AlbumType::Album,
                 s if s == "single" => AlbumType::Single,
                 s if s == "compilation" => AlbumType::Compilation,
                 _ => AlbumType::Unknown,
-            }
-        ).unwrap_or(AlbumType::Unknown),
+            })
+            .unwrap_or(AlbumType::Unknown),
         url: album.external_urls.get("spotify").cloned(),
         cover: album.images.get(0).map(|image| image.url.clone()),
         date: album.release_date.clone(),

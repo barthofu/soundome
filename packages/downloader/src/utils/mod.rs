@@ -1,2 +1,2 @@
-pub mod ytdlp;
 pub mod scdl;
+pub mod ytdlp;

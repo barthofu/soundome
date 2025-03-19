@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-use std::process::Stdio;
 use serde_json::Value;
 use shared::errors::Error;
-use tokio::{process::Command, io::AsyncReadExt};
+use std::path::PathBuf;
+use std::process::Stdio;
+use tokio::{io::AsyncReadExt, process::Command};
 
 pub async fn download_with_ytdlp(url: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
     let output_path = format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap());
@@ -13,12 +13,16 @@ pub async fn download_with_ytdlp(url: &str, base_dir: PathBuf) -> Result<PathBuf
         .args(&[
             url,
             "--print-json",
-            "-f", "ba",
+            "-f",
+            "ba",
             "-x",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
+            "--audio-format",
+            "mp3",
+            "--audio-quality",
+            "0",
             "--embed-thumbnail",
-            "--output", &output_path,
+            "--output",
+            &output_path,
         ])
         .spawn()?;
 
@@ -44,7 +48,9 @@ pub async fn download_with_ytdlp(url: &str, base_dir: PathBuf) -> Result<PathBuf
 
     // Parse JSON output
     let value: Value = serde_json::from_slice(&stdout)?;
-    let path = value["_filename"].as_str().ok_or(Error::NotFound("downloaded file path".to_string()))?;
+    let path = value["_filename"]
+        .as_str()
+        .ok_or(Error::NotFound("downloaded file path".to_string()))?;
 
     // Replace extension with .mp3
     let final_path = PathBuf::from(match path.rsplit_once('.') {

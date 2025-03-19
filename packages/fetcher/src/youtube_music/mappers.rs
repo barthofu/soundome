@@ -1,5 +1,14 @@
-use rustypipe::model::{AlbumItem, AlbumType, ArtistId, ArtistItem, MusicAlbum, MusicArtist, TrackItem};
-use shared::{errors::Error, models::{album::Album, artist::Artist, track::{Track, TrackSource}}};
+use rustypipe::model::{
+    AlbumItem, AlbumType, ArtistId, ArtistItem, MusicAlbum, MusicArtist, TrackItem,
+};
+use shared::{
+    errors::Error,
+    models::{
+        album::Album,
+        artist::Artist,
+        track::{Track, TrackSource},
+    },
+};
 
 /// Converts an rspotify ClientError into a shared Error.
 pub fn convert_error(err: rustypipe::error::Error) -> Error {
@@ -8,7 +17,10 @@ pub fn convert_error(err: rustypipe::error::Error) -> Error {
             404 => Error::NotFound("Resource not found".to_string()),
             _ => Error::Unknown,
         },
-        rustypipe::error::Error::Extraction(e) => Error::Custom(format!("Extraction error from Youtube Music: {}", e.to_string())),
+        rustypipe::error::Error::Extraction(e) => Error::Custom(format!(
+            "Extraction error from Youtube Music: {}",
+            e.to_string()
+        )),
         _ => Error::Unknown,
     }
 }
@@ -25,7 +37,10 @@ pub fn convert_artist(artist: &MusicArtist) -> Artist {
 pub fn convert_artist_id(artist: &ArtistId) -> Artist {
     Artist {
         name: artist.name.clone(),
-        url: artist.id.clone().map(|id| format!("https://music.youtube.com/channel/{}", id)),
+        url: artist
+            .id
+            .clone()
+            .map(|id| format!("https://music.youtube.com/channel/{}", id)),
         icon: None,
     }
 }
@@ -71,7 +86,11 @@ fn convert_album_type(album_type: AlbumType) -> shared::models::album::AlbumType
 }
 
 /// Converts a Youtube Music track to a shared Track.
-pub fn convert_track(track: TrackItem, artists: Vec<MusicArtist>, album: Option<MusicAlbum>) -> Track {
+pub fn convert_track(
+    track: TrackItem,
+    artists: Vec<MusicArtist>,
+    album: Option<MusicAlbum>,
+) -> Track {
     Track {
         title: track.name.clone(),
         artists: artists.iter().map(convert_artist).collect(),
@@ -86,7 +105,9 @@ pub fn convert_track(track: TrackItem, artists: Vec<MusicArtist>, album: Option<
         track_number: track.track_nr.map(|n| n as i32),
         disc_number: None,
         label: None,
-        date: album.as_ref().and_then(|a| a.year.map(|year| year.to_string())),
+        date: album
+            .as_ref()
+            .and_then(|a| a.year.map(|year| year.to_string())),
         cover: album.and_then(|a| a.cover.first().map(|image| image.url.clone())),
     }
 }

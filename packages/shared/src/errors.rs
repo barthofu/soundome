@@ -2,7 +2,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-
     // Generic
     #[error("{0} not found")]
     NotFound(String),
@@ -45,10 +44,7 @@ pub enum Error {
     #[error("process timeout")]
     ProcessTimeout,
     #[error("process error")]
-    ExitCode {
-        code: i32,
-        stderr: String,
-    },
+    ExitCode { code: i32, stderr: String },
 }
 
 impl From<std::io::Error> for Error {

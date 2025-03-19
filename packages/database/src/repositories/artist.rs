@@ -1,6 +1,12 @@
 use diesel::prelude::*;
 
-use crate::{macros, models::{artist::{ArtistEntity, ArtistTrack, NewArtist, NewArtistTrack, UpdateArtist}, track::TrackEntity}};
+use crate::{
+    macros,
+    models::{
+        artist::{ArtistEntity, ArtistTrack, NewArtist, NewArtistTrack, UpdateArtist},
+        track::TrackEntity,
+    },
+};
 
 // basic CRUD operations
 

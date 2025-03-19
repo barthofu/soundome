@@ -1,8 +1,12 @@
 use config::model::AppConfig;
 // On suppose que ces modules existent dans le monorepo et exposent les fonctions nécessaires.
-use fetcher;
 use downloader;
-use shared::{errors::Error, models::track::{Track, TrackSource}, utils::enums::Match};
+use fetcher;
+use shared::{
+    errors::Error,
+    models::track::{Track, TrackSource},
+    utils::enums::Match,
+};
 use tagger::TagProvider;
 
 pub struct Orchestrator {
@@ -18,7 +22,15 @@ impl Orchestrator {
         println!("===========\nDownloading track from {:?}\n------", url);
         // Fetch track metadata
         let mut track = fetcher::get_track_from_url(url, &self.config).await?;
-        println!("Fetched track from {}: {}", track.source.clone().unwrap_or(TrackSource::Unknown).as_ref(), track.display());
+        println!(
+            "Fetched track from {}: {}",
+            track
+                .source
+                .clone()
+                .unwrap_or(TrackSource::Unknown)
+                .as_ref(),
+            track.display()
+        );
 
         // Download the track
         track = self.download_track(track).await?;
@@ -26,7 +38,10 @@ impl Orchestrator {
     }
 
     pub async fn download_playlist_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {
-        println!("====================\nDownloading playlist from {:?}\n---------", url);
+        println!(
+            "====================\nDownloading playlist from {:?}\n---------",
+            url
+        );
         // Fetch playlist metadata
         let playlist_items = fetcher::get_playlist_tracks_from_url(url, &self.config).await?;
         println!("Found {} tracks in playlist", playlist_items.len());
@@ -49,7 +64,11 @@ impl Orchestrator {
             }
         }
 
-        println!("Downloaded {} tracks from playlist, {} errors", tracks.len() - error_count, error_count);
+        println!(
+            "Downloaded {} tracks from playlist, {} errors",
+            tracks.len() - error_count,
+            error_count
+        );
 
         Ok(tracks)
     }
@@ -64,13 +83,23 @@ impl Orchestrator {
         downloaded_track.provider_url = provider_url.clone().into();
 
         // Download the track
-        let file_path = downloader::download(&provider_url, &downloaded_track.source.clone().unwrap_or(TrackSource::Unknown), &self.config).await?;
+        let file_path = downloader::download(
+            &provider_url,
+            &downloaded_track
+                .source
+                .clone()
+                .unwrap_or(TrackSource::Unknown),
+            &self.config,
+        )
+        .await?;
         println!("Downloaded track to {:?}", file_path);
         downloaded_track.file_path = file_path.clone().into();
 
         // Get MusicBrainz metadata
         let musicbrainz = tagger::providers::musicbrainz::MusicBrainz::new();
-        let best_match = musicbrainz.get_best_match_from_track(&downloaded_track).await;
+        let best_match = musicbrainz
+            .get_best_match_from_track(&downloaded_track)
+            .await;
         if let Match::Exact(matched_track) = best_match {
             println!("Exact match found from MusicBrainz");
             downloaded_track.transpose_metadata(&matched_track);
@@ -86,5 +115,4 @@ impl Orchestrator {
 
         Ok(downloaded_track)
     }
-
 }

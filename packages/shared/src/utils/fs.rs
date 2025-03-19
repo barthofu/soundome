@@ -6,6 +6,8 @@ use std::path::PathBuf;
  */
 pub fn get_project_relative_path(relative_path: &str) -> PathBuf {
     let exe_path = env::current_exe().expect("Failed to get current executable path");
-    let exe_dir = exe_path.parent().expect("Failed to get executable directory");
+    let exe_dir = exe_path
+        .parent()
+        .expect("Failed to get executable directory");
     exe_dir.join(relative_path)
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use strsim::{jaro_winkler, damerau_levenshtein, sorensen_dice};
+use strsim::{damerau_levenshtein, jaro_winkler, sorensen_dice};
 use unicode_normalization::UnicodeNormalization;
 
 pub enum SimilarityAlgorithm {
@@ -40,9 +40,11 @@ pub fn string_similarity(s1: &str, s2: &str, similarity_algorithm: SimilarityAlg
             // Weighted average
             let score = (0.50 * jaro) + (0.30 * damerau) + (0.20 * dice);
             score
-        },
+        }
         SimilarityAlgorithm::JaroWinkler => jaro_winkler(&normalized_s1, &normalized_s2),
-        SimilarityAlgorithm::DamerauLevenshtein => normalized_damerau_levenshtein(&normalized_s1, &normalized_s2),
+        SimilarityAlgorithm::DamerauLevenshtein => {
+            normalized_damerau_levenshtein(&normalized_s1, &normalized_s2)
+        }
         SimilarityAlgorithm::SorensenDice => sorensen_dice(&normalized_s1, &normalized_s2),
     }
 }
@@ -52,7 +54,9 @@ pub fn string_similarity(s1: &str, s2: &str, similarity_algorithm: SimilarityAlg
  */
 fn normalized_damerau_levenshtein(s1: &str, s2: &str) -> f64 {
     let max_len = s1.len().max(s2.len());
-    if max_len == 0 { return 1.0; } // If both strings are empty, they are identical
+    if max_len == 0 {
+        return 1.0;
+    } // If both strings are empty, they are identical
     let distance = damerau_levenshtein(s1, s2);
     1.0 - (distance as f64 / max_len as f64)
 }
@@ -64,17 +68,17 @@ fn normalized_damerau_levenshtein(s1: &str, s2: &str) -> f64 {
  * - Strips non-ASCII characters
  */
 pub fn normalize_string(s: &str) -> String {
-    s.to_lowercase()                    // Convert to lowercase
-        .nfd()                          // Normalize using NFD (decomposing accented characters)
-        .filter(|c| c.is_ascii())       // Remove non-ASCII characters
-        .collect()                      // Collect into a new string
+    s.to_lowercase() // Convert to lowercase
+        .nfd() // Normalize using NFD (decomposing accented characters)
+        .filter(|c| c.is_ascii()) // Remove non-ASCII characters
+        .collect() // Collect into a new string
 }
 
 /**
  * Converts a string into a URL-friendly slug.
  */
 pub fn slugify(s: &str) -> String {
-    return slug::slugify(s)
+    return slug::slugify(s);
 }
 
 /**
@@ -101,13 +105,16 @@ pub fn remove_excluded_words(s: &str, excluded_words: &Vec<&str>) -> String {
 /**
  * Composite function
  */
-pub fn render_and_normalize_template(template: &str, context: &HashMap<&str, &str>, excluded_words: &Vec<&str>) -> String {
-    slugify(
-        &normalize_string(
-            &remove_excluded_words(
-                &render_template(template, context).to_lowercase(), excluded_words)))
+pub fn render_and_normalize_template(
+    template: &str,
+    context: &HashMap<&str, &str>,
+    excluded_words: &Vec<&str>,
+) -> String {
+    slugify(&normalize_string(&remove_excluded_words(
+        &render_template(template, context).to_lowercase(),
+        excluded_words,
+    )))
 }
-
 
 // ================================================================================================
 // Tests
@@ -124,7 +131,10 @@ mod tests {
 
         // Test for identical strings, similarity should be 100
         let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
-        assert_eq!(similarity, 1.0, "Identical strings should have a similarity of 100.");
+        assert_eq!(
+            similarity, 1.0,
+            "Identical strings should have a similarity of 100."
+        );
     }
 
     #[test]
@@ -134,7 +144,10 @@ mod tests {
 
         // Test for empty strings, similarity should be 100
         let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
-        assert_eq!(similarity, 1.0, "Empty strings should have a similarity of 100.");
+        assert_eq!(
+            similarity, 1.0,
+            "Empty strings should have a similarity of 100."
+        );
     }
 
     #[test]
@@ -144,7 +157,10 @@ mod tests {
 
         // Test for small typos, similarity should still be high
         let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
-        assert!(similarity > 0.8, "Strings with small typos should have high similarity.");
+        assert!(
+            similarity > 0.8,
+            "Strings with small typos should have high similarity."
+        );
     }
 
     #[test]
@@ -154,7 +170,10 @@ mod tests {
 
         // Test for transposition, similarity should still be reasonable
         let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
-        assert!(similarity >= 0.5 && similarity < 0.8, "Strings with adjacent transpositions should have medium similarity.");
+        assert!(
+            similarity >= 0.5 && similarity < 0.8,
+            "Strings with adjacent transpositions should have medium similarity."
+        );
     }
 
     #[test]
@@ -164,7 +183,10 @@ mod tests {
 
         // Test for completely different strings, similarity should be low
         let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
-        assert!(similarity < 0.5, "Completely different strings should have low similarity.");
+        assert!(
+            similarity < 0.5,
+            "Completely different strings should have low similarity."
+        );
     }
 
     #[test]
@@ -174,7 +196,10 @@ mod tests {
 
         // Test for identical strings, Damerau-Levenshtein distance should be 0 (normalized similarity 1.0)
         let normalized_distance = normalized_damerau_levenshtein(s1, s2);
-        assert_eq!(normalized_distance, 1.0, "Identical strings should have a normalized Damerau-Levenshtein similarity of 1.0.");
+        assert_eq!(
+            normalized_distance, 1.0,
+            "Identical strings should have a normalized Damerau-Levenshtein similarity of 1.0."
+        );
     }
 
     #[test]
@@ -184,7 +209,10 @@ mod tests {
 
         // Test for completely different strings, similarity should be low
         let normalized_distance = normalized_damerau_levenshtein(s1, s2);
-        assert!(normalized_distance < 0.5, "Completely different strings should have low Damerau-Levenshtein similarity.");
+        assert!(
+            normalized_distance < 0.5,
+            "Completely different strings should have low Damerau-Levenshtein similarity."
+        );
     }
 
     #[test]
@@ -193,7 +221,10 @@ mod tests {
 
         // Test for string with accents, normalize to "ecole"
         let normalized = normalize_string(s);
-        assert_eq!(normalized, "ecole", "String with accents should be normalized correctly.");
+        assert_eq!(
+            normalized, "ecole",
+            "String with accents should be normalized correctly."
+        );
     }
 
     #[test]
@@ -202,7 +233,10 @@ mod tests {
 
         // Test for string with non-ASCII characters, normalize to "naive"
         let normalized = normalize_string(s);
-        assert_eq!(normalized, "naive", "String with non-ASCII characters should be normalized correctly.");
+        assert_eq!(
+            normalized, "naive",
+            "String with non-ASCII characters should be normalized correctly."
+        );
     }
 
     #[test]
@@ -211,7 +245,10 @@ mod tests {
 
         // Test for string normalization to lowercase
         let normalized = normalize_string(s);
-        assert_eq!(normalized, "hello", "String should be normalized to lowercase.");
+        assert_eq!(
+            normalized, "hello",
+            "String should be normalized to lowercase."
+        );
     }
 
     #[test]
@@ -220,6 +257,9 @@ mod tests {
 
         // Test for empty string, should return empty string
         let normalized = normalize_string(s);
-        assert_eq!(normalized, "", "Empty string should remain empty after normalization.");
+        assert_eq!(
+            normalized, "",
+            "Empty string should remain empty after normalization."
+        );
     }
 }

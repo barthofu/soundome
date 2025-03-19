@@ -10,11 +10,17 @@ use shared::{errors::Error, types::SoundomeResult};
 #[async_trait]
 pub trait AIBackend {
     async fn generate(&self, prompt: &str) -> SoundomeResult<String>;
-    async fn generate_with_data<T: schemars::JsonSchema + for<'de> Deserialize<'de> + Serialize + Send>(&self, prompt: &str, data: T) -> SoundomeResult<T>;
+    async fn generate_with_data<
+        T: schemars::JsonSchema + for<'de> Deserialize<'de> + Serialize + Send,
+    >(
+        &self,
+        prompt: &str,
+        data: T,
+    ) -> SoundomeResult<T>;
 }
 
 pub enum AIBackendInstance {
-    OpenRouter(OpenRouterAI)
+    OpenRouter(OpenRouterAI),
 }
 
 #[async_trait]
@@ -25,13 +31,17 @@ impl AIBackend for AIBackendInstance {
         }
     }
 
-    async fn generate_with_data<T: schemars::JsonSchema + for<'de> Deserialize<'de> + Serialize + Send>(
+    async fn generate_with_data<
+        T: schemars::JsonSchema + for<'de> Deserialize<'de> + Serialize + Send,
+    >(
         &self,
         prompt: &str,
         data: T,
     ) -> SoundomeResult<T> {
         match self {
-            AIBackendInstance::OpenRouter(open_router) => open_router.generate_with_data(prompt, data).await,
+            AIBackendInstance::OpenRouter(open_router) => {
+                open_router.generate_with_data(prompt, data).await
+            }
         }
     }
 }
@@ -39,15 +49,13 @@ impl AIBackend for AIBackendInstance {
 pub struct AIClient;
 
 impl AIClient {
-
     pub fn new(config: AppConfig) -> SoundomeResult<AIBackendInstance> {
         match config {
             _ if config.openrouter.is_some() => {
                 let openrouter = OpenRouterAI::new(config.openrouter.unwrap())?; // safe unwrap
                 Ok(AIBackendInstance::OpenRouter(openrouter))
-            },
-            _ => Err(Error::NoAIBackend)
+            }
+            _ => Err(Error::NoAIBackend),
         }
     }
-
 }

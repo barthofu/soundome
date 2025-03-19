@@ -44,4 +44,3 @@ pub struct OpenRouterConfig {
     pub base_url: Option<String>,
     pub timeout: Option<u64>,
 }
-

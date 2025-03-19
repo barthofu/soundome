@@ -10,28 +10,32 @@ use crate::{utils::scdl::download_with_scdl, Matcher, Provider};
 
 pub struct SoundCloud {
     fetcher: fetcher::soundcloud::Soundcloud,
-    similarity_treshold: f64
+    similarity_treshold: f64,
 }
 
 impl SoundCloud {
-
     pub async fn new() -> Result<Self, Error> {
-        fetcher::soundcloud::Soundcloud::new().await
+        fetcher::soundcloud::Soundcloud::new()
+            .await
             .map(|fetcher| Self {
                 fetcher,
-                similarity_treshold: 0.80
+                similarity_treshold: 0.80,
             })
     }
 
     fn create_search_query(&self, track: Track) -> String {
-        let artist = track.artists.into_iter().map(|a| a.name.clone()).collect::<Vec<String>>().join(" ");
+        let artist = track
+            .artists
+            .into_iter()
+            .map(|a| a.name.clone())
+            .collect::<Vec<String>>()
+            .join(" ");
         format!("{} {}", artist, track.title)
     }
 }
 
 #[async_trait]
 impl Provider for SoundCloud {
-
     async fn search(&self, track: &Track) -> Result<String, Error> {
         // 1. Create search query
         let search_query = self.create_search_query(track.clone());
@@ -40,10 +44,9 @@ impl Provider for SoundCloud {
         let search_results = self.fetcher.get_tracks_from_query(&search_query).await?;
 
         // 3. Process each pattern to find the best match
-        let best_match = self.match_results(
-            search_results,
-            track.clone()
-        ).ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?;
+        let best_match = self
+            .match_results(search_results, track.clone())
+            .ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?;
         Ok(best_match)
     }
 
@@ -54,5 +57,4 @@ impl Provider for SoundCloud {
     fn is_valid_url(url: &str) -> bool {
         fetcher::soundcloud::Soundcloud::is_valid_track_url(url)
     }
-
 }

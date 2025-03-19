@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-use std::process::Stdio;
 use serde_json::Value;
 use shared::errors::Error;
-use tokio::{process::Command, io::AsyncReadExt};
+use std::path::PathBuf;
+use std::process::Stdio;
+use tokio::{io::AsyncReadExt, process::Command};
 
 pub async fn download_with_scdl(url: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
     let output_path = format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap());
@@ -10,11 +10,7 @@ pub async fn download_with_scdl(url: &str, base_dir: PathBuf) -> Result<PathBuf,
     let mut child = Command::new("scdl")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .args(&[
-            "-l",
-            url,
-            "--path", &output_path,
-        ])
+        .args(&["-l", url, "--path", &output_path])
         .spawn()?;
 
     // Read stdout asynchronously to prevent buffer overflow
@@ -39,7 +35,9 @@ pub async fn download_with_scdl(url: &str, base_dir: PathBuf) -> Result<PathBuf,
 
     // Parse JSON output
     let value: Value = serde_json::from_slice(&stdout)?;
-    let path = value["_filename"].as_str().ok_or(Error::NotFound("downloaded file path".to_string()))?;
+    let path = value["_filename"]
+        .as_str()
+        .ok_or(Error::NotFound("downloaded file path".to_string()))?;
 
     // Replace extension with .mp3
     let final_path = PathBuf::from(match path.rsplit_once('.') {

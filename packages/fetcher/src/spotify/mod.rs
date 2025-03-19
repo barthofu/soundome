@@ -1,8 +1,15 @@
 pub mod mappers;
 
 use async_trait::async_trait;
-use rspotify::{Credentials, ClientCredsSpotify, model::{SearchType, SearchResult, TrackId, PlaylistId, ArtistId, AlbumId}, prelude::BaseClient};
-use shared::{errors::Error, models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track}};
+use rspotify::{
+    model::{AlbumId, ArtistId, PlaylistId, SearchResult, SearchType, TrackId},
+    prelude::BaseClient,
+    ClientCredsSpotify, Credentials,
+};
+use shared::{
+    errors::Error,
+    models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track},
+};
 
 use crate::Source;
 
@@ -11,16 +18,16 @@ pub struct Spotify {
 }
 
 impl Spotify {
-
     pub fn new(client_id: &str, client_secret: &str) -> Result<Self, Error> {
         let credentials = Credentials::new(client_id, client_secret);
         let client = ClientCredsSpotify::new(credentials);
 
-        client.request_token().map_err(|e| Error::Config(e.to_string()))?;
+        client
+            .request_token()
+            .map_err(|e| Error::Config(e.to_string()))?;
 
         Ok(Self { client })
     }
-
 
     // =================
     // Utils
@@ -28,7 +35,6 @@ impl Spotify {
 
     /// Extracts the id from a spotify url (e.g: https://open.spotify.com/track/xxxxxxx?si=yyyyyyy -> xxxxxxx)
     fn url_to_id(&self, url: &str) -> String {
-
         let id = url
             .split('/')
             .last()
@@ -46,20 +52,28 @@ impl Spotify {
 
 #[async_trait]
 impl Source for Spotify {
-
     async fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
-        let id = TrackId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
-        let track = self.client.track(id, None).map_err(|_| Error::NotFound(format!("Spotify track from {}", url).to_string()))?;
+        let id = TrackId::from_id(self.url_to_id(url))
+            .map_err(|_| Error::InvalidUrl(url.to_string()))?;
+        let track = self
+            .client
+            .track(id, None)
+            .map_err(|_| Error::NotFound(format!("Spotify track from {}", url).to_string()))?;
         Ok(mappers::convert_track(&track))
     }
 
     async fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
-        let res = self.client
+        let res = self
+            .client
             .search(query, SearchType::Track, None, None, Some(20), Some(0))
             .map_err(mappers::convert_error)?;
 
         if let SearchResult::Tracks(tracks) = res {
-            Ok(tracks.items.into_iter().map(|track| mappers::convert_track(&track)).collect())
+            Ok(tracks
+                .items
+                .into_iter()
+                .map(|track| mappers::convert_track(&track))
+                .collect())
         } else {
             Ok(Vec::new())
         }
@@ -68,48 +82,73 @@ impl Source for Spotify {
     async fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error> {
         let id = PlaylistId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
-        let playlist = self.client.playlist(id, None, None)
+        let playlist = self
+            .client
+            .playlist(id, None, None)
             .map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
 
-        Ok(playlist.tracks.items
+        Ok(playlist
+            .tracks
+            .items
             .iter()
             .enumerate()
-            .filter_map(|(i, track)| mappers::convert_playlist_item(track, i.try_into().unwrap_or(0)))
+            .filter_map(|(i, track)| {
+                mappers::convert_playlist_item(track, i.try_into().unwrap_or(0))
+            })
             .collect())
     }
 
     async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
-        let id = ArtistId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
-        let full_artist = self.client.artist(id).map_err(|_| Error::NotFound(format!("Spotify artist from {}", url).to_string()))?;
+        let id = ArtistId::from_id(self.url_to_id(url))
+            .map_err(|_| Error::InvalidUrl(url.to_string()))?;
+        let full_artist = self
+            .client
+            .artist(id)
+            .map_err(|_| Error::NotFound(format!("Spotify artist from {}", url).to_string()))?;
 
         Ok(mappers::convert_full_artist(&full_artist))
     }
 
     async fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
-        let res = self.client.search(search, SearchType::Artist, None, None, Some(20), Some(0))
+        let res = self
+            .client
+            .search(search, SearchType::Artist, None, None, Some(20), Some(0))
             .map_err(mappers::convert_error)?;
 
         if let SearchResult::Artists(artists) = res {
-            Ok(artists.items.into_iter().map(|artist| mappers::convert_full_artist(&artist)).collect())
+            Ok(artists
+                .items
+                .into_iter()
+                .map(|artist| mappers::convert_full_artist(&artist))
+                .collect())
         } else {
             Ok(Vec::new())
         }
     }
 
     async fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
-        let id = AlbumId::from_id(self.url_to_id(url)).map_err(|_| Error::InvalidUrl(url.to_string()))?;
-        let full_album = self.client.album(id, None).map_err(|_| Error::NotFound(format!("Spotify album from {}", url).to_string()))?;
+        let id = AlbumId::from_id(self.url_to_id(url))
+            .map_err(|_| Error::InvalidUrl(url.to_string()))?;
+        let full_album = self
+            .client
+            .album(id, None)
+            .map_err(|_| Error::NotFound(format!("Spotify album from {}", url).to_string()))?;
 
         Ok(mappers::convert_full_album(&full_album))
     }
 
     async fn get_albums_from_query(&self, search: &str) -> Result<Vec<Album>, Error> {
-        let res = self.client
+        let res = self
+            .client
             .search(search, SearchType::Album, None, None, Some(20), Some(0))
             .map_err(mappers::convert_error)?;
 
         if let SearchResult::Albums(albums) = res {
-            Ok(albums.items.iter().map(|album| mappers::convert_simplified_album(&album)).collect())
+            Ok(albums
+                .items
+                .iter()
+                .map(|album| mappers::convert_simplified_album(&album))
+                .collect())
         } else {
             Ok(Vec::new())
         }

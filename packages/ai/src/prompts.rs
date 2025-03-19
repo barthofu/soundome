@@ -14,7 +14,6 @@ Tasks:
 2. Extract artist → Detect names in title, extract featured artists (Ft., vs, &, b2b), and deduplicate.
 "#;
 
-
 // Utils
 
 const PROMPT_WITH_DATA: &str = r#"
@@ -28,6 +27,10 @@ Input:
 
 pub fn prompt_with_data<T: Serialize>(prompt: &str, data: T) -> SoundomeResult<String> {
     serde_json::to_string(&data)
-        .map(|data| PROMPT_WITH_DATA.replace("{PROMPT}", prompt).replace("{DATA}", &data))
+        .map(|data| {
+            PROMPT_WITH_DATA
+                .replace("{PROMPT}", prompt)
+                .replace("{DATA}", &data)
+        })
         .map_err(Into::into)
 }

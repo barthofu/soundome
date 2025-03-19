@@ -4,8 +4,14 @@ use async_trait::async_trait;
 use fancy_regex::Regex;
 use futures::future::join_all;
 use mappers::convert_track;
-use rustypipe::{client::RustyPipe, model::{MusicArtist, TrackItem}};
-use shared::{errors::Error, models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track}};
+use rustypipe::{
+    client::RustyPipe,
+    model::{MusicArtist, TrackItem},
+};
+use shared::{
+    errors::Error,
+    models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track},
+};
 
 use crate::Source;
 
@@ -14,7 +20,6 @@ pub struct YoutubeMusic {
 }
 
 impl YoutubeMusic {
-
     const TRACK_REGEX: &str = r#"/(?:https?:)?(?:\/\/)?(?:[0-9A-Z-]+\.)?(?:youtu\.be\/|youtube(?:-nocookie)?\.com\S*?[^\w\s-])([\w-]{11})(?=[^\w-]|$)(?![?=&+%\w.-]*(?:['"][^<>]*>|<\/a>))[?=&+%\w.-]*/gim"#;
     const PLAYLIST_REGEX: &str = r#"/^.*(music.youtube\/|list=)([^#&?]*).*/"#;
     const ARTIST_REGEX: &str = r"^https:\/\/music\.youtube\.com\/channel\/([A-Za-z0-9_-]+)$";
@@ -33,10 +38,20 @@ impl YoutubeMusic {
     async fn get_complete_track_from_music_track(&self, track: TrackItem) -> Track {
         let mut artists: Vec<MusicArtist> = Vec::new();
         for artist in track.artists.iter() {
-            let artist = self.client.query().music_artist(&artist.id.clone().unwrap_or("".to_string()), false).await.ok();
+            let artist = self
+                .client
+                .query()
+                .music_artist(&artist.id.clone().unwrap_or("".to_string()), false)
+                .await
+                .ok();
             artist.map(|artist| artists.push(artist));
         }
-        let album = self.client.query().music_album(&track.album.as_ref().map_or("", |album| &album.id)).await.ok();
+        let album = self
+            .client
+            .query()
+            .music_album(&track.album.as_ref().map_or("", |album| &album.id))
+            .await
+            .ok();
 
         convert_track(track, artists, album)
     }
@@ -72,82 +87,131 @@ impl YoutubeMusic {
 
 #[async_trait]
 impl Source for YoutubeMusic {
-
     async fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
-        let track_id = self.get_id_from_url(url).ok_or(Error::InvalidUrl(url.to_string()))?;
-        let track = self.client.query().music_details(track_id).await.map_err(|_| Error::NotFound(format!("Youtube Music track from {}", url).to_string()))?;
+        let track_id = self
+            .get_id_from_url(url)
+            .ok_or(Error::InvalidUrl(url.to_string()))?;
+        let track = self
+            .client
+            .query()
+            .music_details(track_id)
+            .await
+            .map_err(|_| {
+                Error::NotFound(format!("Youtube Music track from {}", url).to_string())
+            })?;
         Ok(self.get_complete_track_from_music_track(track.track).await)
     }
 
     async fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
-        let results = self.client
+        let results = self
+            .client
             .query()
             .music_search_tracks(query)
             .await
             .map_err(mappers::convert_error)?;
 
-        let tracks = join_all(results.items.items
-            .iter()
-            .map(|track| self.get_complete_track_from_music_track(track.clone()))
-        ).await;
+        let tracks = join_all(
+            results
+                .items
+                .items
+                .iter()
+                .map(|track| self.get_complete_track_from_music_track(track.clone())),
+        )
+        .await;
         Ok(tracks)
     }
 
     async fn get_playlist_tracks_from_url(&self, _url: &str) -> Result<Vec<PlaylistTrack>, Error> {
-        let playlist_id = self.get_playlist_id_from_url(_url).ok_or(Error::InvalidUrl(_url.to_string()))?;
-        let playlist = self.client
+        let playlist_id = self
+            .get_playlist_id_from_url(_url)
+            .ok_or(Error::InvalidUrl(_url.to_string()))?;
+        let playlist = self
+            .client
             .query()
             .music_playlist(playlist_id)
             .await
             .map_err(|_| Error::NotFound("Youtube Music playlist".to_string()))?;
 
-        let tracks = join_all(playlist.tracks.items.iter().map(|track| self.get_complete_track_from_music_track(track.clone()))).await;
+        let tracks = join_all(
+            playlist
+                .tracks
+                .items
+                .iter()
+                .map(|track| self.get_complete_track_from_music_track(track.clone())),
+        )
+        .await;
 
-        Ok(tracks.iter().enumerate().map(|(i, track)| PlaylistTrack {
-            track: track.clone(),
-            added_at: None,
-            position: Some(i as u32),
-        }).collect())
+        Ok(tracks
+            .iter()
+            .enumerate()
+            .map(|(i, track)| PlaylistTrack {
+                track: track.clone(),
+                added_at: None,
+                position: Some(i as u32),
+            })
+            .collect())
     }
 
     async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
-        let artist_id = self.get_artist_id_from_url(url).ok_or(Error::InvalidUrl(url.to_string()))?;
-        let artist = self.client
+        let artist_id = self
+            .get_artist_id_from_url(url)
+            .ok_or(Error::InvalidUrl(url.to_string()))?;
+        let artist = self
+            .client
             .query()
             .music_artist(artist_id, true)
             .await
-            .map_err(|_| Error::NotFound(format!("Youtube Music artist from {}", url).to_string()))?;
+            .map_err(|_| {
+                Error::NotFound(format!("Youtube Music artist from {}", url).to_string())
+            })?;
         Ok(mappers::convert_artist(&artist))
     }
 
     async fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
-        let results = self.client
+        let results = self
+            .client
             .query()
             .music_search_artists(search)
             .await
             .map_err(mappers::convert_error)?;
 
-        Ok(results.items.items.iter().map(|artist| mappers::convert_artist_item(artist)).collect())
+        Ok(results
+            .items
+            .items
+            .iter()
+            .map(|artist| mappers::convert_artist_item(artist))
+            .collect())
     }
 
     async fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
-        let album_id = self.get_album_id_from_url(url).ok_or(Error::InvalidUrl(url.to_string()))?;
-        let album = self.client
+        let album_id = self
+            .get_album_id_from_url(url)
+            .ok_or(Error::InvalidUrl(url.to_string()))?;
+        let album = self
+            .client
             .query()
             .music_album(album_id)
             .await
-            .map_err(|_| Error::NotFound(format!("Youtube Music album from {}", url).to_string()))?;
+            .map_err(|_| {
+                Error::NotFound(format!("Youtube Music album from {}", url).to_string())
+            })?;
         Ok(mappers::convert_album(&album))
     }
 
     async fn get_albums_from_query(&self, search: &str) -> Result<Vec<Album>, Error> {
-        let results = self.client
+        let results = self
+            .client
             .query()
             .music_search_albums(search)
             .await
             .map_err(mappers::convert_error)?;
 
-        Ok(results.items.items.iter().map(|album| mappers::convert_album_item(album)).collect())
+        Ok(results
+            .items
+            .items
+            .iter()
+            .map(|album| mappers::convert_album_item(album))
+            .collect())
     }
 
     async fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {

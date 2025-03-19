@@ -1,18 +1,17 @@
+pub mod soundcloud;
 pub mod spotify;
 pub mod youtube_music;
-pub mod soundcloud;
 
+use async_trait::async_trait;
 use config::model::AppConfig;
-use shared::models::{track::Track, artist::Artist, album::Album, playlist::PlaylistTrack};
 use shared::errors::Error;
+use shared::models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track};
 use soundcloud::Soundcloud;
 use spotify::Spotify;
 use youtube_music::YoutubeMusic;
-use async_trait::async_trait;
 
 #[async_trait]
 pub trait Source {
-
     async fn get_track_from_url(&self, url: &str) -> Result<Track, Error>;
     async fn get_tracks_from_query(&self, search: &str) -> Result<Vec<Track>, Error>;
     async fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error>;
@@ -48,11 +47,17 @@ pub async fn get_track_from_url(url: &str, config: &AppConfig) -> Result<Track, 
         //     let youtube = youtube::Youtube::new();
         //     youtube.get_track_from_url(url)
         // }
-        _ => Err(Error::InvalidUrl(format!("{} is not compatible with any 'source' available", url))),
+        _ => Err(Error::InvalidUrl(format!(
+            "{} is not compatible with any 'source' available",
+            url
+        ))),
     }
 }
 
-pub async fn get_playlist_tracks_from_url(url: &str, config: &AppConfig) -> Result<Vec<PlaylistTrack>, Error> {
+pub async fn get_playlist_tracks_from_url(
+    url: &str,
+    config: &AppConfig,
+) -> Result<Vec<PlaylistTrack>, Error> {
     match url {
         _ if Spotify::is_valid_playlist_url(url) => {
             let spotify = Spotify::new(&config.spotify.client_id, &config.spotify.client_secret)?;
@@ -70,6 +75,9 @@ pub async fn get_playlist_tracks_from_url(url: &str, config: &AppConfig) -> Resu
         //     let youtube = youtube::Youtube::new();
         //     youtube.get_playlist_tracks_from_url(url)
         // }
-        _ => Err(Error::InvalidUrl(format!("{} is not compatible with any 'source' available", url))),
+        _ => Err(Error::InvalidUrl(format!(
+            "{} is not compatible with any 'source' available",
+            url
+        ))),
     }
 }

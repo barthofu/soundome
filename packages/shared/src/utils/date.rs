@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 
 pub enum Format {
-    DATE
+    DATE,
 }
 
 impl Format {
@@ -42,11 +42,18 @@ mod tests {
 
         // Test the parse_date function with a valid date
         let parsed_date = parse_date(date_str, format);
-        assert!(parsed_date.is_some(), "The date should be parsed correctly.");
+        assert!(
+            parsed_date.is_some(),
+            "The date should be parsed correctly."
+        );
 
         // Check that the parsed date matches the expected date
         let expected_date = NaiveDate::from_ymd_opt(2025, 2, 22);
-        assert_eq!(parsed_date.unwrap(), expected_date.unwrap(), "The parsed date is incorrect.");
+        assert_eq!(
+            parsed_date.unwrap(),
+            expected_date.unwrap(),
+            "The parsed date is incorrect."
+        );
     }
 
     #[test]
@@ -66,7 +73,10 @@ mod tests {
 
         // Test the format_date function with a valid date
         let formatted_date = format_date(&date.unwrap(), format);
-        assert_eq!(formatted_date, "2025-02-22", "The formatted date is incorrect.");
+        assert_eq!(
+            formatted_date, "2025-02-22",
+            "The formatted date is incorrect."
+        );
     }
 
     #[test]
@@ -77,6 +87,9 @@ mod tests {
 
         // Check the formatted result for this date
         let formatted_date = format_date(&date.unwrap(), format);
-        assert_eq!(formatted_date, "0000-01-01", "The formatted empty date is incorrect.");
+        assert_eq!(
+            formatted_date, "0000-01-01",
+            "The formatted empty date is incorrect."
+        );
     }
 }

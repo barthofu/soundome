@@ -1,8 +1,8 @@
 use diesel::prelude::*;
 
 use crate::{
-    models::track::{NewTrack, TrackEntity, UpdateTrack},
     macros,
+    models::track::{NewTrack, TrackEntity, UpdateTrack},
 };
 
 // basic CRUD operations

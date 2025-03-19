@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 use strum::AsRefStr;
 
-use crate::{utils::string::{string_similarity, SimilarityAlgorithm}, models::{album::Album, artist::Artist}};
+use crate::{
+    models::{album::Album, artist::Artist},
+    utils::string::{string_similarity, SimilarityAlgorithm},
+};
 
 #[derive(Debug, Clone, AsRefStr)]
 pub enum TrackSource {
@@ -11,7 +14,7 @@ pub enum TrackSource {
     Youtube,
     YoutubeMusic,
     SoundCloud,
-    Unknown
+    Unknown,
 }
 
 #[derive(Debug, Clone, AsRefStr)]
@@ -19,7 +22,7 @@ pub enum TrackProvider {
     Youtube,
     YoutubeMusic,
     SoundCloud,
-    Unknown
+    Unknown,
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +58,6 @@ impl Weights {
 }
 
 impl Track {
-
     pub fn get_primary_artist(&self) -> Artist {
         self.album
             .as_ref()
@@ -68,7 +70,12 @@ impl Track {
      * Display a track in a user-friendly format
      */
     pub fn display(&self) -> String {
-        let artists = self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>().join(", ");
+        let artists = self
+            .artists
+            .iter()
+            .map(|artist| artist.name.clone())
+            .collect::<Vec<String>>()
+            .join(", ");
         let date = self.date.clone().unwrap_or_else(|| "Unknown".to_string());
         format!("{} by {} ({})", self.title, artists, date)
     }
@@ -81,37 +88,54 @@ impl Track {
         let mut total_weight = 0.0;
 
         // Title comparison
-        score += Weights::TITLE * string_similarity(&self.title, &other_track.title, SimilarityAlgorithm::Smart);
+        score += Weights::TITLE
+            * string_similarity(&self.title, &other_track.title, SimilarityAlgorithm::Smart);
         total_weight += Weights::TITLE;
 
         // Artists comparison (sort artists to handle different order)
-        let self_artists = self.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>();
-        let other_artists = other_track.artists.iter().map(|artist| artist.name.clone()).collect::<Vec<String>>();
-        score += Weights::ARTISTS * string_similarity(
-            &self_artists.join("; "),
-            &other_artists.join("; "),
-            SimilarityAlgorithm::Smart
-        );
+        let self_artists = self
+            .artists
+            .iter()
+            .map(|artist| artist.name.clone())
+            .collect::<Vec<String>>();
+        let other_artists = other_track
+            .artists
+            .iter()
+            .map(|artist| artist.name.clone())
+            .collect::<Vec<String>>();
+        score += Weights::ARTISTS
+            * string_similarity(
+                &self_artists.join("; "),
+                &other_artists.join("; "),
+                SimilarityAlgorithm::Smart,
+            );
         total_weight += Weights::ARTISTS;
 
         // Album comparison (if both tracks have an album)
         if let (Some(album1), Some(album2)) = (&self.album, &other_track.album) {
-            score += Weights::ALBUM * string_similarity(&album1.title, &album2.title, SimilarityAlgorithm::Smart);
+            score += Weights::ALBUM
+                * string_similarity(&album1.title, &album2.title, SimilarityAlgorithm::Smart);
             total_weight += Weights::ALBUM;
         }
 
         // Duration comparison (within tolerance ranges)
         if let (Some(duration1), Some(duration2)) = (&self.duration, &other_track.duration) {
             let diff = (duration1 - duration2 / 1000).abs();
-            let duration_score = if diff <= 2000 {  // <= 2 seconds tolerance
+            let duration_score = if diff <= 2000 {
+                // <= 2 seconds tolerance
                 Weights::DURATION
-            } else if diff <= 5000 {  // <= 5 seconds tolerance
+            } else if diff <= 5000 {
+                // <= 5 seconds tolerance
                 Weights::DURATION / 2.0
             } else {
                 0.0
             };
             score += duration_score;
-            total_weight += if duration_score > 0.0 { Weights::DURATION } else { 0.0 };
+            total_weight += if duration_score > 0.0 {
+                Weights::DURATION
+            } else {
+                0.0
+            };
         }
 
         // Release date comparison (exact match)
@@ -145,5 +169,4 @@ impl Track {
         self.disc_number = source_track.disc_number.clone();
         self.label = source_track.label.clone();
     }
-
 }
