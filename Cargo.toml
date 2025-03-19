@@ -9,5 +9,5 @@ members = [
     "packages/shared", "packages/database",
     "packages/downloader",
     "packages/fetcher", "packages/orchestrator",
-    "packages/tagger", "apps/cli"
-, "packages/config", "tests"]
+    "packages/tagger", "apps/cli",
+    "packages/config", "tests", "packages/ai"]

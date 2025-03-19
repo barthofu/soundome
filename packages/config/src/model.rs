@@ -7,6 +7,7 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub spotify: SpotifyConfig,
     pub youtube: Option<YoutubeConfig>,
+    pub openrouter: Option<OpenRouterConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +35,13 @@ pub struct YoutubeConfig {
     pub invidious_instance: Option<String>,
 }
 
-pub struct SoundcloudConfig {
-    pub client_id: String,
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct OpenRouterConfig {
+    pub api_key: String,
+    pub model: Option<String>,
+    pub provider: Option<String>,
+    pub base_url: Option<String>,
+    pub timeout: Option<u64>,
 }
+

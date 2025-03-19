@@ -27,6 +27,10 @@ pub enum Error {
     #[error("unknown error")]
     Unknown,
 
+    // AI
+    #[error("no AI backend configured")]
+    NoAIBackend,
+
     // CLI Parsing
     #[error("{0}")]
     Io(std::io::Error),
