@@ -3,10 +3,11 @@ mod matcher;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use config::model::AiConfig;
 use fetcher::Source;
 use shared::{errors::Error, models::track::Track};
 
-use crate::{utils::scdl::download_with_scdl, Matcher, Provider};
+use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
 
 pub struct SoundCloud {
     fetcher: fetcher::soundcloud::Soundcloud,
@@ -14,8 +15,8 @@ pub struct SoundCloud {
 }
 
 impl SoundCloud {
-    pub async fn new() -> Result<Self, Error> {
-        fetcher::soundcloud::Soundcloud::new()
+    pub async fn new(ai_config: AiConfig) -> Result<Self, Error> {
+        fetcher::soundcloud::Soundcloud::new(ai_config)
             .await
             .map(|fetcher| Self {
                 fetcher,
@@ -51,7 +52,7 @@ impl Provider for SoundCloud {
     }
 
     async fn download(&mut self, url: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
-        download_with_scdl(url, base_dir).await
+        download_with_ytdlp(url, base_dir).await
     }
 
     fn is_valid_url(url: &str) -> bool {

@@ -24,8 +24,8 @@ pub struct OpenRouterAI {
 impl OpenRouterAI {
     const DEFAULT_MODEL: &str = "google/gemini-flash-1.5-8b";
 
-    pub fn new(config: OpenRouterConfig) -> SoundomeResult<Self> {
-        let base_url = with_default(config.base_url, "https://openrouter.ai/api/v1/".to_string());
+    pub fn new(config: &OpenRouterConfig) -> SoundomeResult<Self> {
+        let base_url = with_default(config.base_url.clone(), "https://openrouter.ai/api/v1/".to_string());
         let client = OpenRouterClient::<Unconfigured>::new()
             .with_base_url(base_url.clone())
             .map_err(|_| {
@@ -44,8 +44,8 @@ impl OpenRouterAI {
 
         Ok(Self {
             client: client,
-            model: with_default(config.model, Self::DEFAULT_MODEL.to_string()),
-            provider: config.provider,
+            model: with_default(config.model.clone(), Self::DEFAULT_MODEL.to_string()),
+            provider: config.provider.clone(),
         })
     }
 

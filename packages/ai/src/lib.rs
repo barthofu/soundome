@@ -3,7 +3,7 @@ pub mod prompts;
 
 use async_trait::async_trait;
 use backends::openrouter::OpenRouterAI;
-use config::model::AppConfig;
+use config::model::AiConfig;
 use serde::{Deserialize, Serialize};
 use shared::{errors::Error, types::SoundomeResult};
 
@@ -49,10 +49,13 @@ impl AIBackend for AIBackendInstance {
 pub struct AIClient;
 
 impl AIClient {
-    pub fn new(config: AppConfig) -> SoundomeResult<AIBackendInstance> {
+    pub fn new(config: &AiConfig) -> SoundomeResult<AIBackendInstance> {
+        if !config.enabled {
+            return Err(Error::Config("AI is not enabled".to_string()));
+        }
         match config {
             _ if config.openrouter.is_some() => {
-                let openrouter = OpenRouterAI::new(config.openrouter.unwrap())?; // safe unwrap
+                let openrouter = OpenRouterAI::new(config.openrouter.as_ref().unwrap())?; // safe unwrap
                 Ok(AIBackendInstance::OpenRouter(openrouter))
             }
             _ => Err(Error::NoAIBackend),

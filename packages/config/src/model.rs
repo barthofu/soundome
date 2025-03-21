@@ -1,41 +1,71 @@
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct AppConfig {
     pub general: GeneralConfig,
     pub database: DatabaseConfig,
-    pub spotify: SpotifyConfig,
-    pub youtube: Option<YoutubeConfig>,
-    pub openrouter: Option<OpenRouterConfig>,
+    pub providers: ProvidersConfig,
+    pub ai: AiConfig,
 }
 
-#[derive(Debug, Deserialize)]
+// ===============================================================================
+// General
+// ===============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct GeneralConfig {
     pub base_dir: String,
 }
 
-#[derive(Debug, Deserialize)]
+// ===============================================================================
+// Database
+// ===============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct DatabaseConfig {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+// ===============================================================================
+// Providers
+// ===============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
+pub struct ProvidersConfig {
+    pub spotify: SpotifyConfig,
+    pub youtube: Option<YoutubeConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct SpotifyConfig {
     pub client_id: String,
     pub client_secret: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct YoutubeConfig {
     pub invidious_instance: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+// ===============================================================================
+// AI
+// ===============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
+pub struct AiConfig {
+    pub enabled: bool,
+    pub openrouter: Option<OpenRouterConfig>,
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct OpenRouterConfig {
     pub api_key: String,

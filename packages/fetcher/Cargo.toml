@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 shared = { path = "../shared" }
 config = { path = "../config" }
+ai = { path = "../ai" }
 
 rspotify = { version = "0.14.0", default-features = false, features = [
   "env-file",

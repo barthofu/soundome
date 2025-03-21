@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use config::model::AppConfig;
 use shared::errors::Error;
 use shared::models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track};
+use shared::types::SoundomeResult;
 use soundcloud::Soundcloud;
 use spotify::Spotify;
 use youtube_music::YoutubeMusic;
@@ -29,10 +30,10 @@ pub trait Source {
 // Exposed functions
 // ==============================
 
-pub async fn get_track_from_url(url: &str, config: &AppConfig) -> Result<Track, Error> {
+pub async fn get_track_from_url(url: &str, config: &AppConfig) -> SoundomeResult<Track> {
     match url {
         _ if Spotify::is_valid_track_url(url) => {
-            let spotify = Spotify::new(&config.spotify.client_id, &config.spotify.client_secret)?;
+            let spotify = Spotify::new(&config.providers.spotify.client_id, &config.providers.spotify.client_secret)?;
             spotify.get_track_from_url(url).await
         }
         _ if YoutubeMusic::is_valid_track_url(url) => {
@@ -40,7 +41,7 @@ pub async fn get_track_from_url(url: &str, config: &AppConfig) -> Result<Track, 
             youtube_music.get_track_from_url(url).await
         }
         _ if Soundcloud::is_valid_track_url(url) => {
-            let soundcloud = Soundcloud::new().await?;
+            let soundcloud = Soundcloud::new(config.ai.clone()).await?;
             soundcloud.get_track_from_url(url).await
         }
         // _ if Youtube::is_valid_track_url(url) => {
@@ -57,10 +58,10 @@ pub async fn get_track_from_url(url: &str, config: &AppConfig) -> Result<Track, 
 pub async fn get_playlist_tracks_from_url(
     url: &str,
     config: &AppConfig,
-) -> Result<Vec<PlaylistTrack>, Error> {
+) -> SoundomeResult<Vec<PlaylistTrack>> {
     match url {
         _ if Spotify::is_valid_playlist_url(url) => {
-            let spotify = Spotify::new(&config.spotify.client_id, &config.spotify.client_secret)?;
+            let spotify = Spotify::new(&config.providers.spotify.client_id, &config.providers.spotify.client_secret)?;
             spotify.get_playlist_tracks_from_url(url).await
         }
         _ if YoutubeMusic::is_valid_playlist_url(url) => {
@@ -68,7 +69,7 @@ pub async fn get_playlist_tracks_from_url(
             youtube_music.get_playlist_tracks_from_url(url).await
         }
         _ if Soundcloud::is_valid_playlist_url(url) => {
-            let soundcloud = Soundcloud::new().await?;
+            let soundcloud = Soundcloud::new(config.ai.clone()).await?;
             soundcloud.get_playlist_tracks_from_url(url).await
         }
         // _ if Youtube::is_valid_playlist_url(url) => {

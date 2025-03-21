@@ -150,7 +150,9 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
         file_path: None,
         source: None,
         source_url: None,
+        source_id: None,
         provider: None,
         provider_url: None,
+        provider_id: None,
     }
 }

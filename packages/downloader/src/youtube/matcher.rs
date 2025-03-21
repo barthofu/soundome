@@ -38,9 +38,9 @@ impl Matcher for Youtube<'_> {
                     ]);
 
                     let rendered_track_title =
-                        render_and_normalize_template(pattern.1, &context, &self.excluded_words);
+                        render_and_normalize_template(pattern.1, &context, &self.excluded_words).ok()?;
                     let rendered_video_title =
-                        render_and_normalize_template(pattern.0, &context, &self.excluded_words);
+                        render_and_normalize_template(pattern.0, &context, &self.excluded_words).ok()?;
 
                     let title_score = string_similarity(
                         &rendered_track_title,

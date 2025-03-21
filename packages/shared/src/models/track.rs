@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 
 use crate::{
@@ -43,8 +45,17 @@ pub struct Track {
     pub file_path: Option<PathBuf>,
     pub source: Option<TrackSource>,
     pub source_url: Option<String>,
+    pub source_id: Option<String>,
     pub provider: Option<TrackProvider>,
     pub provider_url: Option<String>,
+    pub provider_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SimplifiedTrack {
+    pub id: String,
+    pub title: String,
+    pub artists: Vec<String>,
 }
 
 struct Weights;

@@ -88,8 +88,10 @@ pub fn convert_track(
         file_path: None,
         source: Some(TrackSource::SoundCloud),
         source_url: Some(track.permalink_url.clone()),
+        source_id: Some(track.id.to_string()),
         provider: None,
         provider_url: None,
+        provider_id: None,
         track_number: album.as_ref().and_then(|a| {
             a.album_playlist
                 .tracks

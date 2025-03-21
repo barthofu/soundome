@@ -30,6 +30,12 @@ pub enum Error {
     #[error("no AI backend configured")]
     NoAIBackend,
 
+    // String
+    #[error("string template error: {0}")]
+    TemplateRenderingError(tinytemplate::error::Error),
+    #[error("invalid path: {0}")]
+    InvalidPath(std::path::PathBuf),
+
     // CLI Parsing
     #[error("{0}")]
     Io(std::io::Error),
@@ -56,5 +62,11 @@ impl From<std::io::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Error::Json(err)
+    }
+}
+
+impl From<tinytemplate::error::Error> for Error {
+    fn from(err: tinytemplate::error::Error) -> Self {
+        Error::TemplateRenderingError(err)
     }
 }

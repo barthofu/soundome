@@ -76,8 +76,10 @@ impl YoutubeMusic {
                 "https://music.youtube.com/watch?v={}",
                 search_item.id
             )),
+            provider_id: Some(search_item.id),
             source: None,
             source_url: None,
+            source_id: None,
             date: None,
             cover: None,
             disc_number: None,

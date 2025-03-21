@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use strsim::{damerau_levenshtein, jaro_winkler, sorensen_dice};
 use unicode_normalization::UnicodeNormalization;
 
+use crate::{errors::Error, types::SoundomeResult};
+
 pub enum SimilarityAlgorithm {
     Smart,
     JaroWinkler,
@@ -85,10 +87,12 @@ pub fn slugify(s: &str) -> String {
  * Applies a template to a context, replacing {placeholders}
  * with values using tinytemplate
  */
-pub fn render_template(template: &str, context: &HashMap<&str, &str>) -> String {
+pub fn render_template(template: &str, context: &HashMap<&str, &str>) -> SoundomeResult<String> {
     let mut tt = tinytemplate::TinyTemplate::new();
-    tt.add_template("template", template).unwrap();
-    tt.render("template", &context).unwrap()
+    tt.add_template("template", template)
+        .map_err(Error::TemplateRenderingError)?;
+    tt.render("template", &context)
+        .map_err(Error::TemplateRenderingError)
 }
 
 /**
@@ -109,11 +113,12 @@ pub fn render_and_normalize_template(
     template: &str,
     context: &HashMap<&str, &str>,
     excluded_words: &Vec<&str>,
-) -> String {
-    slugify(&normalize_string(&remove_excluded_words(
-        &render_template(template, context).to_lowercase(),
+) -> SoundomeResult<String> {
+    let rendered = render_template(template, context)?.to_lowercase();
+    Ok(slugify(&normalize_string(&remove_excluded_words(
+        &rendered,
         excluded_words,
-    )))
+    ))))
 }
 
 // ================================================================================================

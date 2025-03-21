@@ -1,11 +1,12 @@
 use serde_json::Value;
-use shared::errors::Error;
+use shared::{errors::Error, types::SoundomeResult};
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::{io::AsyncReadExt, process::Command};
 
-pub async fn download_with_scdl(url: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
-    let output_path = format!("{}/%(title)s.%(ext)s", base_dir.to_str().unwrap());
+pub async fn _download_with_scdl(url: &str, base_dir: PathBuf) -> SoundomeResult<PathBuf> {
+    let output_path = format!("{}", base_dir.to_str()
+        .ok_or(Error::InvalidPath(base_dir.clone()))?);
 
     let mut child = Command::new("scdl")
         .stdout(Stdio::piped())

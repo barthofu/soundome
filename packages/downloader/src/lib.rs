@@ -37,6 +37,7 @@ pub async fn search(track: &Track, config: &AppConfig) -> Result<(TrackProvider,
     // providers
     let youtube = youtube::Youtube::new(
         config
+            .providers
             .youtube
             .as_ref()
             .map(|youtube| youtube.invidious_instance.clone())
@@ -82,6 +83,7 @@ pub async fn download(
         TrackSource::Spotify => {
             let mut youtube = youtube::Youtube::new(
                 config
+                    .providers
                     .youtube
                     .as_ref()
                     .map(|youtube| youtube.invidious_instance.clone())
@@ -94,6 +96,7 @@ pub async fn download(
         TrackSource::Youtube => {
             let mut youtube = youtube::Youtube::new(
                 config
+                    .providers
                     .youtube
                     .as_ref()
                     .map(|youtube| youtube.invidious_instance.clone())
@@ -110,7 +113,7 @@ pub async fn download(
                 .await
         }
         TrackSource::SoundCloud => {
-            let mut soundcloud = soundcloud::SoundCloud::new().await?;
+            let mut soundcloud = soundcloud::SoundCloud::new(config.ai.clone()).await?;
             soundcloud
                 .download(&url, PathBuf::from(&config.general.base_dir))
                 .await
