@@ -28,7 +28,7 @@ impl TagProvider for MusicBrainz {
         query_builder
             .recording(&track.title)
             .and()
-            .artist(&track.artists[0].name);
+            .artist(&track.artists.get(0).unwrap().name); // TODO: Handle error
 
         if let Some(album) = &track.album {
             query_builder.and().release(&album.title);

@@ -74,6 +74,8 @@ impl Soundcloud {
                 Error::Internal(format!("AI processing failed: {}", e))
             })?;
 
+        println!("Processed tracks: {:#?}", processed_tracks);
+
         // Update the original tracks
         for (i, processed_track) in processed_tracks.iter().enumerate() {
             tracks[i].title = processed_track.title.clone();

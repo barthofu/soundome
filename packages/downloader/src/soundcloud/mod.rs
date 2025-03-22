@@ -51,8 +51,8 @@ impl Provider for SoundCloud {
         Ok(best_match)
     }
 
-    async fn download(&mut self, url: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
-        download_with_ytdlp(url, base_dir).await
+    async fn download(&mut self, url: &str, file_name: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
+        download_with_ytdlp(url, file_name, base_dir).await
     }
 
     fn is_valid_url(url: &str) -> bool {

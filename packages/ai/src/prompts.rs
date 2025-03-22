@@ -5,7 +5,7 @@ use shared::{types::SoundomeResult, utils::string::render_template};
 
 pub fn clean_track_title_and_artist_name(single_track: bool) -> SoundomeResult<String> {
     let template: &str = r#"
-        Clean and enhance track metadata from a JSON {{ if single_track }}object{{ else }}array{{ endif }} of objects with this format:
+        Refine and standardize track metadata from a JSON {{ if single_track }}object{{ else }}array{{ endif }} of objects with this format:
         ```json
         \{
             "id": "<track id>",
@@ -16,6 +16,7 @@ pub fn clean_track_title_and_artist_name(single_track: bool) -> SoundomeResult<S
         Tasks:
         1. Clean title → Remove catalog numbers, platform tags, redundant info (Original Mix, Remastered), and artist names.
         2. Extract artist → Detect names in title, extract featured artists (Ft., vs, &, b2b), and deduplicate.
+        {{ if single_track }}{{ else }}3. Keep the tracks in the same order.{{ endif }}
         "#;
 
     let context = HashMap::from([("single_track", if single_track { "true" } else { "false" })]);

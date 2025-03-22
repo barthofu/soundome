@@ -84,11 +84,7 @@ impl Orchestrator {
 
         // Download the track
         let file_path = downloader::download(
-            &provider_url,
-            &downloaded_track
-                .source
-                .clone()
-                .unwrap_or(TrackSource::Unknown),
+            &downloaded_track,
             &self.config,
         )
         .await?;

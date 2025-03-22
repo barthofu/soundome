@@ -27,7 +27,7 @@ pub fn convert_error(err: rsoundcloud::ClientError) -> Error {
 /// Converts a Soundcloud artist to a shared Artist.
 pub fn convert_artist(user: &rsoundcloud::models::user::User) -> Artist {
     Artist {
-        name: user.user.full_name.clone(),
+        name: user.user.username.clone(),
         url: Some(user.user.permalink_url.clone()),
         icon: Some(user.user.avatar_url.clone()),
     }
@@ -36,7 +36,7 @@ pub fn convert_artist(user: &rsoundcloud::models::user::User) -> Artist {
 /// Converts a Soundcloud basic artist to a shared Artist.
 pub fn convert_basic_artist(basic_user: &rsoundcloud::models::user::BasicUser) -> Artist {
     Artist {
-        name: basic_user.full_name.clone(),
+        name: basic_user.username.clone(),
         url: Some(basic_user.permalink_url.clone()),
         icon: Some(basic_user.avatar_url.clone()),
     }
