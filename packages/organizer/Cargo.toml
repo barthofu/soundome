@@ -1,0 +1,8 @@
+[package]
+name = "organizer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared = { path = "../shared" }
+config = { path = "../config" }

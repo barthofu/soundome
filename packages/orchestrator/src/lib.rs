@@ -2,6 +2,7 @@ use config::model::AppConfig;
 // On suppose que ces modules existent dans le monorepo et exposent les fonctions nécessaires.
 use downloader;
 use fetcher;
+use organizer::move_track_file;
 use shared::{
     errors::Error,
     models::track::{Track, TrackSource},
@@ -108,6 +109,9 @@ impl Orchestrator {
 
         tagger::file::tag_file_with_track(&file_path.clone(), &downloaded_track)?;
         println!("Tagged file with downloaded_track metadata");
+
+        // Move the file to the correct location
+        move_track_file(&mut downloaded_track, &self.config.general.base_dir)?;
 
         Ok(downloaded_track)
     }

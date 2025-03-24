@@ -10,6 +10,7 @@ downloader = { path = "../downloader" }
 fetcher = { path = "../fetcher" }
 tagger = { path = "../tagger" }
 database = { path = "../database" }
+organizer = { path = "../organizer" }
 
 tokio = { version = "1.43.0", features = ["time", "process", "io-util"] }
 diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }

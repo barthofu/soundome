@@ -17,3 +17,4 @@ data/
 # misc
 tmp/
 core
+rustypipe_cache.json
