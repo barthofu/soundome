@@ -1,7 +1,7 @@
 use std::{collections::HashMap, f64::consts::E};
 
 use shared::{
-    models::track::Track,
+    models::Track,
     utils::string::{render_and_normalize_template, string_similarity, SimilarityAlgorithm},
 };
 

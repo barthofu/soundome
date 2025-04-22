@@ -1,7 +1,7 @@
 use super::YoutubeMusic;
 use crate::Matcher;
 use async_trait::async_trait;
-use shared::models::track::Track;
+use shared::models::Track;
 
 #[async_trait]
 impl Matcher for YoutubeMusic {

@@ -10,9 +10,9 @@ use rustypipe::{
 use shared::{
     errors::Error,
     models::{
-        album::Album,
-        artist::Artist,
-        track::{Track, TrackProvider},
+        Album,
+        Artist,
+        Track, TrackProvider,
     },
 };
 
@@ -51,20 +51,23 @@ impl YoutubeMusic {
 
     fn convert_search_item_to_track(&self, search_item: TrackItem) -> Track {
         Track {
+            id: None,
             title: search_item.name,
             artists: search_item
                 .artists
                 .iter()
                 .map(|artist| Artist {
+                    id: None,
                     name: artist.name.clone(),
                     url: None,
                     icon: None,
                 })
                 .collect(),
             album: search_item.album.map(|album| Album {
+                id: None,
                 title: album.name,
                 artists: vec![],
-                album_type: shared::models::album::AlbumType::Unknown,
+                album_type: shared::models::AlbumType::Unknown,
                 cover: None,
                 date: None,
                 url: None,

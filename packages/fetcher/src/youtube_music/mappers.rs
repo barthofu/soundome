@@ -4,9 +4,9 @@ use rustypipe::model::{
 use shared::{
     errors::Error,
     models::{
-        album::Album,
-        artist::Artist,
-        track::{Track, TrackSource},
+        Album,
+        Artist,
+        Track, TrackSource,
     },
 };
 
@@ -28,6 +28,7 @@ pub fn convert_error(err: rustypipe::error::Error) -> Error {
 /// Converts a Youtube Music artist to a shared Artist.
 pub fn convert_artist(artist: &MusicArtist) -> Artist {
     Artist {
+        id: None,
         name: artist.name.clone(),
         url: Some(format!("https://music.youtube.com/channel/{}", artist.id)),
         icon: artist.header_image.first().map(|image| image.url.clone()),
@@ -36,6 +37,7 @@ pub fn convert_artist(artist: &MusicArtist) -> Artist {
 
 pub fn convert_artist_id(artist: &ArtistId) -> Artist {
     Artist {
+        id: None,
         name: artist.name.clone(),
         url: artist
             .id
@@ -47,6 +49,7 @@ pub fn convert_artist_id(artist: &ArtistId) -> Artist {
 
 pub fn convert_artist_item(artist: &ArtistItem) -> Artist {
     Artist {
+        id: None,
         name: artist.name.clone(),
         url: Some(format!("https://music.youtube.com/channel/{}", artist.id)),
         icon: artist.avatar.first().map(|image| image.url.clone()),
@@ -56,6 +59,7 @@ pub fn convert_artist_item(artist: &ArtistItem) -> Artist {
 /// Converts a Youtube Music album to a shared Album.
 pub fn convert_album(album: &MusicAlbum) -> Album {
     Album {
+        id: None,
         title: album.name.clone(),
         artists: album.artists.iter().map(convert_artist_id).collect(),
         album_type: convert_album_type(album.album_type),
@@ -67,6 +71,7 @@ pub fn convert_album(album: &MusicAlbum) -> Album {
 
 pub fn convert_album_item(album: &AlbumItem) -> Album {
     Album {
+        id: None,
         title: album.name.clone(),
         artists: album.artists.iter().map(convert_artist_id).collect(),
         album_type: convert_album_type(album.album_type),
@@ -76,12 +81,12 @@ pub fn convert_album_item(album: &AlbumItem) -> Album {
     }
 }
 
-fn convert_album_type(album_type: AlbumType) -> shared::models::album::AlbumType {
+fn convert_album_type(album_type: AlbumType) -> shared::models::AlbumType {
     match album_type {
-        AlbumType::Album => shared::models::album::AlbumType::Album,
-        AlbumType::Single => shared::models::album::AlbumType::Single,
-        AlbumType::Audiobook => shared::models::album::AlbumType::Unknown,
-        _ => shared::models::album::AlbumType::Unknown,
+        AlbumType::Album => shared::models::AlbumType::Album,
+        AlbumType::Single => shared::models::AlbumType::Single,
+        AlbumType::Audiobook => shared::models::AlbumType::Unknown,
+        _ => shared::models::AlbumType::Unknown,
     }
 }
 
@@ -92,6 +97,7 @@ pub fn convert_track(
     album: Option<MusicAlbum>,
 ) -> Track {
     Track {
+        id: None,
         title: track.name.clone(),
         artists: artists.iter().map(convert_artist).collect(),
         album: album.as_ref().map(|a| convert_album(a)),

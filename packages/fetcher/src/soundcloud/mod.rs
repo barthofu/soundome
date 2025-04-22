@@ -12,7 +12,7 @@ use rsoundcloud::{
 };
 use shared::{
     errors::Error,
-    models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::{SimplifiedTrack, Track}}, types::SoundomeResult,
+    models::{Album, Artist, PlaylistTrack, SimplifiedTrack, Track}, types::SoundomeResult,
 };
 
 use crate::Source;
@@ -80,6 +80,7 @@ impl Soundcloud {
         for (i, processed_track) in processed_tracks.iter().enumerate() {
             tracks[i].title = processed_track.title.clone();
             tracks[i].artists = processed_track.artists.iter().enumerate().map(|(j, name)| Artist {
+                id: None,
                 name: name.clone(),
                 // TODO: only working for the original
                 url: tracks[i].artists.get(j).and_then(|artist| artist.url.clone()),
@@ -157,6 +158,7 @@ impl Source for Soundcloud {
             .iter()
             .enumerate()
             .map(|(i, track)| PlaylistTrack {
+                id: None,
                 track: track.clone(),
                 added_at: None,
                 position: Some(i as u32),

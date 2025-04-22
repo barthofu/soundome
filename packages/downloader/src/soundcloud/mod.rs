@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use config::model::AiConfig;
 use fetcher::Source;
-use shared::{errors::Error, models::track::Track};
+use shared::{errors::Error, models::Track};
 
 use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
 

@@ -5,7 +5,7 @@ pub mod youtube_music;
 use async_trait::async_trait;
 use config::model::AppConfig;
 use shared::errors::Error;
-use shared::models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track};
+use shared::models::{Album, Artist, PlaylistTrack, Track};
 use shared::types::SoundomeResult;
 use soundcloud::Soundcloud;
 use spotify::Spotify;

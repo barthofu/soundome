@@ -1,30 +1,60 @@
+-- Mise à jour de la migration pour correspondre aux modèles métier
+
 create table track (
     id integer not null primary key autoincrement,
     title text not null,
-    album text,
-    year integer,
-    cover text,
     duration integer,
+    album_id integer references album(id),
     track_number integer,
     disc_number integer,
+    label text,
+    date text,
+    genre text,
+    cover text,
+    file_path text,
+    source text,
     source_url text,
-    download_url
-    file_type text not null,
-    file_size integer not null,
-    file_path text not null
+    source_id text,
+    provider text,
+    provider_url text,
+    provider_id text
+);
+
+create table track_source (
+    id integer not null primary key autoincrement,
+    track_id integer not null references track(id),
+    external_id text not null,
+    platform text not null -- "spotify", "soundcloud", "youtube", etc.
 );
 
 create table album (
     id integer not null primary key autoincrement,
     title text not null,
+    album_type text not null,
     cover text,
-    year integer
+    date text,
+    url text
+);
+
+create table album_source (
+    id integer not null primary key autoincrement,
+    album_id integer not null references album(id),
+    external_id text not null,
+    platform text not null -- "spotify", "soundcloud", "youtube", etc.
 );
 
 create table artist (
     id integer not null primary key autoincrement,
     name text not null,
+    url text,
     icon text
+);
+
+create table artist_source (
+    id integer not null primary key autoincrement,
+    artist_id integer not null references artist(id),
+    external_id text not null,
+    platform text not null -- "spotify", "soundcloud", "youtube", etc.
 );
 
 create table playlist (
@@ -43,43 +73,35 @@ create table genre (
 
 /* association tables */
 
-create table album_tracks (
-    id integer not null primary key autoincrement,
-    track_id integer not null,
-    album_id integer not null,
-    foreign key (track_id) references track(id),
-    foreign key (album_id) references album(id)
-);
-
 create table artist_tracks (
-    id integer not null primary key autoincrement,
     track_id integer not null,
     artist_id integer not null,
-    foreign key (track_id) references track(id),
-    foreign key (artist_id) references artist(id)
+    primary key (track_id, artist_id),
+    foreign key (track_id) references track(id) on delete cascade,
+    foreign key (artist_id) references artist(id) on delete cascade
 );
 
 create table artist_albums (
-    id integer not null primary key autoincrement,
     album_id integer not null,
     artist_id integer not null,
-    foreign key (album_id) references album(id),
-    foreign key (artist_id) references artist(id)
+    primary key (album_id, artist_id),
+    foreign key (album_id) references album(id) on delete cascade,
+    foreign key (artist_id) references artist(id) on delete cascade
 );
 
 create table playlist_tracks (
-    id integer not null primary key autoincrement,
     track_id integer not null,
     playlist_id integer not null,
-    position integer not null,
-    foreign key (track_id) references track(id),
-    foreign key (playlist_id) references playlist(id)
+    position integer,
+    primary key (track_id, playlist_id),
+    foreign key (track_id) references track(id) on delete cascade,
+    foreign key (playlist_id) references playlist(id) on delete cascade
 );
 
 create table track_genres (
-    id integer not null primary key autoincrement,
     track_id integer not null,
     genre_id integer not null,
-    foreign key (track_id) references track(id),
-    foreign key (genre_id) references genre(id)
+    primary key (track_id, genre_id),
+    foreign key (track_id) references track(id) on delete cascade,
+    foreign key (genre_id) references genre(id) on delete cascade
 );

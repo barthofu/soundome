@@ -27,6 +27,7 @@
             openssl
             d2
             inkscape
+            ffmpeg
           ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
           PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";

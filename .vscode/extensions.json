@@ -2,6 +2,7 @@
     "recommendations": [
         "rust-lang.rust-analyzer",
         "vadimcn.vscode-lldb",
-        "mkhl.direnv"
+        "mkhl.direnv",
+        "Terrastruct.d2"
     ]
 }

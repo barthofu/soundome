@@ -2,9 +2,9 @@ use audiotags::{AudioTag, Tag};
 use shared::{
     errors::Error,
     models::{
-        album::Album,
-        artist::Artist,
-        track::{Track, TrackProvider, TrackSource},
+        Album,
+        Artist,
+        Track, TrackProvider, TrackSource,
     },
 };
 use std::{path::PathBuf, str::FromStr};
@@ -104,6 +104,7 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
     });
 
     Track {
+        id: None,
         title: tag
             .title()
             .map_or("Unknown".to_string(), |title| title.to_string()),
@@ -113,6 +114,7 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
                 artists
                     .iter()
                     .map(|artist| Artist {
+                        id: None,
                         name: artist.to_string(),
                         url: None,
                         icon: None,
@@ -121,6 +123,7 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
             })
             .unwrap_or_default(),
         album: tag.album_title().map(|album_title| Album {
+            id: None,
             title: album_title.to_string(),
             artists: tag
                 .album_artist()
@@ -128,6 +131,7 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
                     artist
                         .split(";")
                         .map(|artist| Artist {
+                            id: None,
                             name: artist.to_string(),
                             url: None,
                             icon: None,
@@ -135,7 +139,7 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
                         .collect()
                 })
                 .unwrap_or_default(),
-            album_type: shared::models::album::AlbumType::Unknown,
+            album_type: shared::models::AlbumType::Unknown,
             date: date.clone(),
             url: None,
             cover: None,

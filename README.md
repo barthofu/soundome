@@ -27,5 +27,7 @@ Interface web:
 
 1. `make shell`
 2. `cargo install diesel_cli --no-default-features --features sqlite`
+3. `diesel setup`
+4. `diesel migration run`
 
 ###

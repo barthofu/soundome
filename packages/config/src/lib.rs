@@ -10,7 +10,7 @@ impl AppConfig {
             std::env::var("SOUNDOME__CONFIG_DIR").unwrap_or_else(|_| String::from("config.toml"));
 
         let config = Config::builder()
-            // Add in `./Settings.toml`
+            // Add in config toml
             .add_source(config::File::with_name(&config_dir))
             // Add in settings from the environment (with a prefix of SOUNDOME)
             .add_source(config::Environment::with_prefix("SOUNDOME").separator("__"))

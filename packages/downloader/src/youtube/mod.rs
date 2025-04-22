@@ -12,8 +12,8 @@ use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
 use shared::{
     errors::Error,
     models::{
-        artist::Artist,
-        track::{Track, TrackProvider},
+        Artist,
+        Track, TrackProvider,
     },
 };
 
@@ -77,8 +77,10 @@ impl Youtube<'_> {
     fn convert_search_item_to_track(&self, search_item: SearchItem) -> Option<Track> {
         match search_item {
             SearchItem::Video(video) => Some(Track {
+                id: None,
                 title: video.title,
                 artists: vec![Artist {
+                    id: None,
                     name: video.author,
                     icon: None,
                     url: None,

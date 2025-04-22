@@ -2,10 +2,10 @@ use rsoundcloud::http::StatusCode;
 use shared::{
     errors::Error,
     models::{
-        album::{Album, AlbumType},
-        artist::Artist,
-        playlist::PlaylistTrack,
-        track::{Track, TrackSource},
+        Album, AlbumType,
+        Artist,
+        PlaylistTrack,
+        Track, TrackSource,
     },
 };
 
@@ -27,6 +27,7 @@ pub fn convert_error(err: rsoundcloud::ClientError) -> Error {
 /// Converts a Soundcloud artist to a shared Artist.
 pub fn convert_artist(user: &rsoundcloud::models::user::User) -> Artist {
     Artist {
+        id: None,
         name: user.user.username.clone(),
         url: Some(user.user.permalink_url.clone()),
         icon: Some(user.user.avatar_url.clone()),
@@ -36,6 +37,7 @@ pub fn convert_artist(user: &rsoundcloud::models::user::User) -> Artist {
 /// Converts a Soundcloud basic artist to a shared Artist.
 pub fn convert_basic_artist(basic_user: &rsoundcloud::models::user::BasicUser) -> Artist {
     Artist {
+        id: None,
         name: basic_user.username.clone(),
         url: Some(basic_user.permalink_url.clone()),
         icon: Some(basic_user.avatar_url.clone()),
@@ -47,6 +49,7 @@ pub fn convert_album(album_playlist: &rsoundcloud::models::playlist::AlbumPlayli
     let user = &album_playlist.user;
     let album = &album_playlist.album_playlist;
     Album {
+        id: None,
         title: album.title.clone(),
         artists: vec![convert_artist(&user)],
         album_type: AlbumType::Unknown,
@@ -63,6 +66,7 @@ pub fn convert_basic_album(
     let user = &basic_album_playlist.user;
     let album = &basic_album_playlist.album_playlist;
     Album {
+        id: None,
         title: album.title.clone(),
         artists: vec![convert_basic_artist(&user)],
         album_type: AlbumType::Unknown,
@@ -80,6 +84,7 @@ pub fn convert_track(
     let user = &track.user;
     let track = &track.track;
     Track {
+        id: None,
         title: track.title.clone(),
         artists: vec![convert_basic_artist(&user)],
         album: album.as_ref().map(|a| convert_basic_album(&a)),
@@ -115,6 +120,7 @@ pub fn convert_playlist_item(
     pos: u32,
 ) -> Option<PlaylistTrack> {
     Some(PlaylistTrack {
+        id: None,
         track: convert_track(item, None),
         added_at: None,
         position: Some(pos),

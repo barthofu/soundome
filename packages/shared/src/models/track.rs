@@ -19,6 +19,23 @@ pub enum TrackSource {
     Unknown,
 }
 
+impl TrackSource {
+    pub fn from_str(source: &str) -> Self {
+        match source.to_lowercase().as_str() {
+            "local" => TrackSource::Local,
+            "spotify" => TrackSource::Spotify,
+            "youtube" => TrackSource::Youtube,
+            "youtube_music" => TrackSource::YoutubeMusic,
+            "soundcloud" => TrackSource::SoundCloud,
+            _ => TrackSource::Unknown,
+        }
+    }
+
+    pub fn from_string(source: String) -> Self {
+        TrackSource::from_str(&source)
+    }
+}
+
 #[derive(Debug, Clone, AsRefStr)]
 pub enum TrackProvider {
     Youtube,
@@ -27,8 +44,25 @@ pub enum TrackProvider {
     Unknown,
 }
 
+impl TrackProvider {
+    pub fn from_str(provider: &str) -> Self {
+        match provider.to_lowercase().as_str() {
+            "youtube" => TrackProvider::Youtube,
+            "youtube_music" => TrackProvider::YoutubeMusic,
+            "soundcloud" => TrackProvider::SoundCloud,
+            _ => TrackProvider::Unknown,
+        }
+    }
+
+    pub fn from_string(provider: String) -> Self {
+        TrackProvider::from_str(&provider)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Track {
+    pub id: Option<i32>,
+
     // Audio metadata
     pub title: String,
     pub artists: Vec<Artist>,

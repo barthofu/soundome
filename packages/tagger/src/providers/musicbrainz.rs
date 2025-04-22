@@ -4,7 +4,7 @@ use musicbrainz_rs::prelude::*;
 use shared::utils::enums::Match;
 use shared::utils::string::{string_similarity, SimilarityAlgorithm};
 use shared::{
-    models::{album::Album, artist::Artist, track::Track},
+    models::{Album, Artist, Track},
     utils::date::{format_date, Format},
 };
 
@@ -124,6 +124,7 @@ impl TagProvider for MusicBrainz {
 
 fn convert_to_artist(artist: &ArtistCredit) -> Artist {
     Artist {
+        id: None,
         name: artist.name.clone(),
         url: None,
         icon: None,
@@ -132,6 +133,7 @@ fn convert_to_artist(artist: &ArtistCredit) -> Artist {
 
 fn convert_to_album(release: &Release) -> Album {
     Album {
+        id: None,
         title: release.title.clone(),
         artists: release
             .artist_credit
@@ -142,7 +144,7 @@ fn convert_to_album(release: &Release) -> Album {
             .date
             .as_ref()
             .map(|date| format_date(&date, Format::DATE)),
-        album_type: shared::models::album::AlbumType::Unknown,
+        album_type: shared::models::AlbumType::Unknown,
         url: None,
         // cover: release.get_coverart().res_1200().execute().await.unwrap().
         cover: None,
@@ -168,6 +170,7 @@ fn convert_to_track(recording: &Recording) -> Track {
         .unwrap_or(1);
 
     Track {
+        id: None,
         title: recording.title.clone(),
         artists,
         album,

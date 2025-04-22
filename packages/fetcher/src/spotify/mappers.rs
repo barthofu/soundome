@@ -4,10 +4,10 @@ use rspotify::model::{
 use shared::{
     errors::Error,
     models::{
-        album::{Album, AlbumType},
-        artist::Artist,
-        playlist::PlaylistTrack,
-        track::{Track, TrackSource},
+        Album, AlbumType,
+        Artist,
+        PlaylistTrack,
+        Track, TrackSource,
     },
 };
 
@@ -23,6 +23,7 @@ pub fn convert_error(err: rspotify::ClientError) -> Error {
 /// Converts a simplified Spotify artist to a shared Artist.
 pub fn convert_artist(artist: &SimplifiedArtist) -> Artist {
     Artist {
+        id: None,
         name: artist.name.clone(),
         url: artist.external_urls.get("spotify").cloned(),
         icon: None,
@@ -32,6 +33,7 @@ pub fn convert_artist(artist: &SimplifiedArtist) -> Artist {
 /// Converts a full Spotify artist to a shared Artist.
 pub fn convert_full_artist(artist: &FullArtist) -> Artist {
     Artist {
+        id: None,
         name: artist.name.clone(),
         url: artist.external_urls.get("spotify").cloned(),
         icon: artist.images.get(0).map(|image| image.url.clone()),
@@ -41,6 +43,7 @@ pub fn convert_full_artist(artist: &FullArtist) -> Artist {
 /// Converts a simplified Spotify album to a shared Album.
 pub fn convert_simplified_album(album: &SimplifiedAlbum) -> Album {
     Album {
+        id: None,
         title: album.name.clone(),
         artists: album.artists.iter().map(convert_artist).collect(),
         album_type: album
@@ -71,6 +74,7 @@ fn convert_album_type(album_type: &rspotify::model::AlbumType) -> AlbumType {
 /// Converts a full Spotify album to a shared Album.
 pub fn convert_full_album(album: &FullAlbum) -> Album {
     Album {
+        id: None,
         title: album.name.clone(),
         artists: album.artists.iter().map(convert_artist).collect(),
         album_type: convert_album_type(&album.album_type),
@@ -86,6 +90,7 @@ pub fn convert_track(track: &FullTrack) -> Track {
     let artists = track.artists.iter().map(convert_artist).collect();
 
     Track {
+        id: None,
         title: track.name.clone(),
         artists,
         album: Some(convert_simplified_album(album)),
@@ -110,6 +115,7 @@ pub fn convert_track(track: &FullTrack) -> Track {
 pub fn convert_playlist_item(item: &PlaylistItem, pos: u32) -> Option<PlaylistTrack> {
     item.track.as_ref().and_then(|t| match t {
         PlayableItem::Track(track) => Some(PlaylistTrack {
+            id: None,
             track: convert_track(track),
             added_at: item.added_at.clone(),
             position: Some(pos),

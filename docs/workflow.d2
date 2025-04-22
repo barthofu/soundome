@@ -10,10 +10,22 @@ user: "User" {
     shape: person
 }
 
+
 fetcher: "Fetcher" {
+
+    check_track_url: "Check for track URL in the database" {
+        shape: diamond
+        # style.fill: "darkseagreen"
+    }
+
     get_track_info_from_url: "Get track info from URL" {
         shape: oval
         style.fill: "darkseagreen"
+    }
+
+    check_track: "Check track in the database" {
+        shape: diamond
+        # style.fill: "darkseagreen"
     }
 
     soundcloud {
@@ -28,6 +40,9 @@ fetcher: "Fetcher" {
     spotify {
         style.fill: "darkseagreen"
     }
+
+    check_track_url -> get_track_info_from_url: "if doesn't exist"
+    get_track_info_from_url -> check_track: "track object"
 }
 
 downloader: "Downloader" {
@@ -146,8 +161,10 @@ db: "Database" {
 
 # Relations
 
-user -> fetcher.get_track_info_from_url: "url"
-fetcher.get_track_info_from_url -> downloader.search_track: "track object"
+user -> fetcher.check_track_url: "url"
+fetcher.check_track_url -> stop: "if exists"
+fetcher.check_track -> stop: "if exists"
+fetcher.check_track -> downloader.search_track: "if not exists"
 downloader.search_track -> downloader.download_track: "download url"
 downloader.download_track -> fs_cache: "write"
 downloader.download_track -> tagger.get_music_brainz_metadata_from_track_object: "track object"

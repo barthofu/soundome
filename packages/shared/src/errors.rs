@@ -20,6 +20,10 @@ pub enum Error {
     #[error("{0} http error: {1}")]
     Http(String, String),
 
+    // Database
+    #[error("database error: {0}")]
+    Database(String),
+
     // Other
     #[error("custom error: {0}")]
     Custom(String),

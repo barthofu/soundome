@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use config::model::AppConfig;
 use shared::{
     errors::Error,
-    models::track::{Track, TrackProvider, TrackSource}, types::SoundomeResult,
+    models::{Track, TrackProvider, TrackSource}, types::SoundomeResult,
 };
 use std::path::PathBuf;
 

@@ -8,7 +8,7 @@ use rspotify::{
 };
 use shared::{
     errors::Error,
-    models::{album::Album, artist::Artist, playlist::PlaylistTrack, track::Track},
+    models::{Album, Artist, PlaylistTrack, Track},
 };
 
 use crate::Source;
