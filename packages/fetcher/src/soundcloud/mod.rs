@@ -65,7 +65,7 @@ impl Soundcloud {
 
         let processed_tracks = ai_client
             .generate_with_data(&prompt, tracks.iter().map(|track| SimplifiedTrack {
-                id: track.source_id.clone().unwrap_or_default(),
+                id: track.get_source().and_then(|track_ref| track_ref.external_id).unwrap_or_default(),
                 title: track.title.clone(),
                 artists: track.artists.iter().map(|a| a.name.clone()).collect(),
             }).collect::<Vec<SimplifiedTrack>>())
@@ -82,9 +82,9 @@ impl Soundcloud {
             tracks[i].artists = processed_track.artists.iter().enumerate().map(|(j, name)| Artist {
                 id: None,
                 name: name.clone(),
-                // TODO: only working for the original
-                url: tracks[i].artists.get(j).and_then(|artist| artist.url.clone()),
                 icon: tracks[i].artists.get(j).and_then(|artist| artist.icon.clone()),
+                // TODO: only working for the original
+                references: tracks[i].artists.get(j).and_then(|artist| Some(artist.references.clone())).unwrap_or_default(),
             }).collect();
         }
 

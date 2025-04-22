@@ -11,20 +11,16 @@ create table track (
     date text,
     genre text,
     cover text,
-    file_path text,
-    source text,
-    source_url text,
-    source_id text,
-    provider text,
-    provider_url text,
-    provider_id text
+    file_path text
 );
 
-create table track_source (
+create table track_ref (
     id integer not null primary key autoincrement,
-    track_id integer not null references track(id),
-    external_id text not null,
-    platform text not null -- "spotify", "soundcloud", "youtube", etc.
+    track_id integer not null references track(id) on delete cascade, -- Cascade delete ensures that when a track is deleted, its associations in this table are also removed
+    type text not null, -- "source", "metadata", "provider", etc.
+    platform text not null, -- "spotify", "soundcloud", "youtube", etc.
+    external_id text,
+    external_url text
 );
 
 create table album (
@@ -32,29 +28,31 @@ create table album (
     title text not null,
     album_type text not null,
     cover text,
-    date text,
-    url text
+    date text
 );
 
-create table album_source (
+create table album_ref (
     id integer not null primary key autoincrement,
-    album_id integer not null references album(id),
-    external_id text not null,
-    platform text not null -- "spotify", "soundcloud", "youtube", etc.
+    album_id integer not null references album(id) on delete cascade, -- Cascade delete ensures that when an album is deleted, its associations in this table are also removed
+    type text not null, -- "source", "metadata", "provider", etc.
+    platform text not null, -- "spotify", "soundcloud", "youtube", etc.
+    external_id text,
+    external_url text
 );
 
 create table artist (
     id integer not null primary key autoincrement,
     name text not null,
-    url text,
     icon text
 );
 
-create table artist_source (
+create table artist_ref (
     id integer not null primary key autoincrement,
-    artist_id integer not null references artist(id),
-    external_id text not null,
-    platform text not null -- "spotify", "soundcloud", "youtube", etc.
+    artist_id integer not null references artist(id) on delete cascade, -- Cascade delete ensures that when an artist is deleted, its associations in this table are also removed
+    type text not null, -- "source", "metadata", "provider", etc.
+    platform text not null, -- "spotify", "soundcloud", "youtube", etc.
+    external_id text,
+    external_url text
 );
 
 create table playlist (
@@ -77,6 +75,7 @@ create table artist_tracks (
     track_id integer not null,
     artist_id integer not null,
     primary key (track_id, artist_id),
+    -- Cascade delete ensures that when a track is deleted, its associations in this table are also removed
     foreign key (track_id) references track(id) on delete cascade,
     foreign key (artist_id) references artist(id) on delete cascade
 );
@@ -85,6 +84,7 @@ create table artist_albums (
     album_id integer not null,
     artist_id integer not null,
     primary key (album_id, artist_id),
+    -- Cascade delete ensures that when an album is deleted, its associations in this table are also removed
     foreign key (album_id) references album(id) on delete cascade,
     foreign key (artist_id) references artist(id) on delete cascade
 );
@@ -94,6 +94,7 @@ create table playlist_tracks (
     playlist_id integer not null,
     position integer,
     primary key (track_id, playlist_id),
+    -- Cascade delete ensures that when a track is deleted, its associations in this table are also removed
     foreign key (track_id) references track(id) on delete cascade,
     foreign key (playlist_id) references playlist(id) on delete cascade
 );
@@ -102,6 +103,7 @@ create table track_genres (
     track_id integer not null,
     genre_id integer not null,
     primary key (track_id, genre_id),
+    -- Cascade delete ensures that when a track is deleted, its associations in this table are also removed
     foreign key (track_id) references track(id) on delete cascade,
     foreign key (genre_id) references genre(id) on delete cascade
 );

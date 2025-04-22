@@ -2,10 +2,7 @@ use rsoundcloud::http::StatusCode;
 use shared::{
     errors::Error,
     models::{
-        Album, AlbumType,
-        Artist,
-        PlaylistTrack,
-        Track, TrackSource,
+        Album, AlbumType, Artist, PlaylistTrack, Reference, ReferenceType, Track
     },
 };
 
@@ -29,8 +26,14 @@ pub fn convert_artist(user: &rsoundcloud::models::user::User) -> Artist {
     Artist {
         id: None,
         name: user.user.username.clone(),
-        url: Some(user.user.permalink_url.clone()),
         icon: Some(user.user.avatar_url.clone()),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::SoundCloud,
+            external_id: Some(user.user.id.to_string()),
+            external_url: Some(user.user.permalink_url.clone()),
+        }]
     }
 }
 
@@ -39,8 +42,14 @@ pub fn convert_basic_artist(basic_user: &rsoundcloud::models::user::BasicUser) -
     Artist {
         id: None,
         name: basic_user.username.clone(),
-        url: Some(basic_user.permalink_url.clone()),
         icon: Some(basic_user.avatar_url.clone()),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::SoundCloud,
+            external_id: Some(basic_user.id.to_string()),
+            external_url: Some(basic_user.permalink_url.clone()),
+        }]
     }
 }
 
@@ -53,9 +62,15 @@ pub fn convert_album(album_playlist: &rsoundcloud::models::playlist::AlbumPlayli
         title: album.title.clone(),
         artists: vec![convert_artist(&user)],
         album_type: AlbumType::Unknown,
-        url: Some(album.permalink_url.clone()),
         cover: album.artwork_url.clone(),
         date: album.release_date.clone(),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::SoundCloud,
+            external_id: Some(album.id.to_string()),
+            external_url: Some(album.permalink_url.clone()),
+        }],
     }
 }
 
@@ -70,9 +85,15 @@ pub fn convert_basic_album(
         title: album.title.clone(),
         artists: vec![convert_basic_artist(&user)],
         album_type: AlbumType::Unknown,
-        url: Some(album.permalink_url.clone()),
         cover: album.artwork_url.clone(),
         date: album.release_date.clone(),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::SoundCloud,
+            external_id: Some(album.id.to_string()),
+            external_url: Some(album.permalink_url.clone()),
+        }],
     }
 }
 
@@ -91,12 +112,6 @@ pub fn convert_track(
         genre: track.genre.clone(), // TODO: check if this is correct instead of tag_list
         duration: Some(track.duration.clone()),
         file_path: None,
-        source: Some(TrackSource::SoundCloud),
-        source_url: Some(track.permalink_url.clone()),
-        source_id: Some(track.id.to_string()),
-        provider: None,
-        provider_url: None,
-        provider_id: None,
         track_number: album.as_ref().and_then(|a| {
             a.album_playlist
                 .tracks
@@ -111,6 +126,13 @@ pub fn convert_track(
         label: track.label_name.clone(),
         date: track.release_date.clone(),
         cover: track.artwork_url.clone(),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::SoundCloud,
+            external_id: Some(track.id.to_string()),
+            external_url: Some(track.permalink_url.clone()),
+        }],
     }
 }
 

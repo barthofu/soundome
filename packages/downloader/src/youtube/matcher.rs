@@ -11,7 +11,7 @@ use async_trait::async_trait;
 
 #[async_trait]
 impl Matcher for Youtube<'_> {
-    fn match_results(&self, search_results: Vec<Track>, source_track: Track) -> Option<String> {
+    fn match_results(&self, search_results: Vec<Track>, source_track: Track) -> Option<Track> {
         let best_match = self
             .patterns
             .iter()
@@ -21,7 +21,7 @@ impl Matcher for Youtube<'_> {
                         .artists
                         .first()
                         .map_or("", |artist| artist.name.as_str());
-                    let track_artist = &source_track.get_primary_artist().name;
+                    let track_artist = source_track.get_primary_artist().name;
                     let track_artists = source_track
                         .artists
                         .iter()
@@ -33,7 +33,7 @@ impl Matcher for Youtube<'_> {
                         ("video_title", result.title.as_str()),
                         ("video_author", video_author),
                         ("track_title", &source_track.title),
-                        ("track_artist", track_artist),
+                        ("track_artist", &track_artist),
                         ("track_artists", &track_artists),
                     ]);
 
@@ -60,7 +60,10 @@ impl Matcher for Youtube<'_> {
                         source_track.duration.unwrap_or(0),
                         result.duration.unwrap_or(0),
                         duration_score,
-                        result.provider_url.as_ref().unwrap()
+                        result
+                            .get_provider()
+                            .and_then(|provider| provider.external_url)
+                            .unwrap_or_default()
                     );
 
                     if title_score < self.similarity_treshold || duration_score < 25.0 {
@@ -83,8 +86,7 @@ impl Matcher for Youtube<'_> {
 
         best_match
             .filter(|(score, _)| *score >= self.similarity_treshold)
-            .map(|(_, result)| result.provider_url.clone())
-            .flatten()
+            .map(|(_, result)| result.clone())
     }
 }
 

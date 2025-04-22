@@ -57,19 +57,30 @@ pub fn has_track(conn: &mut SqliteConnection, artist: &ArtistEntity, track: &Tra
 }
 
 // ================================================================================================
-// Artist Source
+// Artist Ref
 // ================================================================================================
 
-pub mod artist_source {
-    use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+pub mod artist_ref {
+    use diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 
     use crate::{
-        entities::{ArtistSourceEntity, NewArtistSourceEntity, UpdateArtistSourceEntity}, macros
+        entities::{ArtistEntity, ArtistRefEntity, NewArtistRefEntity, UpdateArtistRefEntity}, macros
     };
 
-    macros::resource::find_one!(artist_source, ArtistSourceEntity);
-    macros::resource::find_all!(artist_source, ArtistSourceEntity);
-    macros::resource::create!(artist_source, ArtistSourceEntity, NewArtistSourceEntity);
-    macros::resource::update!(artist_source, ArtistSourceEntity, UpdateArtistSourceEntity);
-    macros::resource::delete!(artist_source);
+    macros::resource::find_one!(artist_ref, ArtistRefEntity);
+    macros::resource::find_all!(artist_ref, ArtistRefEntity);
+    macros::resource::create!(artist_ref, ArtistRefEntity, NewArtistRefEntity);
+    macros::resource::update!(artist_ref, ArtistRefEntity, UpdateArtistRefEntity);
+    macros::resource::delete!(artist_ref);
+
+    // custom operations
+
+    pub fn get_artist_refs_by_artist_entity(
+        conn: &mut SqliteConnection,
+        artist: &ArtistEntity,
+    ) -> Vec<ArtistRefEntity> {
+        ArtistRefEntity::belonging_to(artist)
+            .load::<ArtistRefEntity>(conn)
+            .unwrap_or_default()
+    }
 }

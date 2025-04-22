@@ -126,8 +126,8 @@ fn convert_to_artist(artist: &ArtistCredit) -> Artist {
     Artist {
         id: None,
         name: artist.name.clone(),
-        url: None,
         icon: None,
+        references: Vec::new(),
     }
 }
 
@@ -145,9 +145,9 @@ fn convert_to_album(release: &Release) -> Album {
             .as_ref()
             .map(|date| format_date(&date, Format::DATE)),
         album_type: shared::models::AlbumType::Unknown,
-        url: None,
         // cover: release.get_coverart().res_1200().execute().await.unwrap().
         cover: None,
+        references: Vec::new(),
     }
 }
 
@@ -181,15 +181,10 @@ fn convert_to_track(recording: &Recording) -> Track {
             .map(|date| format_date(&date, Format::DATE)),
         track_number: Some(track_number),
         disc_number: None,
-        source: None,
-        source_url: None,
-        source_id: None,
-        provider: None,
-        provider_url: None,
-        provider_id: None,
         cover: None,
         duration: recording.length.map(|length| length as i32),
         label: None,
         file_path: None,
+        references: Vec::new(),
     }
 }

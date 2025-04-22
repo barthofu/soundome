@@ -4,7 +4,7 @@ use shared::{
     models::{
         Album,
         Artist,
-        Track, TrackProvider, TrackSource,
+        Track,
     },
 };
 use std::{path::PathBuf, str::FromStr};
@@ -76,18 +76,18 @@ fn convert_track_to_tag(tag: &mut Box<dyn AudioTag + Send + Sync>, track: &Track
 
     tag.set_comment(
         "Downloaded by Soundome\n---".to_string()
-            + "\nSource: "
-            + track
-                .source
-                .as_ref()
-                .unwrap_or(&TrackSource::Unknown)
-                .as_ref()
-            + "\nProvider: "
-            + track
-                .provider
-                .as_ref()
-                .unwrap_or(&TrackProvider::Unknown)
-                .as_ref(),
+            // + "\nSource: "
+            // + track
+            //     .source
+            //     .as_ref()
+            //     .unwrap_or(&TrackSource::Unknown)
+            //     .as_ref()
+            // + "\nProvider: "
+            // + track
+            //     .provider
+            //     .as_ref()
+            //     .unwrap_or(&TrackProvider::Unknown)
+            //     .as_ref(),
     );
 }
 
@@ -116,8 +116,8 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
                     .map(|artist| Artist {
                         id: None,
                         name: artist.to_string(),
-                        url: None,
                         icon: None,
+                        references: Vec::new(),
                     })
                     .collect()
             })
@@ -133,16 +133,16 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
                         .map(|artist| Artist {
                             id: None,
                             name: artist.to_string(),
-                            url: None,
                             icon: None,
+                            references: Vec::new(),
                         })
                         .collect()
                 })
                 .unwrap_or_default(),
             album_type: shared::models::AlbumType::Unknown,
             date: date.clone(),
-            url: None,
             cover: None,
+            references: Vec::new(),
         }),
         genre: tag.genre().map(|genre| genre.to_string()),
         date: date,
@@ -152,11 +152,6 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
         duration: tag.duration().map(|duration| duration as i32),
         label: None,
         file_path: None,
-        source: None,
-        source_url: None,
-        source_id: None,
-        provider: None,
-        provider_url: None,
-        provider_id: None,
+        references: Vec::new(),
     }
 }

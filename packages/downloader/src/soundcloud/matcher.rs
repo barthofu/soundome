@@ -5,7 +5,7 @@ use shared::models::Track;
 
 #[async_trait]
 impl Matcher for SoundCloud {
-    fn match_results(&self, search_results: Vec<Track>, source_track: Track) -> Option<String> {
+    fn match_results(&self, search_results: Vec<Track>, source_track: Track) -> Option<Track> {
         let best_match = search_results
             .iter()
             .map(|result| (source_track.compare(result), result.clone()))
@@ -13,7 +13,6 @@ impl Matcher for SoundCloud {
 
         best_match
             .filter(|(score, _)| *score >= self.similarity_treshold)
-            .map(|(_, result)| result.provider_url.clone())
-            .flatten()
+            .map(|(_, result)| result)
     }
 }

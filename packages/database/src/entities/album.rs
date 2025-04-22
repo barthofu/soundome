@@ -2,7 +2,7 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket_okapi::JsonSchema;
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 
-use crate::schema::{album, album_source};
+use crate::schema::{album, album_ref};
 
 // ================================================================================================
 // Album
@@ -16,7 +16,6 @@ pub struct AlbumEntity {
     pub album_type: String,
     pub cover: Option<String>,
     pub date: Option<String>,
-    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize, JsonSchema)]
@@ -26,7 +25,6 @@ pub struct NewAlbumEntity {
     pub album_type: String,
     pub cover: Option<String>,
     pub date: Option<String>,
-    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone, AsChangeset, Deserialize, JsonSchema)]
@@ -36,34 +34,43 @@ pub struct UpdateAlbumEntity {
     pub album_type: Option<String>,
     pub cover: Option<String>,
     pub date: Option<String>,
-    pub url: Option<String>,
 }
 
 // ================================================================================================
 // Album Source
 // ================================================================================================
 
-#[derive(Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
-#[diesel(table_name = album_source)]
-pub struct AlbumSourceEntity {
+#[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[diesel(table_name = album_ref)]
+#[diesel(belongs_to(AlbumEntity, foreign_key = album_id))]
+pub struct AlbumRefEntity {
     pub id: i32,
     pub album_id: i32,
-    pub external_id: String,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize, JsonSchema)]
-#[diesel(table_name = album_source)]
-pub struct NewAlbumSourceEntity {
+#[diesel(table_name = album_ref)]
+pub struct NewAlbumRefEntity {
     pub album_id: i32,
-    pub external_id: String,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, AsChangeset, Deserialize, JsonSchema)]
-#[diesel(table_name = album_source)]
-pub struct UpdateAlbumSourceEntity {
+#[diesel(table_name = album_ref)]
+pub struct UpdateAlbumRefEntity {
     pub album_id: Option<i32>,
-    pub external_id: Option<String>,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: Option<String>,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }

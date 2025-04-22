@@ -2,14 +2,13 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket_okapi::JsonSchema;
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 
-use crate::{entities::{album::AlbumEntity, track::TrackEntity}, schema::{artist, artist_albums, artist_source, artist_tracks}};
+use crate::{entities::{album::AlbumEntity, track::TrackEntity}, schema::{artist, artist_albums, artist_ref, artist_tracks}};
 
 #[derive(Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
 #[diesel(table_name = artist)]
 pub struct ArtistEntity {
     pub id: i32,
     pub name: String,
-    pub url: Option<String>,
     pub icon: Option<String>,
 }
 
@@ -17,7 +16,6 @@ pub struct ArtistEntity {
 #[diesel(table_name = artist)]
 pub struct NewArtistEntity {
     pub name: String,
-    pub url: Option<String>,
     pub icon: Option<String>,
 }
 
@@ -25,7 +23,6 @@ pub struct NewArtistEntity {
 #[diesel(table_name = artist)]
 pub struct UpdateArtistEntity {
     pub name: Option<String>,
-    pub url: Option<String>,
     pub icon: Option<String>,
 }
 
@@ -57,27 +54,37 @@ pub struct ArtistAlbumEntity {
 // Artist Source
 // ================================================================================================
 
-#[derive(Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
-#[diesel(table_name = artist_source)]
-pub struct ArtistSourceEntity {
+#[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[diesel(table_name = artist_ref)]
+#[diesel(belongs_to(ArtistEntity, foreign_key = artist_id))]
+pub struct ArtistRefEntity {
     pub id: i32,
     pub artist_id: i32,
-    pub external_id: String,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize, JsonSchema)]
-#[diesel(table_name = artist_source)]
-pub struct NewArtistSourceEntity {
+#[diesel(table_name = artist_ref)]
+pub struct NewArtistRefEntity {
     pub artist_id: i32,
-    pub external_id: String,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, AsChangeset, Deserialize, JsonSchema)]
-#[diesel(table_name = artist_source)]
-pub struct UpdateArtistSourceEntity {
+#[diesel(table_name = artist_ref)]
+pub struct UpdateArtistRefEntity {
     pub artist_id: Option<i32>,
-    pub external_id: Option<String>,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: Option<String>,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }

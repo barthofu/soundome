@@ -4,9 +4,7 @@ use downloader;
 use fetcher;
 use organizer::move_track_file;
 use shared::{
-    errors::Error,
-    models::{Track, TrackSource},
-    utils::enums::Match,
+    errors::Error, models::{Platform, Track}, types::SoundomeResult, utils::enums::Match
 };
 use tagger::TagProvider;
 
@@ -25,10 +23,9 @@ impl Orchestrator {
         let mut track = fetcher::get_track_from_url(url, &self.config).await?;
         println!(
             "Fetched track from {}: {}",
-            track
-                .source
-                .clone()
-                .unwrap_or(TrackSource::Unknown)
+            track.get_source()
+                .map(|s| s.platform)
+                .unwrap_or(Platform::Unknown)
                 .as_ref(),
             track.display()
         );
@@ -38,7 +35,7 @@ impl Orchestrator {
         Ok(track)
     }
 
-    pub async fn download_playlist_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {
+    pub async fn download_playlist_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
         println!(
             "====================\nDownloading playlist from {:?}\n---------",
             url
@@ -74,14 +71,13 @@ impl Orchestrator {
         Ok(tracks)
     }
 
-    async fn download_track(&self, track: Track) -> Result<Track, Error> {
+    async fn download_track(&self, track: Track) -> SoundomeResult<Track> {
         let mut downloaded_track = track;
 
         // Get the best download URL
-        let (provider, provider_url) = downloader::search(&downloaded_track, &self.config).await?;
-        println!("Found download URL from {:?}: {:?}", provider, provider_url);
-        downloaded_track.provider = provider.into();
-        downloaded_track.provider_url = provider_url.clone().into();
+        let provider_ref = downloader::search(&downloaded_track, &self.config).await?;
+        println!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
+        downloaded_track.references.push(provider_ref);
 
         // Download the track
         let file_path = downloader::download(

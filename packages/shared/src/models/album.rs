@@ -1,6 +1,21 @@
 use strum::AsRefStr;
 
-use super::artist::Artist;
+use super::{artist::Artist, Reference};
+
+#[derive(Debug, Clone)]
+pub struct Album {
+    pub id: Option<i32>,
+    pub title: String,
+    pub artists: Vec<Artist>,
+    pub album_type: AlbumType,
+    pub cover: Option<String>,
+    pub date: Option<String>,
+    pub references: Vec<Reference>
+}
+
+// ================================================================================================
+// Enums
+// ================================================================================================
 
 #[derive(Debug, Clone, AsRefStr)]
 pub enum AlbumType {
@@ -33,15 +48,4 @@ impl AlbumType {
             _ => AlbumType::Unknown,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Album {
-    pub id: Option<i32>,
-    pub title: String,
-    pub artists: Vec<Artist>,
-    pub album_type: AlbumType,
-    pub url: Option<String>,
-    pub cover: Option<String>,
-    pub date: Option<String>,
 }

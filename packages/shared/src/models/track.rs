@@ -9,6 +9,12 @@ use crate::{
     utils::string::{string_similarity, SimilarityAlgorithm},
 };
 
+use super::{Reference, ReferenceType};
+
+// ================================================================================================
+// Enums
+// ================================================================================================
+
 #[derive(Debug, Clone, AsRefStr)]
 pub enum TrackSource {
     Local,
@@ -59,6 +65,10 @@ impl TrackProvider {
     }
 }
 
+// ================================================================================================
+// Structs
+// ================================================================================================
+
 #[derive(Debug, Clone)]
 pub struct Track {
     pub id: Option<i32>,
@@ -77,12 +87,7 @@ pub struct Track {
 
     // Utils
     pub file_path: Option<PathBuf>,
-    pub source: Option<TrackSource>,
-    pub source_url: Option<String>,
-    pub source_id: Option<String>,
-    pub provider: Option<TrackProvider>,
-    pub provider_url: Option<String>,
-    pub provider_id: Option<String>,
+    pub references: Vec<Reference>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -92,8 +97,12 @@ pub struct SimplifiedTrack {
     pub artists: Vec<String>,
 }
 
-struct Weights;
 
+// ================================================================================================
+// Implementations
+// ================================================================================================
+
+struct Weights;
 impl Weights {
     const TITLE: f64 = 1.0;
     const ARTISTS: f64 = 0.7;
@@ -111,9 +120,21 @@ impl Track {
             .unwrap_or_else(|| self.artists.first().unwrap().clone())
     }
 
-    /**
-     * Display a track in a user-friendly format
-     */
+    pub fn get_source(&self) -> Option<Reference> {
+        self.references
+            .iter()
+            .find(|r| r.ref_type == ReferenceType::Source)
+            .cloned()
+    }
+
+    pub fn get_provider(&self) -> Option<Reference> {
+        self.references
+            .iter()
+            .find(|r| r.ref_type == ReferenceType::Provider)
+            .cloned()
+    }
+
+    /// Display a track in a user-friendly format
     pub fn display(&self) -> String {
         let artists = self
             .artists
@@ -125,9 +146,7 @@ impl Track {
         format!("{} by {} ({})", self.title, artists, date)
     }
 
-    /**
-     * Returns a normalized similarity score (between 0 and 1) of the match between two tracks
-     */
+    /// Returns a normalized similarity score (between 0 and 1) of the match between two tracks
     pub fn compare(&self, other_track: &Track) -> f64 {
         let mut score = 0.0;
         let mut total_weight = 0.0;
@@ -199,9 +218,7 @@ impl Track {
         }
     }
 
-    /**
-     * Transpose metadata from a source track to a destination track
-     */
+    /// Transpose metadata from a source track to a destination track
     pub fn transpose_metadata(&mut self, source_track: &Track) {
         self.title = source_track.title.clone();
         self.album = source_track.album.clone();

@@ -12,9 +12,8 @@ use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
 use shared::{
     errors::Error,
     models::{
-        Artist,
-        Track, TrackProvider,
-    },
+        Artist, Reference, Track
+    }, types::SoundomeResult,
 };
 
 pub struct Youtube<'a> {
@@ -61,7 +60,7 @@ impl Youtube<'_> {
         format!("{} {}", artist, track.title)
     }
 
-    async fn get_results(&self, search_query: &str) -> Result<Search, Error> {
+    async fn get_results(&self, search_query: &str) -> SoundomeResult<Search> {
         self.client
             .search(Some(&format!("q={}&type=video", search_query)))
             .await
@@ -83,16 +82,10 @@ impl Youtube<'_> {
                     id: None,
                     name: video.author,
                     icon: None,
-                    url: None,
+                    references: vec![]
                 }],
                 album: None,
                 duration: Some(video.length as i32),
-                provider: Some(TrackProvider::Youtube),
-                provider_url: Some(format!("https://www.youtube.com/watch?v={}", video.id)),
-                provider_id: Some(video.id),
-                source: None,
-                source_url: None,
-                source_id: None,
                 cover: None,
                 date: None,
                 disc_number: None,
@@ -100,6 +93,13 @@ impl Youtube<'_> {
                 file_path: None,
                 genre: None,
                 label: None,
+                references: vec![shared::models::Reference {
+                    id: None,
+                    ref_type: shared::models::ReferenceType::Provider,
+                    platform: shared::models::Platform::Youtube,
+                    external_id: Some(video.id.to_string()),
+                    external_url: Some(format!("https://www.youtube.com/watch?v={}", video.id)),
+                }],
             }),
             _ => None,
         }
@@ -108,7 +108,7 @@ impl Youtube<'_> {
 
 #[async_trait]
 impl Provider for Youtube<'_> {
-    async fn search(&self, track: &Track) -> Result<String, Error> {
+    async fn search(&self, track: &Track) -> SoundomeResult<Reference> {
         // 1. Create search query
         let search_query = self.create_search_query(track.clone());
         println!("SEARCH QUERY: {}", search_query);
@@ -127,11 +127,14 @@ impl Provider for Youtube<'_> {
         // 3. Find the best match
         let best_match = self
             .match_results(search_results, track.clone())
+            .ok_or(Error::NoMatch("youtube".to_string(), track.display()))?
+            .get_provider()
             .ok_or(Error::NoMatch("youtube".to_string(), track.display()))?;
+        
         Ok(best_match)
     }
 
-    async fn download(&mut self, url: &str, file_name: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
+    async fn download(&mut self, url: &str, file_name: &str, base_dir: PathBuf) -> SoundomeResult<PathBuf> {
         download_with_ytdlp(url, file_name, base_dir).await
     }
 

@@ -1,7 +1,7 @@
-use diesel::{connection::WithMetadataLookup, r2d2::R2D2Connection, SqliteConnection};
+use diesel::SqliteConnection;
 use shared::{models::Track, types::SoundomeResult};
 
-use crate::{mappers::{convert_album_to_new_album_entity, convert_artist_to_new_artist_entity, convert_track_entity_to_track, convert_track_to_new_track_entity}, repositories};
+use crate::{mappers::{convert_album_to_new_album_entity, convert_artist_to_new_artist_entity, convert_track_entity_to_track, convert_track_ref_to_new_track_ref_entity, convert_track_to_new_track_entity}, repositories};
 
 pub fn create_track(conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Track> {
     // create album if it exists
@@ -15,8 +15,13 @@ pub fn create_track(conn: &mut SqliteConnection, track: &Track) -> SoundomeResul
 
     // create track
     let new_track = convert_track_to_new_track_entity(track, album_id);
-    println!("conn: {:?}", conn.is_broken());
     let inserted_track = repositories::track::create(conn, new_track)?;
+
+    // create track references
+    for reference in &track.references {
+        let new_reference = convert_track_ref_to_new_track_ref_entity(reference, inserted_track.id);
+        repositories::track::track_ref::create(conn, new_reference)?;
+    }
 
     // create track artists
     let artists = track.artists.iter().map(|artist| {

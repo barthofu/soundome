@@ -5,9 +5,9 @@ drop table artist_albums;
 drop table playlist_tracks;
 drop table track_genres;
 
--- drop table track_source;
--- drop table album_source;
--- drop table artist_source;
+drop table track_ref;
+drop table album_ref;
+drop table artist_ref;
 
 drop table track;
 drop table album;

@@ -52,19 +52,30 @@ pub fn get_album(conn: &mut SqliteConnection, track: &TrackEntity) -> Option<Alb
 }
 
 // ================================================================================================
-// Track Source
+// Track Ref
 // ================================================================================================
 
-pub mod track_source {
-    use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+pub mod track_ref {
+    use diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 
     use crate::{
-        entities::{TrackSourceEntity, NewTrackSourceEntity, UpdateTrackSourceEntity}, macros
+        entities::{NewTrackRefEntity, TrackEntity, TrackRefEntity, UpdateTrackRefEntity}, macros
     };
 
-    macros::resource::find_one!(track_source, TrackSourceEntity);
-    macros::resource::find_all!(track_source, TrackSourceEntity);
-    macros::resource::create!(track_source, TrackSourceEntity, NewTrackSourceEntity);
-    macros::resource::update!(track_source, TrackSourceEntity, UpdateTrackSourceEntity);
-    macros::resource::delete!(track_source);
+    macros::resource::find_one!(track_ref, TrackRefEntity);
+    macros::resource::find_all!(track_ref, TrackRefEntity);
+    macros::resource::create!(track_ref, TrackRefEntity, NewTrackRefEntity);
+    macros::resource::update!(track_ref, TrackRefEntity, UpdateTrackRefEntity);
+    macros::resource::delete!(track_ref);
+
+    // custom operations
+
+    pub fn get_track_refs_by_track_entity(
+        conn: &mut SqliteConnection,
+        track: &TrackEntity,
+    ) -> Vec<TrackRefEntity> {
+        TrackRefEntity::belonging_to(track)
+            .load::<TrackRefEntity>(conn)
+            .unwrap_or_default()
+    }
 }

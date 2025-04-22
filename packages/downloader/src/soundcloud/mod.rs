@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use config::model::AiConfig;
 use fetcher::Source;
-use shared::{errors::Error, models::Track};
+use shared::{errors::Error, models::{Reference, Track}, types::SoundomeResult};
 
 use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
 
@@ -37,7 +37,7 @@ impl SoundCloud {
 
 #[async_trait]
 impl Provider for SoundCloud {
-    async fn search(&self, track: &Track) -> Result<String, Error> {
+    async fn search(&self, track: &Track) -> SoundomeResult<Reference> {
         // 1. Create search query
         let search_query = self.create_search_query(track.clone());
 
@@ -47,7 +47,10 @@ impl Provider for SoundCloud {
         // 3. Process each pattern to find the best match
         let best_match = self
             .match_results(search_results, track.clone())
+            .ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?
+            .get_provider()
             .ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?;
+        
         Ok(best_match)
     }
 

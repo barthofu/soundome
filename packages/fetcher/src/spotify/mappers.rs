@@ -1,13 +1,10 @@
 use rspotify::model::{
-    FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist,
+    FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist
 };
 use shared::{
     errors::Error,
     models::{
-        Album, AlbumType,
-        Artist,
-        PlaylistTrack,
-        Track, TrackSource,
+        Album, AlbumType, Artist, PlaylistTrack, Reference, ReferenceType, Track,
     },
 };
 
@@ -25,8 +22,14 @@ pub fn convert_artist(artist: &SimplifiedArtist) -> Artist {
     Artist {
         id: None,
         name: artist.name.clone(),
-        url: artist.external_urls.get("spotify").cloned(),
         icon: None,
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::Spotify,
+            external_id: artist.id.as_ref().map(|id| id.to_string()),
+            external_url: artist.external_urls.get("spotify").cloned(),
+        }]
     }
 }
 
@@ -35,8 +38,14 @@ pub fn convert_full_artist(artist: &FullArtist) -> Artist {
     Artist {
         id: None,
         name: artist.name.clone(),
-        url: artist.external_urls.get("spotify").cloned(),
         icon: artist.images.get(0).map(|image| image.url.clone()),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::Spotify,
+            external_id: Some(artist.id.to_string()),
+            external_url: artist.external_urls.get("spotify").cloned(),
+        }],
     }
 }
 
@@ -56,9 +65,15 @@ pub fn convert_simplified_album(album: &SimplifiedAlbum) -> Album {
                 _ => AlbumType::Unknown,
             })
             .unwrap_or(AlbumType::Unknown),
-        url: album.external_urls.get("spotify").cloned(),
         cover: album.images.get(0).map(|image| image.url.clone()),
         date: album.release_date.clone(),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::Spotify,
+            external_id: album.id.as_ref().map(|id| id.to_string()),
+            external_url: album.external_urls.get("spotify").cloned(),
+        }],
     }
 }
 
@@ -78,9 +93,15 @@ pub fn convert_full_album(album: &FullAlbum) -> Album {
         title: album.name.clone(),
         artists: album.artists.iter().map(convert_artist).collect(),
         album_type: convert_album_type(&album.album_type),
-        url: album.external_urls.get("spotify").cloned(),
         cover: album.images.get(0).map(|image| image.url.clone()),
         date: Some(album.release_date.clone()),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::Spotify,
+            external_id: Some(album.id.to_string()),
+            external_url: album.external_urls.get("spotify").cloned(),
+        }],
     }
 }
 
@@ -97,17 +118,18 @@ pub fn convert_track(track: &FullTrack) -> Track {
         genre: None, // TODO: get genre from artist
         duration: Some(track.duration.num_seconds() as i32),
         file_path: None,
-        source: Some(TrackSource::Spotify),
-        source_url: track.external_urls.get("spotify").cloned(),
-        source_id: track.id.as_ref().map(|id| id.to_string()),
-        provider: None,
-        provider_url: None,
-        provider_id: None,
         track_number: Some(track.track_number as i32),
         disc_number: Some(track.disc_number as i32),
         label: None,
         date: album.release_date.clone(),
         cover: album.images.get(0).map(|image| image.url.clone()),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::Spotify,
+            external_id: track.id.as_ref().map(|id| id.to_string()),
+            external_url: track.external_urls.get("spotify").cloned(),
+        }],
     }
 }
 

@@ -1,13 +1,19 @@
 use diesel::SqliteConnection;
 use shared::{models::Album, types::SoundomeResult};
 
-use crate::{mappers::{convert_album_entity_to_track, convert_album_to_new_album_entity, convert_artist_to_new_artist_entity}, repositories};
+use crate::{mappers::{convert_album_entity_to_album, convert_album_ref_to_new_album_ref_entity, convert_album_to_new_album_entity, convert_artist_to_new_artist_entity}, repositories};
 
 pub fn create_album(conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Album> {
     let new_album = convert_album_to_new_album_entity(album);
 
     // create album
     let inserted_album = repositories::album::create(conn, new_album)?;
+
+    // create album references
+    for reference in &album.references {
+        let new_reference = convert_album_ref_to_new_album_ref_entity(reference, inserted_album.id);
+        repositories::album::album_ref::create(conn, new_reference)?;
+    }
 
     // create album artists
     let artists = album.artists.iter().map(|artist| {
@@ -21,5 +27,5 @@ pub fn create_album(conn: &mut SqliteConnection, album: &Album) -> SoundomeResul
         repositories::album::create_artist(conn, &inserted_album, &artist)?;
     }
 
-    convert_album_entity_to_track(conn, inserted_album)
+    convert_album_entity_to_album(conn, inserted_album)
 }

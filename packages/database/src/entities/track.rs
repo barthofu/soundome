@@ -2,7 +2,7 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket_okapi::JsonSchema;
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 
-use crate::{entities::AlbumEntity, schema::{track, track_source}};
+use crate::{entities::AlbumEntity, schema::{track, track_ref}};
 
 #[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
 #[diesel(table_name = track)]
@@ -19,12 +19,6 @@ pub struct TrackEntity {
     pub genre: Option<String>,
     pub cover: Option<String>,
     pub file_path: Option<String>,
-    pub source: Option<String>,
-    pub source_url: Option<String>,
-    pub source_id: Option<String>,
-    pub provider: Option<String>,
-    pub provider_url: Option<String>,
-    pub provider_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize, JsonSchema)]
@@ -40,12 +34,6 @@ pub struct NewTrackEntity {
     pub genre: Option<String>,
     pub cover: Option<String>,
     pub file_path: Option<String>,
-    pub source: Option<String>,
-    pub source_url: Option<String>,
-    pub source_id: Option<String>,
-    pub provider: Option<String>,
-    pub provider_url: Option<String>,
-    pub provider_id: Option<String>,
 }
 
 #[derive(Debug, Clone, AsChangeset, Deserialize, JsonSchema)]
@@ -61,39 +49,43 @@ pub struct UpdateTrackEntity {
     pub genre: Option<String>,
     pub cover: Option<String>,
     pub file_path: Option<String>,
-    pub source: Option<String>,
-    pub source_url: Option<String>,
-    pub source_id: Option<String>,
-    pub provider: Option<String>,
-    pub provider_url: Option<String>,
-    pub provider_id: Option<String>,
 }
 
 // ================================================================================================
 // Track Source
 // ================================================================================================
 
-#[derive(Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
-#[diesel(table_name = track_source)]
-pub struct TrackSourceEntity {
+#[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[diesel(table_name = track_ref)]
+#[diesel(belongs_to(TrackEntity, foreign_key = track_id))]
+pub struct TrackRefEntity {
     pub id: i32,
     pub track_id: i32,
-    pub external_id: String,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize, JsonSchema)]
-#[diesel(table_name = track_source)]
-pub struct NewTrackSourceEntity {
+#[diesel(table_name = track_ref)]
+pub struct NewTrackRefEntity {
     pub track_id: i32,
-    pub external_id: String,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, AsChangeset, Deserialize, JsonSchema)]
-#[diesel(table_name = track_source)]
-pub struct UpdateTrackSourceEntity {
+#[diesel(table_name = track_ref)]
+pub struct UpdateTrackRefEntity {
     pub track_id: Option<i32>,
-    pub external_id: Option<String>,
+    #[diesel(column_name = "type_")]
+    pub ref_type: String,
     pub platform: Option<String>,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
 }

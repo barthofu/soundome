@@ -10,10 +10,8 @@ use rustypipe::{
 use shared::{
     errors::Error,
     models::{
-        Album,
-        Artist,
-        Track, TrackProvider,
-    },
+        Album, Artist, Reference, Track
+    }, types::SoundomeResult,
 };
 
 use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
@@ -41,7 +39,7 @@ impl YoutubeMusic {
         format!("{} {}", artist, track.title)
     }
 
-    async fn get_results(&self, query: &str) -> Result<MusicSearchResult<TrackItem>, Error> {
+    async fn get_results(&self, query: &str) -> SoundomeResult<MusicSearchResult<TrackItem>> {
         self.client
             .query()
             .music_search_tracks(query)
@@ -59,8 +57,8 @@ impl YoutubeMusic {
                 .map(|artist| Artist {
                     id: None,
                     name: artist.name.clone(),
-                    url: None,
                     icon: None,
+                    references: vec![],
                 })
                 .collect(),
             album: search_item.album.map(|album| Album {
@@ -70,32 +68,33 @@ impl YoutubeMusic {
                 album_type: shared::models::AlbumType::Unknown,
                 cover: None,
                 date: None,
-                url: None,
+                references: vec![],
             }),
             duration: search_item.duration.map(|duration| duration as i32),
             track_number: search_item.track_nr.map(|track_nr| track_nr as i32),
-            provider: Some(TrackProvider::YoutubeMusic),
-            provider_url: Some(format!(
-                "https://music.youtube.com/watch?v={}",
-                search_item.id
-            )),
-            provider_id: Some(search_item.id),
-            source: None,
-            source_url: None,
-            source_id: None,
             date: None,
             cover: None,
             disc_number: None,
             file_path: None,
             genre: None,
             label: None,
+            references: vec![shared::models::Reference {
+                id: None,
+                ref_type: shared::models::ReferenceType::Provider,
+                platform: shared::models::Platform::YoutubeMusic,
+                external_id: Some(search_item.id.to_string()),
+                external_url: Some(format!(
+                    "https://music.youtube.com/watch?v={}",
+                    search_item.id
+                )),
+            }],
         }
     }
 }
 
 #[async_trait]
 impl Provider for YoutubeMusic {
-    async fn search(&self, track: &Track) -> Result<String, Error> {
+    async fn search(&self, track: &Track) -> SoundomeResult<Reference> {
         // 1. Create search query
         let search_query = self.create_search_query(track.clone());
 
@@ -113,11 +112,14 @@ impl Provider for YoutubeMusic {
                     .collect(),
                 track.clone(),
             )
+            .ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?
+            .get_provider()
             .ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?;
+
         Ok(best_match)
     }
 
-    async fn download(&mut self, url: &str, file_name: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
+    async fn download(&mut self, url: &str, file_name: &str, base_dir: PathBuf) -> SoundomeResult<PathBuf> {
         download_with_ytdlp(url, file_name, base_dir).await
     }
 
