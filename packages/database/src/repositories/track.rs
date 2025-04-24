@@ -1,8 +1,96 @@
 use diesel::prelude::*;
+use shared::types::SoundomeResult;
 
 use crate::{
-    entities::{AlbumEntity, ArtistEntity, ArtistTrackEntity, NewTrackEntity, TrackEntity, UpdateTrackEntity}, macros,
+    entities::{AlbumEntity, ArtistEntity, ArtistTrackEntity, NewTrackEntity, TrackEntity, TrackRefEntity, UpdateTrackEntity}, macros, schema,
 };
+
+pub trait TrackRepository: Send + Sync {
+    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Track>;
+    fn create(
+        conn: &mut SqliteConnection,
+        new_track: &shared::models::Track,
+    ) -> SoundomeResult<shared::models::Track>;
+}
+
+pub struct DieselTrackRepository {}
+
+impl TrackRepository for DieselTrackRepository {
+
+    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Track> {
+        let (track, album): (TrackEntity, Option<AlbumEntity>) = schema::track::table
+            .left_join(schema::album::table.on(schema::album::id.nullable().eq(schema::track::album_id)))
+            .filter(schema::track::id.eq(id))
+            .first(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+
+        let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+            .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+            .filter(schema::artist_tracks::track_id.eq(track.id))
+            .select(schema::artist::all_columns)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+
+        let references: Vec<TrackRefEntity> = schema::track_ref::table
+            .filter(schema::track_ref::track_id.eq(track.id))
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+        
+        Ok(TrackEntity::convert_to_domain(
+            track,
+            album,
+            artists,
+            references,
+        ))
+    }
+
+    fn create(
+        conn: &mut SqliteConnection,
+        new_track: &shared::models::Track,
+    ) -> SoundomeResult<shared::models::Track> {
+        let new_track_entity = NewTrackEntity::convert_from_domain(new_track, None);
+        let track = diesel::insert_into(schema::track::table)
+            .values(&new_track_entity)
+            .execute(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to create resource: {}",
+                    err
+                ))
+            })?;
+
+        Ok(track)
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // basic CRUD operations
 

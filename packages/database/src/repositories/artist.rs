@@ -1,11 +1,93 @@
 use diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use shared::types::SoundomeResult;
 
 use crate::{
-    macros,
     entities::{
-        ArtistEntity, ArtistTrackEntity, NewArtistEntity, UpdateArtistEntity, TrackEntity,
-    },
+        ArtistEntity, ArtistRefEntity, ArtistTrackEntity, NewArtistEntity, NewArtistRefEntity, TrackEntity, UpdateArtistEntity
+    }, macros, schema
 };
+
+
+pub trait ArtistRepository: Send + Sync {
+    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Artist>;
+    fn create(
+        conn: &mut SqliteConnection,
+        new_track: &shared::models::Artist,
+    ) -> SoundomeResult<shared::models::Artist>;
+}
+
+pub struct DieselArtistRepository {}
+
+impl ArtistRepository for DieselArtistRepository {
+    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Artist> {
+        let artist: ArtistEntity = schema::artist::table
+            .filter(schema::artist::id.eq(id))
+            .first(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+
+        let references: Vec<ArtistRefEntity> = schema::artist_ref::table
+            .filter(schema::artist_ref::artist_id.eq(artist.id))
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+
+        Ok(ArtistEntity::convert_to_domain(
+            artist,
+            references,
+        ))
+    }
+
+    fn create(
+        conn: &mut SqliteConnection,
+        new_artist: &shared::models::Artist,
+    ) -> SoundomeResult<shared::models::Artist> {
+        let new_artist_entity = NewArtistEntity::convert_from_domain(new_artist);
+        let inserted_artist = diesel::insert_into(schema::artist::table)
+            .values(&new_artist_entity)
+            .execute(conn)
+            .and_then(|_| {
+                schema::artist::table
+                    .order(schema::artist::id.desc())
+                    .first::<ArtistEntity>(conn)
+            })
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to create resource: {}",
+                    err
+                ))
+            })?;
+
+        for reference in new_artist.references.clone() {
+            let new_artist_ref = NewArtistRefEntity::convert_from_domain(&reference, inserted_artist.id);
+            diesel::insert_into(schema::artist_ref::table)
+                .values(&new_artist_ref)
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to create resource: {}",
+                        err
+                    ))
+                })?;
+        }
+        
+        <DieselArtistRepository as ArtistRepository>::get_by_id(conn, inserted_artist.id)
+    }
+}
+
+
+
+
+
+
 
 // basic CRUD operations
 

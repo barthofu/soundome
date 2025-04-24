@@ -16,6 +16,20 @@ pub mod resource {
         };
     }
 
+    macro_rules! find_one_method {
+        ($table: ident, $type: ident) => {
+            fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<$type> {
+                crate::schema::$table::table.find(id).first::<$type>(self.conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to get resource by id: {}",
+                            err
+                        ))
+                    })
+            }
+        };
+    }
+
     // get all macro
 
     macro_rules! find_all {
@@ -115,6 +129,7 @@ pub mod resource {
     pub(crate) use delete;
     pub(crate) use find_all;
     pub(crate) use find_one;
+    pub(crate) use find_one_method;
     pub(crate) use update;
 }
 

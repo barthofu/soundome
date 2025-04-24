@@ -1,12 +1,122 @@
 // basic CRUD operations
 
 use diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use shared::types::SoundomeResult;
 
 use crate::{
     entities::{
-        AlbumEntity, ArtistAlbumEntity, ArtistEntity, NewAlbumEntity, UpdateAlbumEntity
-    }, macros
+        AlbumEntity, AlbumRefEntity, ArtistAlbumEntity, ArtistEntity, NewAlbumEntity, NewAlbumRefEntity, UpdateAlbumEntity
+    }, macros, schema
 };
+
+pub trait AlbumRepository: Send + Sync {
+    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Album>;
+    fn create(
+        conn: &mut SqliteConnection,
+        new_album: &shared::models::Album,
+    ) -> SoundomeResult<shared::models::Album>;
+}
+
+pub struct DieselAlbumRepository {}
+
+impl AlbumRepository for DieselAlbumRepository {
+    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Album> {
+        let album: AlbumEntity = schema::album::table
+            .filter(schema::album::id.eq(id))
+            .first(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+
+        let artists: Vec<ArtistEntity> = schema::artist_albums::table
+            .inner_join(schema::artist::table.on(schema::artist_albums::artist_id.eq(schema::artist::id)))
+            .filter(schema::artist_albums::album_id.eq(album.id))
+            .select(schema::artist::all_columns)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+
+        let references: Vec<AlbumRefEntity> = schema::album_ref::table
+            .filter(schema::album_ref::album_id.eq(album.id))
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by id: {}",
+                    err
+                ))
+            })?;
+
+        Ok(AlbumEntity::convert_to_domain(
+            album,
+            artists,
+            references,
+        ))
+    }
+
+    fn create(
+        conn: &mut SqliteConnection,
+        new_album: &shared::models::Album,
+    ) -> SoundomeResult<shared::models::Album> {
+        let new_album_entity = NewAlbumEntity::convert_from_domain(new_album);
+        let inserted_album = diesel::insert_into(schema::album::table)
+            .values(&new_album_entity)
+            .execute(conn)
+            .and_then(|_| {
+                schema::album::table
+                    .order(schema::album::id.desc())
+                    .first::<AlbumEntity>(conn)
+            })
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to create resource: {}",
+                    err
+                ))
+            })?;
+
+        for reference in new_album.references.clone() {
+            let new_album_ref = NewAlbumRefEntity::convert_from_domain(&reference, inserted_album.id);
+            diesel::insert_into(schema::album_ref::table)
+                .values(&new_album_ref)
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to create resource: {}",
+                        err
+                    ))
+                })?;
+        }
+
+        for artist in new_album.artists.clone() {
+            let new_artist_album = ArtistAlbumEntity::convert_from_domain(
+                &artist,
+                inserted_album.id,
+            );
+            diesel::insert_into(schema::artist_albums::table)
+                .values(&new_artist_album)
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to create resource: {}",
+                        err
+                    ))
+                })?;
+        }
+
+        Ok(AlbumEntity::convert_to_domain(
+            inserted_album,
+            vec![],
+            vec![],
+        ))
+    }
+}
+
 
 macros::resource::find_one!(album, AlbumEntity);
 macros::resource::find_all!(album, AlbumEntity);
