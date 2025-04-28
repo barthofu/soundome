@@ -1,25 +1,24 @@
+use core::ports::repositories::ArtistRepository;
+
 use diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::types::SoundomeResult;
 
 use crate::{
     entities::{
-        ArtistEntity, ArtistRefEntity, ArtistTrackEntity, NewArtistEntity, NewArtistRefEntity, TrackEntity, UpdateArtistEntity
+        ArtistEntity, ArtistRefEntity, ArtistTrackEntity, NewArtistEntity, TrackEntity, UpdateArtistEntity
     }, macros, schema
 };
 
-
-pub trait ArtistRepository: Send + Sync {
-    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Artist>;
-    fn create(
-        conn: &mut SqliteConnection,
-        new_track: &shared::models::Artist,
-    ) -> SoundomeResult<shared::models::Artist>;
-}
-
 pub struct DieselArtistRepository {}
 
+impl DieselArtistRepository {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl ArtistRepository for DieselArtistRepository {
-    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Artist> {
+    fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Artist> {
         let artist: ArtistEntity = schema::artist::table
             .filter(schema::artist::id.eq(id))
             .first(conn)
@@ -46,10 +45,7 @@ impl ArtistRepository for DieselArtistRepository {
         ))
     }
 
-    fn create(
-        conn: &mut SqliteConnection,
-        new_artist: &shared::models::Artist,
-    ) -> SoundomeResult<shared::models::Artist> {
+    fn create(&self, conn: &mut SqliteConnection, new_artist: &shared::models::Artist) -> SoundomeResult<shared::models::Artist> {
         let new_artist_entity = NewArtistEntity::convert_from_domain(new_artist);
         let inserted_artist = diesel::insert_into(schema::artist::table)
             .values(&new_artist_entity)
@@ -66,20 +62,33 @@ impl ArtistRepository for DieselArtistRepository {
                 ))
             })?;
 
-        for reference in new_artist.references.clone() {
-            let new_artist_ref = NewArtistRefEntity::convert_from_domain(&reference, inserted_artist.id);
-            diesel::insert_into(schema::artist_ref::table)
-                .values(&new_artist_ref)
-                .execute(conn)
-                .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to create resource: {}",
-                        err
-                    ))
-                })?;
-        }
-        
-        <DieselArtistRepository as ArtistRepository>::get_by_id(conn, inserted_artist.id)
+        Ok(ArtistEntity::convert_to_domain(
+            inserted_artist,
+            vec![],
+        ))
+    }
+
+    fn update(&self, conn: &mut SqliteConnection, id: i32, updated_artist: &shared::models::Artist) -> SoundomeResult<shared::models::Artist> {
+        let updated_artist_entity = UpdateArtistEntity::convert_from_domain(updated_artist);
+        let updated_artist = diesel::update(schema::artist::table.filter(schema::artist::id.eq(id)))
+            .set(&updated_artist_entity)
+            .execute(conn)
+            .and_then(|_| {
+                schema::artist::table
+                    .filter(schema::artist::id.eq(id))
+                    .first::<ArtistEntity>(conn)
+            })
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to update resource: {}",
+                    err
+                ))
+            })?;
+
+        Ok(ArtistEntity::convert_to_domain(
+            updated_artist,
+            vec![],
+        ))
     }
 }
 

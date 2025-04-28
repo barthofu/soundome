@@ -1,26 +1,20 @@
 // basic CRUD operations
 
-use diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use core::ports::repositories::AlbumRepository;
+
+use diesel::{BelongingToDsl, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::types::SoundomeResult;
 
 use crate::{
     entities::{
-        AlbumEntity, AlbumRefEntity, ArtistAlbumEntity, ArtistEntity, NewAlbumEntity, NewAlbumRefEntity, UpdateAlbumEntity
+        AlbumEntity, AlbumRefEntity, ArtistAlbumEntity, ArtistEntity, NewAlbumEntity, UpdateAlbumEntity
     }, macros, schema
 };
-
-pub trait AlbumRepository: Send + Sync {
-    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Album>;
-    fn create(
-        conn: &mut SqliteConnection,
-        new_album: &shared::models::Album,
-    ) -> SoundomeResult<shared::models::Album>;
-}
 
 pub struct DieselAlbumRepository {}
 
 impl AlbumRepository for DieselAlbumRepository {
-    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Album> {
+    fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Album> {
         let album: AlbumEntity = schema::album::table
             .filter(schema::album::id.eq(id))
             .first(conn)
@@ -61,9 +55,11 @@ impl AlbumRepository for DieselAlbumRepository {
     }
 
     fn create(
+        &self,
         conn: &mut SqliteConnection,
         new_album: &shared::models::Album,
     ) -> SoundomeResult<shared::models::Album> {
+
         let new_album_entity = NewAlbumEntity::convert_from_domain(new_album);
         let inserted_album = diesel::insert_into(schema::album::table)
             .values(&new_album_entity)
@@ -80,42 +76,62 @@ impl AlbumRepository for DieselAlbumRepository {
                 ))
             })?;
 
-        for reference in new_album.references.clone() {
-            let new_album_ref = NewAlbumRefEntity::convert_from_domain(&reference, inserted_album.id);
-            diesel::insert_into(schema::album_ref::table)
-                .values(&new_album_ref)
-                .execute(conn)
-                .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to create resource: {}",
-                        err
-                    ))
-                })?;
-        }
-
-        for artist in new_album.artists.clone() {
-            let new_artist_album = ArtistAlbumEntity::convert_from_domain(
-                &artist,
-                inserted_album.id,
-            );
-            diesel::insert_into(schema::artist_albums::table)
-                .values(&new_artist_album)
-                .execute(conn)
-                .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to create resource: {}",
-                        err
-                    ))
-                })?;
-        }
-
         Ok(AlbumEntity::convert_to_domain(
             inserted_album,
             vec![],
             vec![],
         ))
     }
+
+    fn update(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        updated_album: &shared::models::Album,
+    ) -> SoundomeResult<shared::models::Album> {
+        let updated_album_entity = UpdateAlbumEntity::convert_from_domain(updated_album);
+        diesel::update(schema::album::table)
+            .filter(schema::album::id.eq(id))
+            .set(&updated_album_entity)
+            .execute(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to update resource: {}",
+                    err
+                ))
+            })?;
+
+        self.get_by_id(conn, id)
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ================================================================================================
+// ARCHIVES
+// ================================================================================================
 
 
 macros::resource::find_one!(album, AlbumEntity);

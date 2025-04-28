@@ -7,5 +7,6 @@
         "scminput": false,
         "yaml": true,
         "mdx": true
-    }
+    },
+    "discord.enabled": true
 }

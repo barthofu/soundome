@@ -8,6 +8,10 @@ use shared::{
 };
 use tagger::TagProvider;
 
+pub mod ports;
+pub mod services;
+pub mod utils;
+
 pub struct Orchestrator {
     config: AppConfig,
 }
@@ -110,8 +114,8 @@ impl Orchestrator {
         move_track_file(&mut downloaded_track, &self.config.general.base_dir)?;
 
         // Save in the database
-        let mut conn = database::get_connection(&self.config.database.url);
-        database::services::track::create_track(&mut conn, &downloaded_track).unwrap(); // TODO: tmp
+        // let mut conn = database::get_connection(&self.config.database.url);
+        // database::services::track::create_track(&mut conn, &downloaded_track).unwrap(); // TODO: tmp
         println!("Saved track in the database");
 
         Ok(downloaded_track)

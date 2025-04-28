@@ -1,3 +1,5 @@
+use core::ports::repositories::TrackRepository;
+
 use diesel::prelude::*;
 use shared::types::SoundomeResult;
 
@@ -5,19 +7,17 @@ use crate::{
     entities::{AlbumEntity, ArtistEntity, ArtistTrackEntity, NewTrackEntity, TrackEntity, TrackRefEntity, UpdateTrackEntity}, macros, schema,
 };
 
-pub trait TrackRepository: Send + Sync {
-    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Track>;
-    fn create(
-        conn: &mut SqliteConnection,
-        new_track: &shared::models::Track,
-    ) -> SoundomeResult<shared::models::Track>;
-}
-
 pub struct DieselTrackRepository {}
+
+impl DieselTrackRepository {
+    pub fn new() -> Self {
+        Self { }
+    }
+}
 
 impl TrackRepository for DieselTrackRepository {
 
-    fn get_by_id(conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Track> {
+    fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Track> {
         let (track, album): (TrackEntity, Option<AlbumEntity>) = schema::track::table
             .left_join(schema::album::table.on(schema::album::id.nullable().eq(schema::track::album_id)))
             .filter(schema::track::id.eq(id))
@@ -59,14 +59,16 @@ impl TrackRepository for DieselTrackRepository {
         ))
     }
 
-    fn create(
-        conn: &mut SqliteConnection,
-        new_track: &shared::models::Track,
-    ) -> SoundomeResult<shared::models::Track> {
-        let new_track_entity = NewTrackEntity::convert_from_domain(new_track, None);
-        let track = diesel::insert_into(schema::track::table)
+    fn create(&self, conn: &mut SqliteConnection, new_track: &shared::models::Track) -> SoundomeResult<shared::models::Track> {
+        let new_track_entity = NewTrackEntity::convert_from_domain(new_track);
+        let inserted_track = diesel::insert_into(schema::track::table)
             .values(&new_track_entity)
             .execute(conn)
+            .and_then(|_| {
+                schema::track::table
+                    .order(schema::track::id.desc())
+                    .first::<TrackEntity>(conn)
+            })
             .map_err(|err| {
                 shared::errors::Error::Database(format!(
                     "Failed to create resource: {}",
@@ -74,7 +76,37 @@ impl TrackRepository for DieselTrackRepository {
                 ))
             })?;
 
-        Ok(track)
+        Ok(TrackEntity::convert_to_domain(
+            inserted_track,
+            None,
+            vec![],
+            vec![],
+        ))
+    }
+
+    fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &shared::models::Track) -> SoundomeResult<shared::models::Track> {
+        let updated_track_entity = UpdateTrackEntity::convert_from_domain(updated_track);
+        let updated_track = diesel::update(schema::track::table.filter(schema::track::id.eq(id)))
+            .set(&updated_track_entity)
+            .execute(conn)
+            .and_then(|_| {
+                schema::track::table
+                    .filter(schema::track::id.eq(id))
+                    .first::<TrackEntity>(conn)
+            })
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to update resource: {}",
+                    err
+                ))
+            })?;
+
+        Ok(TrackEntity::convert_to_domain(
+            updated_track,
+            None,
+            vec![],
+            vec![],
+        ))
     }
 }
 

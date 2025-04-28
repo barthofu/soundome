@@ -83,7 +83,7 @@ pub struct NewArtistRefEntity {
 pub struct UpdateArtistRefEntity {
     pub artist_id: Option<i32>,
     #[diesel(column_name = "type_")]
-    pub ref_type: String,
+    pub ref_type: Option<String>,
     pub platform: Option<String>,
     pub external_id: Option<String>,
     pub external_url: Option<String>,

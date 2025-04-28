@@ -1,3 +1,6 @@
+#[macro_use] extern crate rocket;
+
+use database::repositories::artist::DieselArtistRepository;
 use rocket::{catchers, launch, routes};
 use rocket_okapi::{
     openapi_get_routes,
@@ -21,6 +24,14 @@ fn get_docs() -> SwaggerUIConfig {
 fn rocket() -> _ {
     println!("Starting server...");
 
+    let artist_repo = Arc::new(DieselArtistRepository::new());
+
+    let repositories = Arc::new(RepositoryLayer {
+        artist: artist_repo.clone(),
+    });
+
+    // let artist_service = Arc::new(ArtistService::new(artist_repo.clone()));
+
     rocket::build()
         .attach(Cors)
         .attach(Db::fairing())
@@ -29,21 +40,21 @@ fn rocket() -> _ {
             "/api",
             openapi_get_routes![
                 routes::misc::index,
-                routes::tracks::get,
-                routes::tracks::get_all,
-                routes::tracks::create,
-                routes::tracks::update,
-                routes::tracks::delete,
-                routes::artists::get,
-                routes::artists::get_all,
-                routes::artists::create,
-                routes::artists::update,
-                routes::artists::delete,
-                routes::artists::get_tracks,
-                routes::artists::associate_track,
-                routes::artists::dissociate_track,
+                // routes::tracks::get,
+                // routes::tracks::get_all,
+                // routes::tracks::create,
+                // routes::tracks::update,
+                // routes::tracks::delete,
+                // routes::artists::get,
+                // routes::artists::get_all,
+                // routes::artists::create,
+                // routes::artists::update,
+                // routes::artists::delete,
+                // routes::artists::get_tracks,
+                // routes::artists::associate_track,
+                // routes::artists::dissociate_track,
             ],
         )
-        .mount("/api", routes![routes::audio::stream,])
+        // .mount("/api", routes![routes::audio::stream,])
         .mount("/swagger", make_swagger_ui(&get_docs()))
 }

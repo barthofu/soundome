@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use shared::models::{Album, AlbumType};
 
-use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewTrackEntity, NewTrackRefEntity, TrackEntity, TrackRefEntity};
+use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewTrackEntity, NewTrackRefEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
 
 // ================================================================================================
 // Track
@@ -31,13 +31,31 @@ impl TrackEntity {
 
 impl NewTrackEntity {
 
-    pub fn convert_from_domain(track: &shared::models::Track, album_id: Option<i32>) -> NewTrackEntity {
+    pub fn convert_from_domain(track: &shared::models::Track) -> NewTrackEntity {
         NewTrackEntity {
             title: track.title.clone(),
             duration: track.duration,
             track_number: track.track_number,
             disc_number: track.disc_number,
-            album_id,
+            album_id: track.album.as_ref().and_then(|a| a.id),
+            label: track.label.clone(),
+            date: track.date.clone(),
+            genre: track.genre.clone(),
+            cover: track.cover.clone(),
+            file_path: track.file_path.clone().map(|p| p.to_string_lossy().to_string()),
+        }
+    }
+}
+
+impl UpdateTrackEntity {
+
+    pub fn convert_from_domain(track: &shared::models::Track) -> UpdateTrackEntity {
+        UpdateTrackEntity {
+            title: Some(track.title.clone()),
+            duration: track.duration,
+            track_number: track.track_number,
+            disc_number: track.disc_number,
+            album_id: track.album.as_ref().and_then(|a| a.id),
             label: track.label.clone(),
             date: track.date.clone(),
             genre: track.genre.clone(),
@@ -78,6 +96,18 @@ impl NewAlbumEntity {
     }
 }
 
+impl UpdateAlbumEntity {
+
+    pub fn convert_from_domain(album: &shared::models::Album) -> UpdateAlbumEntity {
+        UpdateAlbumEntity {
+            title: Some(album.title.clone()),
+            album_type: Some(album.album_type.as_ref().to_string()),
+            cover: album.cover.clone(),
+            date: album.date.clone(),
+        }
+    }
+}
+
 // ================================================================================================
 // Artist
 // ================================================================================================
@@ -99,6 +129,16 @@ impl NewArtistEntity {
     pub fn convert_from_domain(artist: &shared::models::Artist) -> NewArtistEntity {
         NewArtistEntity {
             name: artist.name.clone(),
+            icon: artist.icon.clone(),
+        }
+    }
+}
+
+impl UpdateArtistEntity {
+
+    pub fn convert_from_domain(artist: &shared::models::Artist) -> UpdateArtistEntity {
+        UpdateArtistEntity {
+            name: Some(artist.name.clone()),
             icon: artist.icon.clone(),
         }
     }
@@ -134,6 +174,19 @@ impl NewTrackRefEntity {
     }
 }
 
+impl UpdateTrackRefEntity {
+
+    pub fn convert_from_domain(track_ref: &shared::models::Reference) -> UpdateTrackRefEntity {
+        UpdateTrackRefEntity {
+            track_id: track_ref.id,
+            ref_type: Some(track_ref.ref_type.as_ref().to_string()),
+            platform: Some(track_ref.platform.as_ref().to_string()),
+            external_id: track_ref.external_id.clone(),
+            external_url: track_ref.external_url.clone(),
+        }
+    }
+}
+
 impl AlbumRefEntity {
 
     pub fn convert_to_domain(album_ref_entity: AlbumRefEntity) -> shared::models::Reference {
@@ -154,6 +207,19 @@ impl NewAlbumRefEntity {
             album_id,
             ref_type: album_ref.ref_type.as_ref().to_string(),
             platform: album_ref.platform.as_ref().to_string(),
+            external_id: album_ref.external_id.clone(),
+            external_url: album_ref.external_url.clone(),
+        }
+    }
+}
+
+impl UpdateAlbumRefEntity {
+
+    pub fn convert_from_domain(album_ref: &shared::models::Reference) -> UpdateAlbumRefEntity {
+        UpdateAlbumRefEntity {
+            album_id: album_ref.id,
+            ref_type: Some(album_ref.ref_type.as_ref().to_string()),
+            platform: Some(album_ref.platform.as_ref().to_string()),
             external_id: album_ref.external_id.clone(),
             external_url: album_ref.external_url.clone(),
         }
@@ -183,5 +249,29 @@ impl NewArtistRefEntity {
             external_id: artist_ref.external_id.clone(),
             external_url: artist_ref.external_url.clone(),
         }
+    }
+}
+
+impl UpdateArtistRefEntity {
+
+    pub fn convert_from_domain(artist_ref: &shared::models::Reference) -> UpdateArtistRefEntity {
+        UpdateArtistRefEntity {
+            artist_id: artist_ref.id,
+            ref_type: Some(artist_ref.ref_type.as_ref().to_string()),
+            platform: Some(artist_ref.platform.as_ref().to_string()),
+            external_id: artist_ref.external_id.clone(),
+            external_url: artist_ref.external_url.clone(),
+        }
+    }
+}
+
+// ================================================================================================
+// Misc
+// ================================================================================================
+
+pub fn map_error(err: diesel::result::Error) -> shared::errors::Error {
+    match err {
+        diesel::result::Error::NotFound => shared::errors::Error::NotFound("Database item".to_string()),
+        _ => shared::errors::Error::Database(format!("Database error: {}", err)),
     }
 }

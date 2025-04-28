@@ -1,5 +1,5 @@
 [package]
-name = "orchestrator"
+name = "core"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,8 +9,7 @@ config = { path = "../config" }
 downloader = { path = "../downloader" }
 fetcher = { path = "../fetcher" }
 tagger = { path = "../tagger" }
-database = { path = "../database" }
 organizer = { path = "../organizer" }
 
-tokio = { version = "1.43.0", features = ["time", "process", "io-util"] }
+tokio = { version = "1.44.2", features = ["time", "process", "io-util"] }
 diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }

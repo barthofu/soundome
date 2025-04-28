@@ -9,6 +9,7 @@ use rocket_okapi::util::add_schema_response;
 use schemars::JsonSchema;
 use std::io::Cursor;
 use thiserror::Error;
+use std::fmt;
 
 #[derive(JsonSchema, Serialize, Debug, Clone)]
 pub struct ErrorResponse {
@@ -133,5 +134,23 @@ impl OpenApiResponderInner for Error {
         add_schema_response(&mut responses, 409, "application/json", schema.clone())?;
 
         Ok(responses)
+    }
+}
+
+impl From<shared::errors::Error> for Error {
+    fn from(err: shared::errors::Error) -> Self {
+        match err {
+            shared::errors::Error::MissingArg => Error::BadRequest,
+            shared::errors::Error::InvalidArg => Error::BadRequest,
+            shared::errors::Error::NotFound(text) => Error::NotFound,
+            shared::errors::Error::AlreadyExists => Error::AlreadyExists,
+            shared::errors::Error::Internal(text) => Error::Internal,
+            shared::errors::Error::Unauthorized => Error::Unauthorized,
+        }
+    }
+}
+impl fmt::Display for CustomError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CustomError: {} - {}", self.code, self.message)
     }
 }

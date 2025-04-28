@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 shared = { path = "../../packages/shared" }
 config = { path = "../../packages/config" }
-orchestrator = { path = "../../packages/orchestrator" }
+core = { path = "../../packages/core" }
 database = { path = "../../packages/database" }
 
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 dotenvy = { git = "https://github.com/allan2/dotenvy", features = ["macros"] }

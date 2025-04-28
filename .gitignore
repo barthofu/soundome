@@ -16,5 +16,5 @@ data/
 
 # misc
 tmp/
-core
+/core
 rustypipe_cache.json

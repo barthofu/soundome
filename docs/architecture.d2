@@ -1,0 +1,39 @@
+vars: {
+    d2-config: {
+        layout-engine: dagre
+        # Terminal theme code
+        theme-id: 200
+    }
+}
+
+user: "User" {
+    shape: person
+}
+
+app: "Application Layer" {
+    style.fill: "lightblue"
+
+    middleware
+    controller
+}
+
+domain: "Domain Layer" {
+    style.fill: "lightgreen"
+
+    orchestrator
+    service
+}
+
+database: "Database Layer" {
+    style.fill: "lightyellow"
+
+    repository
+    model
+}
+
+user -> app.middleware: "request"
+app.middleware -> app.controller: "request"
+app.controller -> domain.orchestrator: "ctx"
+domain.orchestrator -> domain.service: "ctx"
+domain.service -> database.repository
+
