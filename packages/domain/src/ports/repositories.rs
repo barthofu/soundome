@@ -9,22 +9,14 @@ pub struct RepositoryLayer {
     pub artist: Arc<dyn ArtistRepository>,
 }
 
-impl RepositoryLayer {
-    pub fn new(
-        track: Arc<dyn TrackRepository>,
-        album: Arc<dyn AlbumRepository>,
-        artist: Arc<dyn ArtistRepository>,
-    ) -> Self {
-        Self { track, album, artist }
-    }
-}
-
 // ================================================================================================
 
 pub trait TrackRepository: Send + Sync {
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Track>;
     fn create(&self, conn: &mut SqliteConnection, new_track: &Track) -> SoundomeResult<Track>;
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &Track) -> SoundomeResult<Track>;
+
+    fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Track>;
 }
 
 pub trait AlbumRepository: Send + Sync {
@@ -35,6 +27,7 @@ pub trait AlbumRepository: Send + Sync {
 
 pub trait ArtistRepository: Send + Sync {
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Artist>;
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Artist>>;
     fn create(&self, conn: &mut SqliteConnection, new_artist: &Artist) -> SoundomeResult<Artist>;
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_artist: &Artist) -> SoundomeResult<Artist>;
 }

@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use super::track::Track;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistTrack {
     pub id: Option<i32>,
     pub track: Track,

@@ -3,6 +3,6 @@ address = "0.0.0.0"
 port = 8000
 
 [global.databases.sqlite]
-url = "data/data.db"
+url = "data/db.sqlite"
 pool_size = 10
 timeout = 5

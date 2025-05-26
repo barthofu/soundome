@@ -1,14 +1,16 @@
+use std::sync::Arc;
+
 use diesel::SqliteConnection;
 
 use crate::ports::repositories::AlbumRepository;
 
 pub struct AlbumService {
-    album_repo: Box<dyn AlbumRepository + Send + Sync>,
+    album_repo: Arc<dyn AlbumRepository + Send + Sync>,
 }
 
 impl AlbumService {
     pub fn new(
-        album_repo: Box<dyn AlbumRepository + Send + Sync>,
+        album_repo: Arc<dyn AlbumRepository + Send + Sync>,
     ) -> Self {
         Self {
             album_repo,

@@ -15,3 +15,4 @@ thiserror = "2.0.11"
 tinytemplate = "1.1"
 slug = "0.1.6"
 schemars = "0.8.22"
+rocket_okapi = { version = "0.9.0", features = ["swagger"] }

@@ -1,8 +1,11 @@
-use rocket::{get, serde::json::Json};
-use rocket_okapi::openapi;
-use shared::{models::Artist, types::SoundomeResult};
+use std::sync::Arc;
 
-use crate::utils::database::Db;
+use domain::services::ServiceLayer;
+use rocket::{get, http::Status, serde::json::Json};
+use rocket_okapi::openapi;
+use shared::models::Artist;
+
+use crate::utils::{database::Db, error::CustomError};
 
 #[openapi]
 #[get("/")]
@@ -10,17 +13,22 @@ pub async fn index() -> Json<String> {
     Json("API is running!".to_owned())
 }
 
-// #[openapi]
-// #[get("/get-all")]
-// pub async fn get_all(
-//     db: Db,
-// ) -> SoundomeResult<Json<Vec<Artist>>> {
-//     db.run(|c| {
-//         // Simulate a database query
-//         let result = vec!["Item 1".to_string(), "Item 2".to_string()];
-//         Ok(result)
-//     })
-//     .await
-//     .map(Json)
-//     .map_err(|_| shared::errors::Error::MissingArg)
-// }
+#[openapi]
+#[get("/get-all")]
+pub async fn get_all(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<Artist>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    db.run(move |c| services.artist_service.get_all(c))
+        .await
+        .map(Json)
+        .map_err(|err|
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        )
+}

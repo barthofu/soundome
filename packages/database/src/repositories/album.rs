@@ -1,6 +1,6 @@
 // basic CRUD operations
 
-use core::ports::repositories::AlbumRepository;
+use domain::ports::repositories::AlbumRepository;
 
 use diesel::{BelongingToDsl, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::types::SoundomeResult;
@@ -12,6 +12,12 @@ use crate::{
 };
 
 pub struct DieselAlbumRepository {}
+
+impl DieselAlbumRepository {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
 impl AlbumRepository for DieselAlbumRepository {
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Album> {

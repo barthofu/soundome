@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 
 use super::{artist::Artist, Reference};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Album {
     pub id: Option<i32>,
     pub title: String,
@@ -17,7 +18,7 @@ pub struct Album {
 // Enums
 // ================================================================================================
 
-#[derive(Debug, Clone, AsRefStr)]
+#[derive(Debug, Clone, Serialize, Deserialize, AsRefStr)]
 pub enum AlbumType {
     Album,
     Single,

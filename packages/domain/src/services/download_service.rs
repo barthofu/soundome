@@ -1,27 +1,28 @@
+use std::sync::Arc;
+
 use config::model::AppConfig;
-// On suppose que ces modules existent dans le monorepo et exposent les fonctions nécessaires.
-use downloader;
-use fetcher;
-use organizer::move_track_file;
-use shared::{
-    errors::Error, models::{Platform, Track}, types::SoundomeResult, utils::enums::Match
-};
+use shared::{models::{Platform, Track}, types::SoundomeResult, utils::enums::Match};
 use tagger::TagProvider;
 
-pub mod ports;
-pub mod services;
-pub mod utils;
+use super::track_service::TrackService;
 
-pub struct Orchestrator {
-    config: AppConfig,
+pub struct DownloadService {
+    track_service: Arc<TrackService>,
+    config: Arc<AppConfig>
 }
 
-impl Orchestrator {
-    pub fn new(config: AppConfig) -> Self {
-        Self { config }
+impl DownloadService {
+    pub fn new(
+        track_service: Arc<TrackService>,
+        config: Arc<AppConfig>,
+    ) -> Self {
+        Self { 
+            track_service,
+            config
+        }
     }
 
-    pub async fn download_track_from_url(&self, url: &str) -> Result<Track, Error> {
+    pub async fn download_track_from_url(&self, url: &str) -> SoundomeResult<Track> {
         println!("===========\nDownloading track from {:?}\n------", url);
         // Fetch track metadata
         let mut track = fetcher::get_track_from_url(url, &self.config).await?;
@@ -37,13 +38,14 @@ impl Orchestrator {
         // Download the track
         track = self.download_track(track).await?;
         Ok(track)
-    }
+    } 
 
     pub async fn download_playlist_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
         println!(
             "====================\nDownloading playlist from {:?}\n---------",
             url
         );
+        
         // Fetch playlist metadata
         let playlist_items = fetcher::get_playlist_tracks_from_url(url, &self.config).await?;
         println!("Found {} tracks in playlist", playlist_items.len());
@@ -74,6 +76,8 @@ impl Orchestrator {
 
         Ok(tracks)
     }
+
+    // Utils
 
     async fn download_track(&self, track: Track) -> SoundomeResult<Track> {
         let mut downloaded_track = track;
@@ -111,7 +115,7 @@ impl Orchestrator {
         println!("Tagged file with downloaded_track metadata");
 
         // Move the file to the correct location
-        move_track_file(&mut downloaded_track, &self.config.general.base_dir)?;
+        organizer::move_track_file(&mut downloaded_track, &self.config.general.base_dir)?;
 
         // Save in the database
         // let mut conn = database::get_connection(&self.config.database.url);

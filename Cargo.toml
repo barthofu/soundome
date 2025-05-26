@@ -8,6 +8,6 @@ members = [
     "apps/server",
     "packages/shared", "packages/database",
     "packages/downloader",
-    "packages/fetcher", "packages/core",
+    "packages/fetcher", "packages/domain",
     "packages/tagger", "apps/cli",
     "packages/config", "tests", "packages/ai", "packages/organizer"]

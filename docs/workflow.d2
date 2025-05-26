@@ -10,39 +10,41 @@ user: "User" {
     shape: person
 }
 
+check_track_url: "Check for track URL in the database" {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
+
+check_album_artists_url: "Check for album and artists URL in the database.\nIf found, fill the id of the object." {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
+
+check_musicbrainz_url: "Check for corresponding musicbrainz\nurl/id in the database.\nIf found, makes a new track_ref with the current url." {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
 
 fetcher: "Fetcher" {
 
-    check_track_url: "Check for track URL in the database" {
-        shape: diamond
-        # style.fill: "darkseagreen"
-    }
 
     get_track_info_from_url: "Get track info from URL" {
         shape: oval
         style.fill: "darkseagreen"
     }
 
-    check_track: "Check track in the database" {
-        shape: diamond
-        # style.fill: "darkseagreen"
-    }
-
-    soundcloud {
-        style.fill: "darkseagreen"
-    }
-    youtube {
-        style.fill: "darkseagreen"
-    }
-    youtube_music {
-        style.fill: "darkseagreen"
-    }
-    spotify {
-        style.fill: "darkseagreen"
-    }
-
-    check_track_url -> get_track_info_from_url: "if doesn't exist"
-    get_track_info_from_url -> check_track: "track object"
+    # soundcloud {
+    #     style.fill: "darkseagreen"
+    # }
+    # youtube {
+    #     style.fill: "darkseagreen"
+    # }
+    # youtube_music {
+    #     style.fill: "darkseagreen"
+    # }
+    # spotify {
+    #     style.fill: "darkseagreen"
+    # }
 }
 
 downloader: "Downloader" {
@@ -55,15 +57,15 @@ downloader: "Downloader" {
         style.fill: "darkseagreen"
     }
 
-    soundcloud {
-        style.fill: "darkseagreen"
-    }
-    youtube {
-        style.fill: "darkseagreen"
-    }
-    youtube_music {
-        style.fill: "darkseagreen"
-    }
+    # soundcloud {
+    #     style.fill: "darkseagreen"
+    # }
+    # youtube {
+    #     style.fill: "darkseagreen"
+    # }
+    # youtube_music {
+    #     style.fill: "darkseagreen"
+    # }
 }
 
 tagger: "Tagger" {
@@ -161,15 +163,22 @@ db: "Database" {
 
 # Relations
 
-user -> fetcher.check_track_url: "url"
-fetcher.check_track_url -> stop: "if exists"
-fetcher.check_track -> stop: "if exists"
-fetcher.check_track -> downloader.search_track: "if not exists"
+user -> check_track_url: "url"
+check_track_url -> fetcher.get_track_info_from_url: "if doesn't exist"
+fetcher.get_track_info_from_url -> check_album_artists_url: "track object"
+# check_album_artists_url -> check_track
+check_album_artists_url -> tagger.get_music_brainz_metadata_from_track_object: "track object"
+tagger.get_music_brainz_metadata_from_track_object -> check_musicbrainz_url
+check_track -> stop: "if exists"
+
+check_track -> downloader.search_track: "if not exists"
 downloader.search_track -> downloader.download_track: "download url"
 downloader.download_track -> fs_cache: "write"
-downloader.download_track -> tagger.get_music_brainz_metadata_from_track_object: "track object"
+
+# downloader.download_track -> tagger.get_music_brainz_metadata_from_track_object: "track object"
 fs_ingest -> tagger.sufficient_metadata: "get"
 tagger.tag_track -> organizer.duplicate_detection: "track object"
+
 organizer.move_track -> fs_library: "write"
 organizer.save_track_info_to_db -> db: "write"
 organizer.quality_comparison -> stop: "if new version worse"

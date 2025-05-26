@@ -1,4 +1,4 @@
-use core::ports::repositories::TrackRepository;
+use domain::ports::repositories::TrackRepository;
 
 use diesel::prelude::*;
 use shared::types::SoundomeResult;
@@ -16,6 +16,10 @@ impl DieselTrackRepository {
 }
 
 impl TrackRepository for DieselTrackRepository {
+
+    // =================================================================================
+    // CRUD
+    // =================================================================================
 
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Track> {
         let (track, album): (TrackEntity, Option<AlbumEntity>) = schema::track::table
@@ -108,6 +112,25 @@ impl TrackRepository for DieselTrackRepository {
             vec![],
         ))
     }
+
+    // =================================================================================
+    // Custom
+    // =================================================================================
+
+    fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<shared::models::Track> {
+        let track_ref = schema::track_ref::table
+            .filter(schema::track_ref::external_url.eq(url))
+            .first::<TrackRefEntity>(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by url: {}",
+                    err
+                ))
+            })?;
+
+        self.get_by_id(conn, track_ref.track_id)
+    }
+
 }
 
 

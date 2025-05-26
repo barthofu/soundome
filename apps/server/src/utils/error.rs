@@ -140,12 +140,11 @@ impl OpenApiResponderInner for Error {
 impl From<shared::errors::Error> for Error {
     fn from(err: shared::errors::Error) -> Self {
         match err {
-            shared::errors::Error::MissingArg => Error::BadRequest,
-            shared::errors::Error::InvalidArg => Error::BadRequest,
-            shared::errors::Error::NotFound(text) => Error::NotFound,
-            shared::errors::Error::AlreadyExists => Error::AlreadyExists,
-            shared::errors::Error::Internal(text) => Error::Internal,
-            shared::errors::Error::Unauthorized => Error::Unauthorized,
+            _ => Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            }),
         }
     }
 }

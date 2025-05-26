@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display};
+use rocket_okapi::JsonSchema;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Reference {
     pub id: Option<i32>,
     pub ref_type: ReferenceType,
@@ -13,7 +15,7 @@ pub struct Reference {
 // Enums
 // ================================================================================================
 
-#[derive(Debug, Clone, AsRefStr, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, AsRefStr, PartialEq, JsonSchema)]
 pub enum ReferenceType {
     Source,
     Provider,
@@ -37,7 +39,7 @@ impl ReferenceType {
     }
 }
 
-#[derive(Debug, Clone, Display, AsRefStr, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Display, AsRefStr, PartialEq, JsonSchema)]
 pub enum Platform {
     Spotify,
     SoundCloud,

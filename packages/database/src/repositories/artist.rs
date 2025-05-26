@@ -1,4 +1,4 @@
-use core::ports::repositories::ArtistRepository;
+use domain::ports::repositories::ArtistRepository;
 
 use diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::types::SoundomeResult;
@@ -43,6 +43,33 @@ impl ArtistRepository for DieselArtistRepository {
             artist,
             references,
         ))
+    }
+
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<shared::models::Artist>> {
+        let artists: Vec<ArtistEntity> = schema::artist::table
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get all resources: {}",
+                    err
+                ))
+            })?;
+
+        let references: Vec<ArtistRefEntity> = schema::artist_ref::table
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get all resources: {}",
+                    err
+                ))
+            })?;
+
+        Ok(artists.into_iter()
+            .map(|artist| ArtistEntity::convert_to_domain(
+                artist,
+                references.clone(),
+            ))
+            .collect())
     }
 
     fn create(&self, conn: &mut SqliteConnection, new_artist: &shared::models::Artist) -> SoundomeResult<shared::models::Artist> {

@@ -15,7 +15,7 @@ use super::{Reference, ReferenceType};
 // Enums
 // ================================================================================================
 
-#[derive(Debug, Clone, AsRefStr)]
+#[derive(Debug, Clone, Serialize, Deserialize, AsRefStr)]
 pub enum TrackSource {
     Local,
     Spotify,
@@ -42,7 +42,7 @@ impl TrackSource {
     }
 }
 
-#[derive(Debug, Clone, AsRefStr)]
+#[derive(Debug, Clone, Serialize, Deserialize, AsRefStr)]
 pub enum TrackProvider {
     Youtube,
     YoutubeMusic,
@@ -69,7 +69,7 @@ impl TrackProvider {
 // Structs
 // ================================================================================================
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
     pub id: Option<i32>,
 

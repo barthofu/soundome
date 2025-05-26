@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 shared = { path = "../../packages/shared" }
 config = { path = "../../packages/config" }
-core = { path = "../../packages/core" }
+domain = { path = "../../packages/domain" }
 database = { path = "../../packages/database" }
 
 tokio = { version = "1.44.2", features = ["full"] }

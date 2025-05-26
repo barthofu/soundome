@@ -26,6 +26,10 @@ Track dedupe detection:
 - lv2. same track name + artists name + release date
 - lv3. same musicbrainz resolution
 
+Album dedupe detection:
+
+Artist dedupe detection:
+
 Soundcloud:
 - si artiste similaire:
     - si on a un match musicbrainz, on peut voir s'il existe déjà et simplement le compléter
