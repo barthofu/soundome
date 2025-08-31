@@ -40,6 +40,8 @@ impl ServiceLayer {
         // Services
         let download_service = Arc::new(download_service::DownloadService::new(
             track_service.clone(),
+            album_service.clone(),
+            artist_service.clone(),
             config,
         ));
 

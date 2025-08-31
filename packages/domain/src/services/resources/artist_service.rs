@@ -32,4 +32,8 @@ impl ArtistService {
     pub fn update(&self, conn: &mut SqliteConnection, id: i32, updated_artist: &shared::models::Artist) -> shared::types::SoundomeResult<shared::models::Artist> {
         self.artist_repo.update(conn, id, updated_artist)
     }
+
+    pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<shared::models::Artist> {
+        self.artist_repo.get_by_url(conn, url).ok()
+    }
 }

@@ -1,5 +1,9 @@
 # Todo
 
+1. créer metadata reference dans la db
+    -> il faut une ref pour les 3 resources; track, album, artist
+2. voir pour renommer les bails de "tag" et "tagger" en "metadata"
+
 ## Apps
 
 ### CLI
@@ -13,3 +17,4 @@
 - [ ] Downloaders
   - [ ] Soundcloud
   - [x] Youtube
+

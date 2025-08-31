@@ -23,6 +23,8 @@ impl TrackService {
         }
     }
 
+    // CRUD
+
     pub fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<shared::models::Track> {
         self.track_repo.get_by_id(conn, id)
     }
@@ -33,5 +35,11 @@ impl TrackService {
 
     pub fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &shared::models::Track) -> shared::types::SoundomeResult<shared::models::Track> {
         self.track_repo.update(conn, id, updated_track)
+    }
+
+    // Getters
+
+    pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<shared::models::Track> {
+        self.track_repo.get_by_url(conn, url).ok()
     }
 }

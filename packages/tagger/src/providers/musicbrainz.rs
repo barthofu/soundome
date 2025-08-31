@@ -1,6 +1,7 @@
 use musicbrainz_rs::entity::recording::RecordingSearchQuery;
 use musicbrainz_rs::entity::{artist_credit::ArtistCredit, recording::Recording, release::Release};
 use musicbrainz_rs::prelude::*;
+use shared::models::{Reference, ReferenceType};
 use shared::utils::enums::Match;
 use shared::utils::string::{string_similarity, SimilarityAlgorithm};
 use shared::{
@@ -125,9 +126,17 @@ impl TagProvider for MusicBrainz {
 fn convert_to_artist(artist: &ArtistCredit) -> Artist {
     Artist {
         id: None,
-        name: artist.name.clone(),
+        name: artist.artist.name.clone(),
         icon: None,
-        references: Vec::new(),
+        references: vec![
+            Reference {
+                id: None,
+                ref_type: ReferenceType::Metadata,
+                platform: shared::models::Platform::Spotify,
+                external_id: Some(artist.artist.id.clone()),
+                external_url: Some("https://musicbrainz.org/artist/".to_string() + &artist.artist.id),
+            }
+        ],
     }
 }
 
@@ -147,7 +156,15 @@ fn convert_to_album(release: &Release) -> Album {
         album_type: shared::models::AlbumType::Unknown,
         // cover: release.get_coverart().res_1200().execute().await.unwrap().
         cover: None,
-        references: Vec::new(),
+        references: vec![
+            Reference {
+                id: None,
+                ref_type: ReferenceType::Metadata,
+                platform: shared::models::Platform::Spotify,
+                external_id: Some(release.id.clone()),
+                external_url: Some("https://musicbrainz.org/release/".to_string() + &release.id),
+            }
+        ],
     }
 }
 
@@ -185,6 +202,14 @@ fn convert_to_track(recording: &Recording) -> Track {
         duration: recording.length.map(|length| length as i32),
         label: None,
         file_path: None,
-        references: Vec::new(),
+        references: vec![
+            Reference {
+                id: None,
+                ref_type: ReferenceType::Metadata,
+                platform: shared::models::Platform::Spotify,
+                external_id: Some(recording.id.clone()),
+                external_url: Some("https://musicbrainz.org/recording/".to_string() + &recording.id),
+            }
+        ],
     }
 }

@@ -1,43 +1,77 @@
 use std::sync::Arc;
 
 use config::model::AppConfig;
+use diesel::SqliteConnection;
 use shared::{models::{Platform, Track}, types::SoundomeResult, utils::enums::Match};
 use tagger::TagProvider;
 
-use super::track_service::TrackService;
+use super::{album_service::AlbumService, artist_service::ArtistService, track_service::TrackService};
 
 pub struct DownloadService {
     track_service: Arc<TrackService>,
+    album_service: Arc<AlbumService>,
+    artist_service: Arc<ArtistService>,
     config: Arc<AppConfig>
 }
 
 impl DownloadService {
     pub fn new(
         track_service: Arc<TrackService>,
+        album_service: Arc<AlbumService>,
+        artist_service: Arc<ArtistService>,
         config: Arc<AppConfig>,
     ) -> Self {
         Self { 
             track_service,
+            album_service,
+            artist_service,
             config
         }
     }
 
-    pub async fn download_track_from_url(&self, url: &str) -> SoundomeResult<Track> {
+    pub async fn download_track_from_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Track> {
         println!("===========\nDownloading track from {:?}\n------", url);
-        // Fetch track metadata
-        let mut track = fetcher::get_track_from_url(url, &self.config).await?;
-        println!(
-            "Fetched track from {}: {}",
-            track.get_source()
-                .map(|s| s.platform)
-                .unwrap_or(Platform::Unknown)
-                .as_ref(),
-            track.display()
-        );
 
-        // Download the track
-        track = self.download_track(track).await?;
-        Ok(track)
+        let existing_track = self.track_service.get_by_url(conn, url);
+        if let Some(track) = existing_track {
+            println!("Track already exists in the database: {}", track.display());
+            return Ok(track);
+        } else {
+            // Fetch track metadata
+            let mut track = fetcher::get_track_from_url(url, &self.config).await?;
+            println!(
+                "Fetched track from {}: {}",
+                track.get_source()
+                    .map(|s| s.platform)
+                    .unwrap_or(Platform::Unknown)
+                    .as_ref(),
+                track.display()
+            );
+
+            // Check if the album already exists in the database)
+            let existing_album = track
+                .album
+                .and_then(|a|
+                    a.get_source().and_then(|s| s.external_url).and_then(|url| {
+                        self.album_service.get_by_url(conn, &url)
+                    }
+                ));
+            track.album = existing_album;
+
+            // Check if the artist already exists in the database
+            for artist in &mut track.artists {
+                if let Some(existing_artist) = artist.get_source().and_then(|s| s.external_url).and_then(|url| {
+                    self.artist_service.get_by_url(conn, &url)
+                }) {
+                    *artist = existing_artist;
+                }
+            }
+    
+            // Download the track
+            track = self.download_track(track).await?;
+            Ok(track)
+        }
+
     } 
 
     pub async fn download_playlist_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
@@ -82,20 +116,6 @@ impl DownloadService {
     async fn download_track(&self, track: Track) -> SoundomeResult<Track> {
         let mut downloaded_track = track;
 
-        // Get the best download URL
-        let provider_ref = downloader::search(&downloaded_track, &self.config).await?;
-        println!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
-        downloaded_track.references.push(provider_ref);
-
-        // Download the track
-        let file_path = downloader::download(
-            &downloaded_track,
-            &self.config,
-        )
-        .await?;
-        println!("Downloaded track to {:?}", file_path);
-        downloaded_track.file_path = file_path.clone().into();
-
         // Get MusicBrainz metadata
         let musicbrainz = tagger::providers::musicbrainz::MusicBrainz::new();
         let best_match = musicbrainz
@@ -110,6 +130,22 @@ impl DownloadService {
         } else {
             println!("No match found from MusicBrainz");
         }
+
+
+        // Get the best download URL
+        let provider_ref = downloader::search(&downloaded_track, &self.config).await?;
+        println!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
+        downloaded_track.references.push(provider_ref);
+
+        // Download the track
+        let file_path = downloader::download(
+            &downloaded_track,
+            &self.config,
+        )
+        .await?;
+        println!("Downloaded track to {:?}", file_path);
+        downloaded_track.file_path = file_path.clone().into();
+
 
         tagger::file::tag_file_with_track(&file_path.clone(), &downloaded_track)?;
         println!("Tagged file with downloaded_track metadata");

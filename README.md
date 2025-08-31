@@ -1,33 +1,88 @@
 # Soundome
 
-Le but de cette application est de :
-1. Télécharger des fichiers audio depuis plusieurs sources (Spotify, Soundcloud, Youtube)
-2. Synchroniser des playlists et des artistes depuis ces mêmes sources
-3. Tagger les fichiers audio téléchargés afin qu'ils disposent des métadonnées nécessaires à leur classement dans une bibliothèque musicale
-4. Gestion des fichiers et organisation de la bibliothèque musicale (dossier par artiste, album, etc.), tout en gardant une trace de la playlist d'origine si la track vient d'une playlist (dans la base de données, dans les metadata ou encore en physique avec des liens symboliques)
-5. Reconnaissance automatique du genre d'une musique
-6. Suppression des duplicats
-7. Interface web de gestion des metadata si besoin (pour les fichiers non taggés automatiquement)
+**Soundome** is a self-hosted tool that centralizes, downloads, tags, and organizes your music library from multiple platforms such as **Spotify**, **SoundCloud**, and **YouTube**. It ensures a clean, structured, and metadata-rich collection — all fully under your control.
+
+---
+
+## Features
+
+- 🔁 Sync playlists, artists from multiple platforms
+- 📥 Download audio files from Spotify, SoundCloud, YouTube (and more to come)
+- 🏷️ Automatically tag and organize tracks by artist, album, etc.
+- 🧠 Detect and remove duplicates intelligently
+- 🧾 Keep metadata on original source (platform + playlist)
+- ❓ Web panel to review and manually tag unknown files
+- 📁 Organize files physically (`Artist/Album/Track`) and maintain symbolic links for playlists
+
+---
+
+## Monorepo Structure
+
+```bash
+soundome/
+├── apps/
+│ ├── cli/ # Command-line interface for automation
+│ └── server/ # Web admin interface (API + frontend)
+├── packages/
+│ ├── orchestrator/ # Coordinates workflows across the system
+│ ├── fetcher/ # Fetch metadata and track references from sources
+│ ├── downloader/ # Match and download tracks from providers
+│ ├── tagger/ # Apply metadata to audio files
+│ ├── database/ # Persistent layer (Diesel + SQLite)
+│ ├── config/ # Centralized configuration manager
+│ └── shared/ # Shared domain types and utilities
+```
+
+---
+
+## Tech Stack
+
+- 🦀 **Rust** — fast, safe, and reliable
+- 🗃️ **Diesel** + **SQLite** — simple and robust database layer
+- 🧱 **Rocket** + `rocket_okapi` — backend API with OpenAPI support
+- 🧾 **Symphonia**, **id3**, **lofty** — for audio metadata handling
+- 📦 Monorepo structure with domain-centric packages
+
+---
+
+## Roadmap
+
+- [x] Core domain model (track, artist, album)
+- [x] Diesel migrations + SQLite persistence
+- [x] Config system with layered support
+- [x] CLI workflows
+- [ ] Web admin interface
+- [ ] Audio fingerprinting for duplicate detection
+- [ ] Smart tagging using ML
+- [ ] Remote sync and backup options
+
+---
+
+## Requirements
+
+- Rust (latest stable)
+- SQLite (or another database if extended)
+- `ffmpeg` (for audio conversion/muxing)
+- API keys for platforms (Spotify, YouTube, etc.)
+
+---
+
+## Development Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/barthofu/soundome.git
+cd soundome
+```
+2. Install dependencies:
+```bash
+make shell
+cargo install diesel_cli --no-default-features --features sqlite
+```
+3. Set up the database:
+```bash
+diesel setup
+diesel migration run
+```
 
 
-4. Persistence des infos dans une base de données :
-
-
-Interface web:
-1. Parcours des différentes playlists et/ou artistes qui sont synchronisés:
-    - vue par artistes, puis album
-    - vue par 
-
-## Development
-
-### Requirements
-
-
-### Initialization
-
-1. `make shell`
-2. `cargo install diesel_cli --no-default-features --features sqlite`
-3. `diesel setup`
-4. `diesel migration run`
-
-###

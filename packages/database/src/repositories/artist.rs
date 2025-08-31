@@ -117,6 +117,24 @@ impl ArtistRepository for DieselArtistRepository {
             vec![],
         ))
     }
+
+    // =================================================================================
+    // Custom
+    // =================================================================================
+
+    fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<shared::models::Artist> {
+        let artist_ref = schema::artist_ref::table
+            .filter(schema::artist_ref::external_url.eq(url))
+            .first::<ArtistRefEntity>(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by url: {}",
+                    err
+                ))
+            })?;
+
+        self.get_by_id(conn, artist_ref.artist_id)
+    }
 }
 
 
@@ -124,6 +142,23 @@ impl ArtistRepository for DieselArtistRepository {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ================================================================================================
+// ARCHIVES
+// ================================================================================================
 
 // basic CRUD operations
 

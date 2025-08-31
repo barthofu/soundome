@@ -1,0 +1,163 @@
+vars: {
+    d2-config: {
+        layout-engine: dagre
+        # Terminal theme code
+        theme-id: 200
+    }
+}
+
+user: "User" {
+    shape: person
+}
+
+check_track_url: "Check for track URL in the database" {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
+
+check_album_artists_url: "Check for album and artists URL in the database.\nIf found, fill the id of the object." {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
+
+check_musicbrainz_url: "Check for corresponding musicbrainz\nurl/id in the database.\nIf found, makes a new track_ref with the current url." {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
+
+check_title_artist: "Check for title and artist in the database.\nIf found, makes a new track_ref with the current url." {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
+
+check_title_artist_2: "Check for title and artist in the database" {
+    shape: diamond
+    # style.fill: "darkseagreen"
+}
+
+
+get_track_info_from_url: "Get track info from URL" {
+    shape: oval
+    style.fill: "darkseagreen"
+}
+
+
+search_track: "Search track" {
+    shape: oval
+    style.fill: "darkseagreen"
+}w
+download_track: "Download track" {
+    shape: oval
+    style.fill: "darkseagreen"
+}
+
+get_music_brainz_metadata_from_track_object: "Get MusicBrainz metadata from Track object" {
+    shape: oval
+    style.fill: "darkseagreen"
+}
+get_music_brainz_metadata_from_query: "Get MusicBrainz metadata from query" {
+    shape: oval
+    style.fill: "darkseagreen"
+}
+score_matching: "Score matching" {
+    shape: diamond
+    style.fill: "darkseagreen"
+}
+tag_track: "Tag track" {
+    shape: oval
+    style.fill: "darkseagreen"
+}
+get_metadata_from_file: "Get metadata from file" {
+    shape: oval
+    style.fill: "darkseagreen"
+}
+sufficient_metadata: "Sufficient metadata in file tags" {
+    shape: diamond
+}
+web_validation: "Web validation log interface"
+
+compare_quality: "Compare quality" {
+    shape: diamond
+}
+
+
+
+move_track: "Move track" {
+    shape: oval
+}
+save_track_info_to_db: "Save track info to database" {
+    shape: oval
+}
+artist_similarity_detection: "Artist similarity detection" {
+    shape: diamond
+}
+merge_artists: "Merge artists" {
+    shape: oval
+}
+
+artist_web_validation: "Artist web validation interface"
+
+# Après ajout, mise à jour de la bibliothèque et base de données
+move_track -> tag_track: "track object"
+tag_track -> save_track_info_to_db: "track object"
+
+# Détection d’artistes similaires
+# move_track -> artist_similarity_detection: "post-addition"
+# artist_similarity_detection -> artist_web_validation: "if similar artist detected"
+# artist_web_validation -> merge_artists: "confirm merge"
+# merge_artists -> quality_comparison: "compare songs"
+
+stop: {
+    shape: circle
+}
+
+fs_cache: "Filesystem download cache" {
+    shape: cylinder
+}
+
+fs_ingest: "Filesystem ingest" {
+    shape: cylinder
+}
+
+fs_library: "Filesystem library" {
+    shape: cylinder
+}
+
+db: "Database" {
+    shape: stored_data
+}
+
+# Relations
+
+user -> check_track_url: "url"
+check_track_url -> get_track_info_from_url: "if doesn't exist"
+get_track_info_from_url -> check_album_artists_url: "track object"
+check_album_artists_url -> get_music_brainz_metadata_from_track_object: "track object"
+# get_music_brainz_metadata_from_track_object -> score_matching: "metadata"
+
+check_musicbrainz_url -> search_track: "if not found"
+search_track -> download_track: "download url"
+download_track -> check_title_artist
+check_title_artist -> move_track: "if not found"
+check_title_artist -> compare_quality: "if found"
+compare_quality -> move_track: "if better version"
+
+# tag_track: "track object"
+
+get_music_brainz_metadata_from_track_object -> search_track: "no match"
+get_music_brainz_metadata_from_track_object -> search_track: "partial match"
+get_music_brainz_metadata_from_track_object -> check_musicbrainz_url: "full match"
+
+web_validation -> check_title_artist_2: "confirm"
+check_title_artist_2 -> move_track: "if not found"
+# get_music_brainz_metadata_from_track_object -> check_musicbrainz_url: "if not found"
+
+fs_ingest -> sufficient_metadata: "get file metadata" { style.stroke: "red" }
+sufficient_metadata -> get_metadata_from_file: "if enough" { style.stroke: "red" }
+sufficient_metadata -> get_music_brainz_metadata_from_query: "if not enough\nuse filename as query" { style.stroke: "red" }
+get_metadata_from_file -> get_music_brainz_metadata_from_track_object: "track object" { style.stroke: "red" }
+get_music_brainz_metadata_from_query -> web_validation: "track object" { style.stroke: "red" }
+
+move_track -> fs_library: "write"
+save_track_info_to_db -> db: "write"
+quality_comparison -> stop: "if new version worse"

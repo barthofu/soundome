@@ -109,6 +109,24 @@ impl AlbumRepository for DieselAlbumRepository {
 
         self.get_by_id(conn, id)
     }
+
+    // =================================================================================
+    // Custom
+    // =================================================================================
+
+    fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<shared::models::Album> {
+        let album_ref = schema::album_ref::table
+            .filter(schema::album_ref::external_url.eq(url))
+            .first::<AlbumRefEntity>(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by url: {}",
+                    err
+                ))
+            })?;
+
+        self.get_by_id(conn, album_ref.album_id)
+    }
 }
 
 

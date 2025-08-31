@@ -9,7 +9,7 @@ use crate::{
     utils::string::{string_similarity, SimilarityAlgorithm},
 };
 
-use super::{Reference, ReferenceType};
+use super::{album, Reference, ReferenceType};
 
 // ================================================================================================
 // Enums
@@ -219,16 +219,26 @@ impl Track {
     }
 
     /// Transpose metadata from a source track to a destination track
-    pub fn transpose_metadata(&mut self, source_track: &Track) {
-        self.title = source_track.title.clone();
-        self.album = source_track.album.clone();
-        self.artists = source_track.artists.clone();
-        self.date = source_track.date.clone();
-        self.genre = source_track.genre.clone();
-        self.cover = source_track.cover.clone();
-        self.duration = source_track.duration.clone();
-        self.track_number = source_track.track_number.clone();
-        self.disc_number = source_track.disc_number.clone();
-        self.label = source_track.label.clone();
+    pub fn transpose_metadata(&mut self, other: &Track) {
+        self.title = other.title.clone();
+        if let Some(val) = &other.album {
+            match &mut self.album {
+                Some(album) => album.transpose_metadata(val),
+                None => self.album = Some(val.clone()),
+            }
+        }
+        self.artists = other.artists.clone();
+        if let Some(val) = &other.date { self.date = Some(val.clone()); };
+        if let Some(val) = &other.genre { self.genre = Some(val.clone()); };
+        if let Some(val) = &other.cover { self.cover = Some(val.clone()); };
+        if let Some(val) = &other.duration { self.duration = Some(val.clone()); };
+        if let Some(val) = &other.track_number { self.track_number = Some(val.clone()); };
+        if let Some(val) = &other.disc_number { self.disc_number = Some(val.clone()); };
+        if let Some(val) = &other.label { self.label = Some(val.clone()); };
+        for ref_item in &other.references {
+            if !self.references.iter().any(|r| r.platform == ref_item.platform && r.external_id == ref_item.external_id && r.ref_type == ref_item.ref_type) {
+                self.references.push(ref_item.clone());
+            }
+        }
     }
 }
