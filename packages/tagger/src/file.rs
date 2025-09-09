@@ -5,14 +5,14 @@ use shared::{
         Album,
         Artist,
         Track,
-    },
+    }, types::SoundomeResult,
 };
 use std::{path::PathBuf, str::FromStr};
 
 /**
  * Reads the tag from a file and returns a converted Track object.
  */
-pub fn get_track_from_file(file_path: &PathBuf) -> Result<Track, Error> {
+pub fn get_track_from_file(file_path: &PathBuf) -> SoundomeResult<Track> {
     println!("Reading tag from file: {:?}", file_path);
 
     Tag::new()
@@ -24,7 +24,7 @@ pub fn get_track_from_file(file_path: &PathBuf) -> Result<Track, Error> {
 /**
  * Tag an audio file with the provided track information.
  */
-pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> Result<(), Error> {
+pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> SoundomeResult<()> {
     let mut tag = Tag::new()
         .read_from_path(file_path)
         .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))?;

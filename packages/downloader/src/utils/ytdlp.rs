@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::{io::AsyncReadExt, process::Command};
 
-pub async fn download_with_ytdlp(url: &str, file_name: &str, base_dir: PathBuf) -> Result<PathBuf, Error> {
-    let base_dir = base_dir.to_str()
-        .ok_or(Error::InvalidPath(base_dir.clone()))?;
-    let output_path = format!("{}/{}.%(ext)s", base_dir, file_name);
+pub async fn download_with_ytdlp(url: &str, file_name: &str, base_library_dir: PathBuf) -> Result<PathBuf, Error> {
+    let base_library_dir = base_library_dir.to_str()
+        .ok_or(Error::InvalidPath(base_library_dir.clone()))?;
+    let output_path = format!("{}/{}.%(ext)s", base_library_dir, file_name);
 
     let mut child = Command::new("yt-dlp")
         .stdout(Stdio::piped())

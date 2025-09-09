@@ -18,7 +18,7 @@ pub trait Provider {
     async fn search(&self, track: &Track) -> SoundomeResult<Reference>;
 
     /// Download the track from the given url at the given base directory
-    async fn download(&mut self, url: &str, file_name: &str, base_dir: PathBuf) -> SoundomeResult<PathBuf>;
+    async fn download(&mut self, url: &str, file_name: &str, base_library_dir: PathBuf) -> SoundomeResult<PathBuf>;
 
     /// Check if the given url is a valid url for the provider
     fn is_valid_url(url: &str) -> bool;
@@ -112,7 +112,7 @@ pub async fn download(
                     .flatten(),
             );
             youtube
-                .download(&url, &track_title, PathBuf::from(&config.general.base_dir))
+                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
                 .await
         }
         Platform::Youtube => {
@@ -125,19 +125,19 @@ pub async fn download(
                     .flatten(),
             );
             youtube
-                .download(&url, &track_title, PathBuf::from(&config.general.base_dir))
+                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
                 .await
         }
         Platform::YoutubeMusic => {
             let mut youtube_music = youtube_music::YoutubeMusic::new();
             youtube_music
-                .download(&url, &track_title, PathBuf::from(&config.general.base_dir))
+                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
                 .await
         }
         Platform::SoundCloud => {
             let mut soundcloud = soundcloud::SoundCloud::new(config.ai.clone()).await?;
             soundcloud
-                .download(&url, &track_title, PathBuf::from(&config.general.base_dir))
+                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
                 .await
         }
         _ => Err(Error::Unknown),

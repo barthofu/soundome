@@ -1,101 +1,146 @@
 vars: {
     d2-config: {
         layout-engine: dagre
-        # Terminal theme code
         theme-id: 200
     }
 }
+
+# ================================================================================================
+# WORKFLOW 1: Download from URL (Spotify)
+# ================================================================================================
 
 user: "User" {
     shape: person
 }
 
-check_track_url: "Check for track URL in the database" {
+# Step 1: Récupération des infos de la source
+check_track_ref_url: "1. Check for track URL in DB" {
     shape: diamond
-    # style.fill: "darkseagreen"
+    style.fill: "yellow"
 }
 
-check_album_artists_url: "Check for album and artists URL in the database.\nIf found, fill the id of the object." {
+# Step 2: Déduplication niveau 1
+get_track_info_from_url: "2. Get track info from URL" {
+    shape: oval
+    style.fill: "lightblue"
+}
+
+check_album_artists_in_db: "3.2. Check if album/artists exist in DB" {
     shape: diamond
-    # style.fill: "darkseagreen"
+    style.fill: "yellow"
 }
 
-check_musicbrainz_url: "Check for corresponding musicbrainz\nurl/id in the database.\nIf found, makes a new track_ref with the current url." {
+# Step 4: Enrichissement des métadonnées
+enrich_musicbrainz: "4. Get metadata via MusicBrainz" {
+    shape: oval
+    style.fill: "lightgreen"
+}
+
+check_musicbrainz_ref: "4.2. MusicBrainz ref exists?" {
     shape: diamond
-    # style.fill: "darkseagreen"
+    style.fill: "yellow"
 }
 
-check_title_artist: "Check for title and artist in the database.\nIf found, makes a new track_ref with the current url." {
+score_matching: "4.3/4.4. Score matching\n(full, partial and no match)" {
     shape: diamond
-    # style.fill: "darkseagreen"
+    style.fill: "orange"
 }
 
-check_title_artist_2: "Check for title and artist in the database" {
+# Step 5: Téléchargement
+search_and_download: "5. Search and download track from provider" {
+    shape: oval
+    style.fill: "lightgreen"
+}
+
+# Step 6: Déduplication qualité
+check_duplicate_quality: "6. Check duplicate by name/artist/year\nand compare quality" {
     shape: diamond
-    # style.fill: "darkseagreen"
+    style.fill: "yellow"
 }
 
-
-get_track_info_from_url: "Get track info from URL" {
+# Step 7: Organisation
+move_and_organize: "7. Move to library structure\n(Artist/Album/Track)" {
     shape: oval
-    style.fill: "darkseagreen"
+    style.fill: "lightgreen"
 }
 
-
-search_track: "Search track" {
+tag_track: "7.2. Tag file with enriched metadata" {
     shape: oval
-    style.fill: "darkseagreen"
-}w
-download_track: "Download track" {
-    shape: oval
-    style.fill: "darkseagreen"
+    style.fill: "lightgreen"
 }
 
-get_music_brainz_metadata_from_track_object: "Get MusicBrainz metadata from Track object" {
+create_playlist_link: "7.4. Create symbolic link if from playlist" {
     shape: oval
-    style.fill: "darkseagreen"
+    style.fill: "lightgreen"
 }
-get_music_brainz_metadata_from_query: "Get MusicBrainz metadata from query" {
+
+# Step 8: Sauvegarde
+save_to_db: "8. Save all info to database" {
     shape: oval
-    style.fill: "darkseagreen"
+    style.fill: "lightgreen"
 }
-score_matching: "Score matching" {
+
+# ================================================================================================
+# WORKFLOW 2: Import from local file (Ingest)
+# ================================================================================================
+
+# Step 1: Récupération des infos du fichier
+get_file_metadata: "1. Extract file path and existing metadata\n(ID3 tags, etc.)" {
+    shape: oval
+    style.fill: "lightcyan"
+}
+
+# Step 2: Vérification des métadonnées
+check_sufficient_metadata: "2.1. Sufficient metadata?\n(title, artists, album, year)" {
     shape: diamond
-    style.fill: "darkseagreen"
+    style.fill: "yellow"
 }
-tag_track: "Tag track" {
+
+enrich_from_filename: "2.2. Enrich via MusicBrainz\n(using tags or filename as query)" {
     shape: oval
-    style.fill: "darkseagreen"
+    style.fill: "lightcyan"
 }
-get_metadata_from_file: "Get metadata from file" {
-    shape: oval
-    style.fill: "darkseagreen"
-}
-sufficient_metadata: "Sufficient metadata in file tags" {
+
+# Step 3: Déduplication améliorée
+check_duplicate_advanced: "3. Check if track exists\n(name/artist/year or MusicBrainz)" {
     shape: diamond
+    style.fill: "yellow"
 }
-web_validation: "Web validation log interface"
 
-compare_quality: "Compare quality" {
+quality_decision: "3.1.x Quality comparison decision" {
     shape: diamond
+    style.fill: "orange"
 }
 
-
-
-move_track: "Move track" {
+replace_file: "3.1.2. Replace with better quality\n(update metadata, archive old)" {
     shape: oval
-}
-save_track_info_to_db: "Save track info to database" {
-    shape: oval
-}
-artist_similarity_detection: "Artist similarity detection" {
-    shape: diamond
-}
-merge_artists: "Merge artists" {
-    shape: oval
+    style.fill: "lightcyan"
 }
 
-artist_web_validation: "Artist web validation interface"
+manual_validation_quality: "3.1.3. Manual validation\n(equivalent quality)" {
+    shape: oval
+    style.fill: "pink"
+}
+
+# Step 4-6: Organisation locale
+move_local_file: "4. Move to library + tag + save metadata" {
+    shape: oval
+    style.fill: "lightcyan"
+}
+
+# ================================================================================================
+# SHARED COMPONENTS
+# ================================================================================================
+
+web_validation: "Web validation panel\n(manual validation)" {
+    shape: oval
+    style.fill: "pink"
+}
+
+error_rollback: "Error handling & rollback\n(cleanup temp files, log errors)" {
+    shape: oval
+    style.fill: "red"
+}
 
 # Après ajout, mise à jour de la bibliothèque et base de données
 move_track -> tag_track: "track object"
@@ -107,8 +152,9 @@ tag_track -> save_track_info_to_db: "track object"
 # artist_web_validation -> merge_artists: "confirm merge"
 # merge_artists -> quality_comparison: "compare songs"
 
-stop: {
+stop: "Stop" {
     shape: circle
+    style.fill: "gray"
 }
 
 fs_cache: "Filesystem download cache" {
@@ -127,37 +173,82 @@ db: "Database" {
     shape: stored_data
 }
 
-# Relations
+# ================================================================================================
+# WORKFLOW 1 CONNECTIONS: Download from URL
+# ================================================================================================
 
-user -> check_track_url: "url"
-check_track_url -> get_track_info_from_url: "if doesn't exist"
-get_track_info_from_url -> check_album_artists_url: "track object"
-check_album_artists_url -> get_music_brainz_metadata_from_track_object: "track object"
-# get_music_brainz_metadata_from_track_object -> score_matching: "metadata"
+user -> check_track_ref_url: "url"
 
-check_musicbrainz_url -> search_track: "if not found"
-search_track -> download_track: "download url"
-download_track -> check_title_artist
-check_title_artist -> move_track: "if not found"
-check_title_artist -> compare_quality: "if found"
-compare_quality -> move_track: "if better version"
+check_track_ref_url -> get_track_info_from_url: "if not exists"
 
-# tag_track: "track object"
+check_track_ref_url -> stop: "if exists"
 
-get_music_brainz_metadata_from_track_object -> search_track: "no match"
-get_music_brainz_metadata_from_track_object -> search_track: "partial match"
-get_music_brainz_metadata_from_track_object -> check_musicbrainz_url: "full match"
+get_track_info_from_url -> check_album_artists_in_db: "album + artists"
 
-web_validation -> check_title_artist_2: "confirm"
-check_title_artist_2 -> move_track: "if not found"
-# get_music_brainz_metadata_from_track_object -> check_musicbrainz_url: "if not found"
+check_album_artists_in_db -> enrich_musicbrainz: "track object (with/without IDs)"
 
-fs_ingest -> sufficient_metadata: "get file metadata" { style.stroke: "red" }
-sufficient_metadata -> get_metadata_from_file: "if enough" { style.stroke: "red" }
-sufficient_metadata -> get_music_brainz_metadata_from_query: "if not enough\nuse filename as query" { style.stroke: "red" }
-get_metadata_from_file -> get_music_brainz_metadata_from_track_object: "track object" { style.stroke: "red" }
-get_music_brainz_metadata_from_query -> web_validation: "track object" { style.stroke: "red" }
+enrich_musicbrainz -> check_musicbrainz_ref: "enriched metadata"
 
-move_track -> fs_library: "write"
-save_track_info_to_db -> db: "write"
-quality_comparison -> stop: "if new version worse"
+check_musicbrainz_ref -> search_and_download: "if exists (associate & continue)"
+check_musicbrainz_ref -> score_matching: "if not exists"
+
+score_matching -> search_and_download: "if full match"
+score_matching -> web_validation: "if partial match"
+
+web_validation -> search_and_download: "after validation"
+
+search_and_download -> fs_cache: "download"
+fs_cache -> check_duplicate_quality: "downloaded file"
+
+check_duplicate_quality -> stop: "if existing better quality"
+check_duplicate_quality -> move_and_organize: "if new version better/unique"
+
+move_and_organize -> fs_library: "organized file"
+move_and_organize -> tag_track: "file path"
+
+tag_track -> create_playlist_link: "tagged file"
+create_playlist_link -> save_to_db: "final track object"
+
+save_to_db -> db: "persist data"
+
+# Error handling for workflow 1
+get_track_info_from_url -> error_rollback: "on error"
+search_and_download -> error_rollback: "on error"
+move_and_organize -> error_rollback: "on error"
+
+# ================================================================================================
+# WORKFLOW 2 CONNECTIONS: Import from local file
+# ================================================================================================
+
+fs_ingest -> get_file_metadata: "local files"
+
+get_file_metadata -> check_sufficient_metadata: "extracted metadata"
+
+check_sufficient_metadata -> check_duplicate_advanced: "if sufficient"
+check_sufficient_metadata -> enrich_from_filename: "if insufficient"
+
+enrich_from_filename -> score_matching: "enriched metadata"
+score_matching -> check_duplicate_advanced: "if high score"
+score_matching -> web_validation: "if low score"
+
+web_validation -> check_duplicate_advanced: "validated metadata"
+
+check_duplicate_advanced -> stop: "if better quality exists"
+check_duplicate_advanced -> quality_decision: "if duplicate found"
+check_duplicate_advanced -> move_local_file: "if unique"
+
+quality_decision -> stop: "if existing better"
+quality_decision -> replace_file: "if new better"
+quality_decision -> manual_validation_quality: "if equivalent"
+
+replace_file -> move_local_file: "replaced file"
+manual_validation_quality -> move_local_file: "chosen file"
+
+move_local_file -> fs_library: "organized file"
+move_local_file -> save_to_db: "track data"
+
+save_to_db -> db: "persist data"
+
+# Error handling for workflow 2
+get_file_metadata -> error_rollback: "on error"
+move_local_file -> error_rollback: "on error"

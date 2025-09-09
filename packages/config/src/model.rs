@@ -16,7 +16,9 @@ pub struct AppConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct GeneralConfig {
-    pub base_dir: String,
+    pub log_level: String,
+    pub base_library_dir: String,
+    pub temp_download_dir: String,
 }
 
 // ===============================================================================
@@ -27,6 +29,7 @@ pub struct GeneralConfig {
 #[allow(unused)]
 pub struct DatabaseConfig {
     pub url: String,
+    pub pool_size: Option<u32>,
 }
 
 // ===============================================================================

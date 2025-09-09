@@ -7,7 +7,7 @@ impl AppConfig {
     pub fn new() -> Result<Self, ConfigError> {
         // get config toml dir from env, with default
         let config_dir =
-            std::env::var("SOUNDOME__CONFIG_DIR").unwrap_or_else(|_| String::from("config.toml"));
+            std::env::var("SOUNDOME__CONFIG_DIR").unwrap_or_else(|_| String::from("./config.toml"));
 
         let config = Config::builder()
             // Add in config toml

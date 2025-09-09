@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 
 use crate::{
-    models::{album::Album, artist::Artist},
+    models::{album::Album, artist::Artist, Platform},
     utils::string::{string_similarity, SimilarityAlgorithm},
 };
 
-use super::{album, Reference, ReferenceType};
+use super::{Reference, ReferenceType};
 
 // ================================================================================================
 // Enums
@@ -125,6 +125,12 @@ impl Track {
             .iter()
             .find(|r| r.ref_type == ReferenceType::Source)
             .cloned()
+    }
+
+    pub fn get_source_platform(&self) -> Platform {
+        self.get_source()
+            .map(|s| s.platform)
+            .unwrap_or(Platform::Unknown)
     }
 
     pub fn get_provider(&self) -> Option<Reference> {

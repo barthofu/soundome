@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use shared::{errors::Error, models::Track, types::SoundomeResult};
 
-pub fn move_track_file(track: &mut Track, base_dir: &str) -> SoundomeResult<()> {
+pub fn move_track_file(track: &mut Track, base_library_dir: &str) -> SoundomeResult<()> {
 
     println!("Moving track file: {:?}", track.file_path);
 
@@ -24,7 +24,7 @@ pub fn move_track_file(track: &mut Track, base_dir: &str) -> SoundomeResult<()> 
         .map(|album| album.title.clone())
         .unwrap_or("Unknown Album".to_string());
 
-    let target_folder = PathBuf::from(base_dir)
+    let target_folder = PathBuf::from(base_library_dir)
         .join(artist_folder_name)
         .join(album_folder_name);
 

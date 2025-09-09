@@ -2,7 +2,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    // Generic
+    
+    // ============================================================================================
+    // Generic errors
+    // ============================================================================================
     #[error("{0} not found")]
     NotFound(String),
     #[error("no match {0} found for {1}")]
@@ -15,6 +18,26 @@ pub enum Error {
     Internal(String),
     #[error("config error: {0}")]
     Config(String),
+
+    // ============================================================================================
+    // Domain errors
+    // ============================================================================================
+
+    // Track
+    #[error("track not found: {0}")]
+    TrackNotFound(String),
+    #[error("track already exists: {0}")]
+    TrackExists(String),
+    #[error("track download failed: {0}")]
+    TrackDownloadFailed(String),
+    #[error("track processing failed: {0}")]
+    TrackProcessingFailed(String),
+    #[error("track metadata error: {0}")]
+    TrackMetadataError(String),
+
+    // ============================================================================================
+    // Technical errors
+    // ============================================================================================
 
     // HTTP
     #[error("{0} http error: {1}")]
