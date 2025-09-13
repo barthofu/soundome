@@ -13,6 +13,7 @@ pub struct RepositoryLayer {
 
 pub trait TrackRepository: Send + Sync {
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Track>;
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>>;
     fn create(&self, conn: &mut SqliteConnection, new_track: &Track) -> SoundomeResult<Track>;
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &Track) -> SoundomeResult<Track>;
 

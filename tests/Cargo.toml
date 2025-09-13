@@ -13,8 +13,12 @@ downloader = { path = "../packages/downloader" }
 database = { path = "../packages/database" }
 ai = { path = "../packages/ai" }
 
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
 tokio = { version = "1.44.2", features = ["full"] }
 dotenvy = { git = "https://github.com/allan2/dotenvy", features = ["macros"] }
+diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }
 
 # TODO: Remove (tmp)
 rsoundcloud = "0.2.3"

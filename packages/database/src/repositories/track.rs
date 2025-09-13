@@ -63,6 +63,52 @@ impl TrackRepository for DieselTrackRepository {
         ))
     }
 
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<shared::models::Track>> {
+        let tracks: Vec<TrackEntity> = schema::track::table
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get all resources: {}",
+                    err
+                ))
+            })?;
+
+        let mut result = Vec::new();
+        for track in tracks {
+            let album = get_album(conn, &track);
+            let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+                .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+                .filter(schema::artist_tracks::track_id.eq(track.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get all resources: {}",
+                        err
+                    ))
+                })?;
+
+            let references: Vec<TrackRefEntity> = schema::track_ref::table
+                .filter(schema::track_ref::track_id.eq(track.id))
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get all resources: {}",
+                        err
+                    ))
+                })?;
+
+            result.push(TrackEntity::convert_to_domain(
+                track,
+                album,
+                artists,
+                references,
+            ));
+        }
+
+        Ok(result)
+    }
+
     fn create(&self, conn: &mut SqliteConnection, new_track: &shared::models::Track) -> SoundomeResult<shared::models::Track> {
         let new_track_entity = NewTrackEntity::convert_from_domain(new_track);
         let inserted_track = diesel::insert_into(schema::track::table)

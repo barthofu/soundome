@@ -140,6 +140,10 @@ impl Track {
             .cloned()
     }
 
+    pub fn get_year(&self) -> Option<String> {
+        self.date.as_ref().and_then(|d| d.split('-').next().map(|s| s.to_string()))
+    }
+
     /// Display a track in a user-friendly format
     pub fn display(&self) -> String {
         let artists = self

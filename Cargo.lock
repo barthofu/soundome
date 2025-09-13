@@ -389,6 +389,7 @@ dependencies = [
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "shared",
  "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -803,6 +804,7 @@ dependencies = [
  "shared",
  "tagger",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3955,6 +3957,7 @@ dependencies = [
  "shared",
  "thiserror 2.0.12",
  "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -4210,6 +4213,7 @@ dependencies = [
  "candle-core",
  "config 0.1.0",
  "database",
+ "diesel",
  "domain",
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "downloader",
@@ -4225,6 +4229,8 @@ dependencies = [
  "shared",
  "tagger",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

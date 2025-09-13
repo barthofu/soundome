@@ -9,5 +9,8 @@ config = { path = "../../packages/config" }
 domain = { path = "../../packages/domain" }
 database = { path = "../../packages/database" }
 
+tracing-subscriber = { workspace = true }
+
 tokio = { version = "1.44.2", features = ["full"] }
 dotenvy = { git = "https://github.com/allan2/dotenvy", features = ["macros"] }
+

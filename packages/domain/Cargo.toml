@@ -11,5 +11,7 @@ fetcher = { path = "../fetcher" }
 tagger = { path = "../tagger" }
 organizer = { path = "../organizer" }
 
+tracing = { workspace = true }
+
 tokio = { version = "1.44.2", features = ["time", "process", "io-util"] }
 diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }
