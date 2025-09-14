@@ -1,5 +1,5 @@
 use serde_json::Value;
-use shared::errors::Error;
+use shared::{errors::Error, http::ProxyRotator};
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::{io::AsyncReadExt, process::Command};
@@ -9,23 +9,11 @@ pub async fn download_with_ytdlp(url: &str, file_name: &str, base_library_dir: P
         .ok_or(Error::InvalidPath(base_library_dir.clone()))?;
     let output_path = format!("{}/{}.%(ext)s", base_library_dir, file_name);
 
+    let args = build_args(url, &output_path);
     let mut child = Command::new("yt-dlp")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .args(&[
-            url,
-            "--print-json",
-            "-f",
-            "bestaudio",
-            "--extract-audio",
-            "--audio-format",
-            "mp3",
-            "--audio-quality",
-            "0",
-            "--embed-thumbnail",
-            "--output",
-            &output_path,
-        ])
+        .args(&args)
         .spawn()?;
 
     // Read stdout asynchronously to prevent buffer overflow
@@ -61,4 +49,31 @@ pub async fn download_with_ytdlp(url: &str, file_name: &str, base_library_dir: P
     });
 
     Ok(final_path)
+}
+
+fn build_args(url: &str, output_path: &str) -> Vec<String> {
+    // default args
+    let mut args = vec![
+        url.to_string(),
+        "--print-json".to_string(),
+        "-f".to_string(),
+        "bestaudio".to_string(),
+        "--extract-audio".to_string(),
+        "--audio-format".to_string(),
+        "mp3".to_string(),
+        "--audio-quality".to_string(),
+        "0".to_string(),
+        "--embed-thumbnail".to_string(),
+        "--output".to_string(),
+        output_path.to_string(),
+    ];
+
+    // proxy
+    if let Some(proxy_url) = ProxyRotator::get().get_next_proxy() {
+        tracing::info!("Using proxy for yt-dlp: {}", proxy_url);
+        args.push("--proxy".to_string());
+        args.push(proxy_url);
+    }
+
+    args
 }

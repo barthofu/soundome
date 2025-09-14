@@ -3,6 +3,7 @@
         "rust-lang.rust-analyzer",
         "vadimcn.vscode-lldb",
         "mkhl.direnv",
-        "Terrastruct.d2"
+        "Terrastruct.d2",
+        "BarbossHack.crates-io"
     ]
 }

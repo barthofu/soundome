@@ -52,7 +52,7 @@ impl Matcher for Youtube<'_> {
                         result.duration.unwrap_or(0),
                     );
 
-                    println!(
+                    tracing::info!(
                         "[{}] vs [{}] : title({:.2}) duration({}/{} : {:.2}) ({})",
                         rendered_track_title,
                         rendered_video_title,

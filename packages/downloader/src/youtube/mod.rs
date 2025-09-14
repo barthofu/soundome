@@ -3,6 +3,7 @@ mod matcher;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use config::Config;
 use invidious::{
     hidden::SearchItem, universal::Search, ClientAsync, ClientAsyncTrait, InvidiousError,
     MethodAsync,
@@ -25,6 +26,14 @@ pub struct Youtube<'a> {
 
 impl Youtube<'_> {
     pub fn new(invidious_instance: Option<String>) -> Self {
+        // TODO: the Invidious client probably uses reqwest internally.
+        // For now, we document this limitation.
+        if let Some(proxy) = Config::get().proxy.as_ref() {
+            if proxy.enabled {
+                tracing::warn!("Proxy configuration for YouTube downloader is not yet supported by the invidious library. Consider setting HTTP_PROXY environment variable.");
+            }
+        }
+
         Self {
             patterns: vec![
                 (
@@ -111,7 +120,7 @@ impl Provider for Youtube<'_> {
     async fn search(&self, track: &Track) -> SoundomeResult<Reference> {
         // 1. Create search query
         let search_query = self.create_search_query(track.clone());
-        println!("SEARCH QUERY: {}", search_query);
+        tracing::info!("Youtube search query: {}", search_query);
 
         // 2. Search on YouTube
         let search_results: Vec<Track> = self

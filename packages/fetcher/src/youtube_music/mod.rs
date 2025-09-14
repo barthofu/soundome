@@ -1,6 +1,7 @@
 pub mod mappers;
 
 use async_trait::async_trait;
+use config::Config;
 use fancy_regex::Regex;
 use futures::future::join_all;
 use mappers::convert_track;
@@ -9,8 +10,7 @@ use rustypipe::{
     model::{MusicArtist, TrackItem},
 };
 use shared::{
-    errors::Error,
-    models::{Album, Artist, PlaylistTrack, Track},
+    errors::Error, http::HttpClientBuilder, models::{Album, Artist, PlaylistTrack, Track}, types::SoundomeResult
 };
 
 use crate::Source;
@@ -24,10 +24,23 @@ impl YoutubeMusic {
     const PLAYLIST_REGEX: &str = r#"/^.*(music.youtube\/|list=)([^#&?]*).*/"#;
     const ARTIST_REGEX: &str = r"^https:\/\/music\.youtube\.com\/channel\/([A-Za-z0-9_-]+)$";
 
-    pub fn new() -> Self {
-        Self {
-            client: RustyPipe::new(),
-        }
+    pub fn new() -> SoundomeResult<Self> {
+        
+        let client = match Config::get().proxy.as_ref() {
+            Some(proxy_config) if proxy_config.enabled => {
+                let reqwest_client = HttpClientBuilder::get_reqwest_client_builder()?;
+                RustyPipe::builder()
+                    .build_with_client(reqwest_client)
+                    .expect("Failed to create RustyPipe client with proxy")
+            }
+            _ => RustyPipe::builder()
+                .build()
+                .expect("Failed to create RustyPipe client"),
+        };
+
+        Ok(Self {
+            client,
+        })
     }
 
     // =================
@@ -87,7 +100,7 @@ impl YoutubeMusic {
 
 #[async_trait]
 impl Source for YoutubeMusic {
-    async fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
+    async fn get_track_from_url(&self, url: &str) -> SoundomeResult<Track> {
         let track_id = self
             .get_id_from_url(url)
             .ok_or(Error::InvalidUrl(url.to_string()))?;
@@ -102,7 +115,7 @@ impl Source for YoutubeMusic {
         Ok(self.get_complete_track_from_music_track(track.track).await)
     }
 
-    async fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
+    async fn get_tracks_from_query(&self, query: &str) -> SoundomeResult<Vec<Track>> {
         let results = self
             .client
             .query()
@@ -121,7 +134,7 @@ impl Source for YoutubeMusic {
         Ok(tracks)
     }
 
-    async fn get_playlist_tracks_from_url(&self, _url: &str) -> Result<Vec<PlaylistTrack>, Error> {
+    async fn get_playlist_tracks_from_url(&self, _url: &str) -> SoundomeResult<Vec<PlaylistTrack>> {
         let playlist_id = self
             .get_playlist_id_from_url(_url)
             .ok_or(Error::InvalidUrl(_url.to_string()))?;
@@ -153,7 +166,7 @@ impl Source for YoutubeMusic {
             .collect())
     }
 
-    async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
+    async fn get_artist_from_url(&self, url: &str) -> SoundomeResult<Artist> {
         let artist_id = self
             .get_artist_id_from_url(url)
             .ok_or(Error::InvalidUrl(url.to_string()))?;
@@ -168,7 +181,7 @@ impl Source for YoutubeMusic {
         Ok(mappers::convert_artist(&artist))
     }
 
-    async fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
+    async fn get_artists_from_query(&self, search: &str) -> SoundomeResult<Vec<Artist>> {
         let results = self
             .client
             .query()
@@ -184,7 +197,7 @@ impl Source for YoutubeMusic {
             .collect())
     }
 
-    async fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
+    async fn get_album_from_url(&self, url: &str) -> SoundomeResult<Album> {
         let album_id = self
             .get_album_id_from_url(url)
             .ok_or(Error::InvalidUrl(url.to_string()))?;
@@ -199,7 +212,7 @@ impl Source for YoutubeMusic {
         Ok(mappers::convert_album(&album))
     }
 
-    async fn get_albums_from_query(&self, search: &str) -> Result<Vec<Album>, Error> {
+    async fn get_albums_from_query(&self, search: &str) -> SoundomeResult<Vec<Album>> {
         let results = self
             .client
             .query()
@@ -215,9 +228,17 @@ impl Source for YoutubeMusic {
             .collect())
     }
 
-    async fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {
+    async fn get_album_tracks_from_url(&self, _: &str) -> SoundomeResult<Vec<Track>> {
         todo!()
     }
+
+    async fn clean_track_metadata(&self, _track: &mut Track) -> SoundomeResult<()> {
+        Ok(())
+    }
+
+    async fn clean_tracks_metadata(&self, _tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
+        Ok(())
+    } 
 
     fn is_valid_track_url(url: &str) -> bool {
         let re = Regex::new(Self::TRACK_REGEX).unwrap(); // safe unwrap

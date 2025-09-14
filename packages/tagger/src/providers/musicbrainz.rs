@@ -11,14 +11,29 @@ use shared::{
 
 use crate::TagProvider;
 
-pub struct MusicBrainz;
+pub struct MusicBrainz {
+    // client: MusicBrainzClient
+}
 
 impl MusicBrainz {
     const EXACT_MATCH_THRESHOLD: f64 = 0.8;
     const PARTIAL_MATCH_THRESHOLD: f64 = 0.5;
 
     pub fn new() -> Self {
-        Self
+
+        // TODO: will be possible when musicbrainz_rs v0.12.0 is fixed (currently broken when building as dependency in this project)
+        // let client = match Config::get().proxy.as_ref() {
+        //     Some(proxy_config) if proxy_config.enabled => {
+        //         HttpClientBuilder::get_reqwest_client()
+        //             .map(|client| MusicBrainzClient::new_with_reqwest_client(client))
+        //             .map_err(|_| MusicBrainzClient::new())
+        //     }
+        //     _ => MusicBrainzClient::new(),
+        // };
+
+        Self {
+            // client,
+        }
     }
 }
 
@@ -36,6 +51,7 @@ impl TagProvider for MusicBrainz {
         }
 
         // Execute the query
+        // let query_result = Recording::search(query_builder.build()).execute_with_client(&self.client).await;
         let query_result = Recording::search(query_builder.build()).execute().await;
 
         // Process the results to find the best match

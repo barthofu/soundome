@@ -1,14 +1,16 @@
 pub mod mappers;
 
+use std::env;
+
 use async_trait::async_trait;
+use config::Config;
 use rspotify::{
     model::{AlbumId, ArtistId, PlaylistId, SearchResult, SearchType, TrackId},
     prelude::BaseClient,
     ClientCredsSpotify, Credentials,
 };
 use shared::{
-    errors::Error,
-    models::{Album, Artist, PlaylistTrack, Track},
+    errors::Error, http::ProxyRotator, models::{Album, Artist, PlaylistTrack, Track}, types::SoundomeResult
 };
 
 use crate::Source;
@@ -18,8 +20,17 @@ pub struct Spotify {
 }
 
 impl Spotify {
-    pub fn new(client_id: &str, client_secret: &str) -> Result<Self, Error> {
+    pub fn new(client_id: &str, client_secret: &str) -> SoundomeResult<Self> {
         let credentials = Credentials::new(client_id, client_secret);
+        
+        // If proxy is enabled and ALL_PROXY is not set, set it using the proxy rotator
+        if let Some(proxy_config) = Config::get().proxy.as_ref() {
+            if proxy_config.enabled && env::var("ALL_PROXY").is_err() {
+                let proxy_url = ProxyRotator::get().get_next_proxy();
+                env::set_var("ALL_PROXY", proxy_url.unwrap_or_default()); 
+            }
+        }
+        
         let client = ClientCredsSpotify::new(credentials);
 
         client
@@ -52,7 +63,7 @@ impl Spotify {
 
 #[async_trait]
 impl Source for Spotify {
-    async fn get_track_from_url(&self, url: &str) -> Result<Track, Error> {
+    async fn get_track_from_url(&self, url: &str) -> SoundomeResult<Track> {
         let id = TrackId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let track = self
@@ -62,7 +73,7 @@ impl Source for Spotify {
         Ok(mappers::convert_track(&track))
     }
 
-    async fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
+    async fn get_tracks_from_query(&self, query: &str) -> SoundomeResult<Vec<Track>> {
         let res = self
             .client
             .search(query, SearchType::Track, None, None, Some(20), Some(0))
@@ -79,7 +90,7 @@ impl Source for Spotify {
         }
     }
 
-    async fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error> {
+    async fn get_playlist_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<PlaylistTrack>> {
         let id = PlaylistId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let playlist = self
@@ -98,7 +109,7 @@ impl Source for Spotify {
             .collect())
     }
 
-    async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
+    async fn get_artist_from_url(&self, url: &str) -> SoundomeResult<Artist> {
         let id = ArtistId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let full_artist = self
@@ -109,7 +120,7 @@ impl Source for Spotify {
         Ok(mappers::convert_full_artist(&full_artist))
     }
 
-    async fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
+    async fn get_artists_from_query(&self, search: &str) -> SoundomeResult<Vec<Artist>> {
         let res = self
             .client
             .search(search, SearchType::Artist, None, None, Some(20), Some(0))
@@ -126,7 +137,7 @@ impl Source for Spotify {
         }
     }
 
-    async fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
+    async fn get_album_from_url(&self, url: &str) -> SoundomeResult<Album> {
         let id = AlbumId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let full_album = self
@@ -137,7 +148,7 @@ impl Source for Spotify {
         Ok(mappers::convert_full_album(&full_album))
     }
 
-    async fn get_albums_from_query(&self, search: &str) -> Result<Vec<Album>, Error> {
+    async fn get_albums_from_query(&self, search: &str) -> SoundomeResult<Vec<Album>> {
         let res = self
             .client
             .search(search, SearchType::Album, None, None, Some(20), Some(0))
@@ -154,9 +165,17 @@ impl Source for Spotify {
         }
     }
 
-    async fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {
+    async fn get_album_tracks_from_url(&self, _: &str) -> SoundomeResult<Vec<Track>> {
         todo!()
     }
+
+    async fn clean_track_metadata(&self, _track: &mut Track) -> SoundomeResult<()> {
+        Ok(())
+    }
+
+    async fn clean_tracks_metadata(&self, _tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
+        Ok(())
+    } 
 
     fn is_valid_track_url(url: &str) -> bool {
         url.contains("open.spotify.com/track/")

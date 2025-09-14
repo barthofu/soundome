@@ -3,7 +3,6 @@ mod matcher;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use config::model::AiConfig;
 use fetcher::Source;
 use shared::{errors::Error, models::{Reference, Track}, types::SoundomeResult};
 
@@ -15,8 +14,8 @@ pub struct SoundCloud {
 }
 
 impl SoundCloud {
-    pub async fn new(ai_config: AiConfig) -> Result<Self, Error> {
-        fetcher::soundcloud::Soundcloud::new(ai_config)
+    pub async fn new() -> Result<Self, Error> {
+        fetcher::soundcloud::Soundcloud::new()
             .await
             .map(|fetcher| Self {
                 fetcher,

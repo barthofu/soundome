@@ -4,7 +4,7 @@ use shared::{errors::Error, models::Track, types::SoundomeResult};
 
 pub fn move_track_file(track: &mut Track, base_library_dir: &str) -> SoundomeResult<()> {
 
-    println!("Moving track file: {:?}", track.file_path);
+    tracing::info!("Moving track file: {:?}", track.file_path);
 
     let file_path = track
         .file_path
@@ -33,7 +33,7 @@ pub fn move_track_file(track: &mut Track, base_library_dir: &str) -> SoundomeRes
     std::fs::create_dir_all(&target_folder).unwrap();
     std::fs::rename(file_path, &destination_path)
         .map(|_| {
-            println!("File moved successfully");
+            tracing::info!("File moved successfully");
             track.file_path = Some(destination_path);
             ()
         })

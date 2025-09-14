@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
-use config::model::AppConfig;
+use config::Config;
 use database::repositories;
 use ::domain::{ports::repositories::RepositoryLayer, services::ServiceLayer};
 
 use serde::{Deserialize, Serialize};
+use shared::{init_globals, utils::logs::init_logger};
+use tracing::error;
 
 mod domain;
 mod file;
@@ -25,11 +27,12 @@ struct Track {
 #[tokio::main]
 async fn main() {
 
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .init();
-       
-    let config = AppConfig::new().unwrap();
+    init_globals().unwrap_or_else(|err| {
+        tracing::error!("Failed to initialize globals: {}", err);
+        std::process::exit(1);
+    });
+
+    init_logger();
 
     let track_repo = Arc::new(repositories::track::DieselTrackRepository::new());
     let album_repo = Arc::new(repositories::album::DieselAlbumRepository::new());
@@ -41,9 +44,9 @@ async fn main() {
         artist: artist_repo.clone(),
     });
 
-    let conn = &mut database::init_connection(&config.database.url);
+    let conn = &mut database::init_connection(&Config::get().database.url);
 
-    let services = Arc::new(ServiceLayer::new(repositories, Arc::new(config)));
+    let services = Arc::new(ServiceLayer::new(repositories));
 
     domain::domain_tests(&services, conn).await;
 }

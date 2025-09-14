@@ -21,7 +21,7 @@ pub async fn get_all(
 ) -> Result<Json<Vec<Artist>>, crate::utils::error::Error> {
     let services = Arc::clone(services);
 
-    db.run(move |c| services.artist_service.get_all(c))
+    db.run(move |conn| services.artist_service.get_all(conn))
         .await
         .map(Json)
         .map_err(|err|

@@ -3,6 +3,7 @@ mod matcher;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use config::Config;
 use rustypipe::{
     client::RustyPipe,
     model::{MusicSearchResult, TrackItem},
@@ -23,6 +24,14 @@ pub struct YoutubeMusic {
 
 impl YoutubeMusic {
     pub fn new() -> Self {
+        // TODO: rustypipe probably uses reqwest internally.
+        // For now, we document this limitation.
+        if let Some(proxy) = Config::get().proxy.as_ref() {
+            if proxy.enabled {
+                tracing::warn!("Proxy configuration for YouTube Music downloader is not yet supported by the rustypipe library. Consider setting HTTP_PROXY environment variable.");
+            }
+        }
+
         Self {
             client: RustyPipe::new(),
             similarity_treshold: 0.80,

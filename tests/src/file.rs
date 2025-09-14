@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
 use audiotags::Tag;
-use config::model::AppConfig;
+use config::Config;
 use fake::{locales::EN, Fake};
 use std::time::Instant;
 
 use crate::TrackTagComment;
 
-pub async fn file_tests(config: &AppConfig) {
+pub async fn file_tests() {
     
     let oritingal_file_path = PathBuf::from("/home/coder/library/JEANNINE/Unknown Album/Synaptic Highway.mp3");
 

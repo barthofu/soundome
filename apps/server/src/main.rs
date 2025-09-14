@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use config::model::AppConfig;
+use config::Config;
 use database::repositories;
 use domain::{ports::repositories::RepositoryLayer, services::ServiceLayer};
 use rocket::{catchers, launch};
@@ -9,6 +9,7 @@ use rocket_okapi::{
     swagger_ui::{make_swagger_ui, SwaggerUIConfig},
 };
 
+use shared::{init_globals, utils::logs::init_logger};
 use soundome_server::utils::database::Db;
 use soundome_server::{
     middlewares::cors::Cors,
@@ -25,8 +26,15 @@ fn get_docs() -> SwaggerUIConfig {
 #[dotenvy::load(path = "./.env", required = true)]
 #[launch]
 fn rocket() -> _ {
-    let config = load_config();
-    println!("Starting server...");
+
+    init_globals().unwrap_or_else(|err| {
+        eprintln!("Failed to initialize globals: {}", err);
+        std::process::exit(1);
+    });
+
+    init_logger();
+
+    tracing::info!("Starting server...");
 
     let track_repo = Arc::new(repositories::track::DieselTrackRepository::new());
     let album_repo = Arc::new(repositories::album::DieselAlbumRepository::new());
@@ -38,7 +46,7 @@ fn rocket() -> _ {
         artist: artist_repo.clone(),
     });
 
-    let services = Arc::new(ServiceLayer::new(repositories, Arc::new(config)));
+    let services = Arc::new(ServiceLayer::new(repositories));
 
     // let artist_service = Arc::new(ArtistService::new(artist_repo.clone()));
 
@@ -69,15 +77,4 @@ fn rocket() -> _ {
         )
         // .mount("/api", routes![routes::audio::stream,])
         .mount("/swagger", make_swagger_ui(&get_docs()))
-}
-
-
-fn load_config() -> AppConfig {
-    println!("Loading configuration...");
-    let config = AppConfig::new().unwrap_or_else(|_| {
-        eprintln!("Failed to load configuration");
-        std::process::exit(1);
-    });
-    println!("Configuration loaded successfully");
-    config
 }

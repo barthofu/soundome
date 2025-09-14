@@ -13,6 +13,7 @@
 - 🧾 Keep metadata on original source (platform + playlist)
 - ❓ Web panel to review and manually tag unknown files
 - 📁 Organize files physically (`Artist/Album/Track`) and maintain symbolic links for playlists
+- 🌐 **Proxy support** for enterprise environments and geo-restrictions
 
 ---
 
@@ -85,4 +86,11 @@ diesel setup
 diesel migration run
 ```
 
+4. Configure the application:
+```bash
+cp config.example.toml config.toml
+# Edit config.toml with your API keys and proxy settings if needed
+```
+
+For proxy configuration in enterprise environments, see [docs/proxy-configuration.md](docs/proxy-configuration.md).
 

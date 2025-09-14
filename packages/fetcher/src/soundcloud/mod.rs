@@ -2,7 +2,7 @@ pub mod mappers;
 
 use ai::AIBackend;
 use async_trait::async_trait;
-use config::model::AiConfig;
+use config::Config;
 use fancy_regex::Regex;
 use futures::future::join_all;
 use mappers::convert_track;
@@ -11,23 +11,28 @@ use rsoundcloud::{
     TracksApi, UsersApi,
 };
 use shared::{
-    errors::Error,
-    models::{Album, Artist, PlaylistTrack, SimplifiedTrack, Track}, types::SoundomeResult,
+    errors::Error, http::HttpClientBuilder, models::{Album, Artist, PlaylistTrack, SimplifiedTrack, Track}, types::SoundomeResult
 };
 
 use crate::Source;
 
 pub struct Soundcloud {
-    client: SoundCloudClient,
-    ai_config: AiConfig,
+    client: SoundCloudClient
 }
 
 impl Soundcloud {
     const TRACK_REGEX: &str = r"^(https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)(?:[a-z0-9\-_]{1,25}))\/(?:(?:(?!sets|playlist|stats|settings|logout|notifications|you|messages)(?:[a-z0-9\-_]{1,100}))(?:\/s\-[a-zA-Z0-9\-_]{1,10})?))(?:[a-z0-9\-\?=\/]*)$";
     const PLAYLIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/sets\/[a-z0-9\-_]{1,100}(?:[a-z0-9\-\?=\/]*)$";
 
-    pub async fn new(ai_config: AiConfig) -> Result<Self, Error> {
-        let client = SoundCloudClient::default().await.map_err(|e| match e {
+    pub async fn new() -> SoundomeResult<Self> {
+        let client = match Config::get().proxy.as_ref() {
+            Some(proxy_config) if proxy_config.enabled => {
+                let reqwest_client = HttpClientBuilder::get_reqwest_client()?;
+                let http_client = rsoundcloud::http::HttpClient::new(reqwest_client);
+                SoundCloudClient::with_http_client(http_client, None, None).await
+            }
+            _ => SoundCloudClient::default().await,
+        }.map_err(|e| match e {
             ClientError::ClientIDGenerationFailed => {
                 Error::Internal("Failed to generate Soundcloud client id".to_string())
             }
@@ -36,7 +41,6 @@ impl Soundcloud {
 
         Ok(Self {
             client,
-            ai_config,
         })
     }
 
@@ -57,35 +61,48 @@ impl Soundcloud {
         convert_track(track, album)
     }
 
-    async fn clean_tracks_title_and_artist_name(&self, tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
+    pub async fn clean_tracks_title_and_artist_name(&self, tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
         let prompt = ai::prompts::clean_track_title_and_artist_name(false)?;
-        let ai_client = ai::AIClient::new(&self.ai_config).map_err(|e| {
+        let ai_client = ai::AIClient::new().map_err(|e| {
             Error::Internal(format!("Failed to initialize AI client: {}", e))
         })?;
 
-        let processed_tracks = ai_client
-            .generate_with_data(&prompt, tracks.iter().map(|track| SimplifiedTrack {
+        // Process in chunks to avoid token limit issues
+        let chunk_size = 100;
+        let mut i = 0;
+
+        while i < tracks.len() {
+            let end = usize::min(i + chunk_size, tracks.len());
+            let chunk = &mut tracks[i..end];
+
+            let simplified_tracks: Vec<SimplifiedTrack> = chunk.iter().map(|track| SimplifiedTrack {
                 id: track.get_source().and_then(|track_ref| track_ref.external_id).unwrap_or_default(),
                 title: track.title.clone(),
                 artists: track.artists.iter().map(|a| a.name.clone()).collect(),
-            }).collect::<Vec<SimplifiedTrack>>())
-            .await
-            .map_err(|e| {
-                Error::Internal(format!("AI processing failed: {}", e))
-            })?;
-
-        println!("Processed tracks: {:#?}", processed_tracks);
-
-        // Update the original tracks
-        for (i, processed_track) in processed_tracks.iter().enumerate() {
-            tracks[i].title = processed_track.title.clone();
-            tracks[i].artists = processed_track.artists.iter().enumerate().map(|(j, name)| Artist {
-                id: None,
-                name: name.clone(),
-                icon: tracks[i].artists.get(j).and_then(|artist| artist.icon.clone()),
-                // TODO: only working for the original
-                references: tracks[i].artists.get(j).and_then(|artist| Some(artist.references.clone())).unwrap_or_default(),
             }).collect();
+
+            // Send to AI for processing
+            tracing::info!("Sending {} tracks to AI for processing", simplified_tracks.len());
+            let processed_tracks = ai_client
+                .generate_with_data(&prompt, simplified_tracks)
+                .await
+                .map_err(|e| {
+                    Error::Internal(format!("AI processing failed: {}", e))
+                })?;
+
+            tracing::info!("Processed tracks: {:#?}", processed_tracks);
+
+            for (i, processed_track) in processed_tracks.iter().enumerate() {
+                chunk[i].title = processed_track.title.clone();
+                chunk[i].artists = processed_track.artists.iter().enumerate().map(|(j, name)| Artist {
+                    id: None,
+                    name: name.clone(),
+                    icon: chunk[i].artists.get(j).and_then(|artist| artist.icon.clone()),
+                    references: chunk[i].artists.get(j).map(|artist| artist.references.clone()).unwrap_or_default(),
+                }).collect();
+            }
+
+            i += chunk_size;
         }
 
         Ok(())
@@ -96,7 +113,7 @@ impl Soundcloud {
 #[async_trait]
 impl Source for Soundcloud {
     async fn get_track_from_url(&self, url: &str) -> SoundomeResult<Track> {
-        println!("Getting SoundCloud track from URL: {}", url);
+        tracing::info!("Getting SoundCloud track from URL: {}", url);
         let track = self
             .client
             .get_track(ResourceId::Url(url.to_string()))
@@ -106,7 +123,7 @@ impl Source for Soundcloud {
         let mut track = self.get_complete_track_from_music_track(track).await;
         let _ = self.clean_tracks_title_and_artist_name(&mut vec![&mut track]).await
             .map_err(|e| {
-                println!("Failed to clean SoundCloud track title and artist name: {}", e);
+                tracing::info!("Failed to clean SoundCloud track title and artist name: {}", e);
             });
         Ok(track)
     }
@@ -128,7 +145,7 @@ impl Source for Soundcloud {
         let mut tracks_refs: Vec<&mut Track> = tracks.iter_mut().collect();
         let _ = self.clean_tracks_title_and_artist_name(&mut tracks_refs).await
             .map_err(|e| {
-                println!("Failed to clean SoundCloud tracks title and artist name: {}", e);
+                tracing::info!("Failed to clean SoundCloud tracks title and artist name: {}", e);
             });
 
         Ok(tracks)
@@ -151,7 +168,7 @@ impl Source for Soundcloud {
         let mut tracks_refs: Vec<&mut Track> = tracks.iter_mut().collect();
         let _ = self.clean_tracks_title_and_artist_name(&mut tracks_refs).await
             .map_err(|e| {
-                println!("Failed to clean SoundCloud track title and artist name: {}", e);
+                tracing::info!("Failed to clean SoundCloud track title and artist name: {}", e);
             });
 
         Ok(tracks
@@ -212,6 +229,15 @@ impl Source for Soundcloud {
 
     async fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {
         todo!()
+    }
+
+    async fn clean_track_metadata(&self, track: &mut Track) -> SoundomeResult<()> {
+        let mut tracks = vec![track];
+        self.clean_tracks_metadata(&mut tracks).await
+    }
+
+    async fn clean_tracks_metadata(&self, tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
+        self.clean_tracks_title_and_artist_name(tracks).await
     }
 
     fn is_valid_track_url(url: &str) -> bool {

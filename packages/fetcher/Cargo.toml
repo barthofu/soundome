@@ -8,15 +8,18 @@ shared = { path = "../shared" }
 config = { path = "../config" }
 ai = { path = "../ai" }
 
+tracing = { workspace = true }
+
 rspotify = { version = "0.15.1", default-features = false, features = [
   "env-file",
   "client-ureq",
   "ureq-rustls-tls",
 ] }
 rustypipe = "0.11.4"
-rsoundcloud = { version = "0.2.3" }
+rsoundcloud = { version = "0.2.4" }
 # rsoundcloud = { path = "../../../rsoundcloud" } # for local testing purposes
 
 futures = "0.3.31"
 async-trait = "0.1.88"
 fancy-regex = "0.14.0"
+reqwest = { version = "0.12.23", default-features = false, features = ["json", "socks", "rustls-tls"] }

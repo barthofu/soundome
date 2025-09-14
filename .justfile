@@ -1,4 +1,6 @@
 shell:
+    # export TMPDIR=/home/coder/.tmp/nix-shell
+    # mkdir -p $TMPDIR
     nix develop --extra-experimental-features nix-command --extra-experimental-features flakes -c zsh
 
 generate_diagrams:

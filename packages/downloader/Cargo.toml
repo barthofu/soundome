@@ -8,6 +8,8 @@ shared = { path = "../shared" }
 config = { path = "../config" }
 fetcher = { path = "../fetcher" }
 
+tracing = { workspace = true }
+
 serde = "1.0.217"
 serde_json = "1.0.138"
 async-trait = "0.1.86"

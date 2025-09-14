@@ -1,10 +1,10 @@
 use std::{path::PathBuf, sync::Arc};
 
-use config::model::AppConfig;
+use config::Config;
 use diesel::SqliteConnection;
+use fetcher::{Fetcher, Source};
 use shared::{errors::Error, models::Track, types::SoundomeResult, utils::enums::Match};
 use tagger::TagProvider;
-use tracing::{error, info, warn};
 
 use super::{album_service::AlbumService, artist_service::ArtistService, track_service::TrackService};
 
@@ -12,7 +12,6 @@ pub struct DownloadService {
     track_service: Arc<TrackService>,
     album_service: Arc<AlbumService>,
     artist_service: Arc<ArtistService>,
-    config: Arc<AppConfig>
 }
 
 // TODO: gestion de la playlist
@@ -22,77 +21,87 @@ impl DownloadService {
         track_service: Arc<TrackService>,
         album_service: Arc<AlbumService>,
         artist_service: Arc<ArtistService>,
-        config: Arc<AppConfig>,
     ) -> Self {
         Self { 
             track_service,
             album_service,
             artist_service,
-            config
         }
     }
 
     pub async fn download_track_from_url(&self, url: &str, conn: &mut SqliteConnection) -> SoundomeResult<Track> {
-        info!("===========\nDownloading track from {:?}\n------", url);
+        tracing::info!("===========\nDownloading track from {:?}\n------", url);
 
         // Check if track already exists in DB
         if let Some(t) = self.track_service.get_by_url(conn, url) {
             return Err(Error::TrackExists(t.display()));
         }
 
+        let fetcher = Fetcher::new().await;
+
         // Fetch track info from URL
-        let track = fetcher::get_track_from_url(url, &self.config).await?;
-        info!("Fetched track info from {}: {}", track.get_source_platform().as_ref(), track.display());
+        let mut track = fetcher.get_track_from_url(url).await?;
+        fetcher.clean_track_metadata(&mut track).await?;
+        tracing::info!("Fetched track info from {}: {}", track.get_source_platform().as_ref(), track.display());
     
         // Orchestrator workflow
         let final_track = self.orchestrator_workflow(conn, track).await?;
         Ok(final_track)
     } 
 
-    pub async fn download_playlist_from_url(&self, url: &str, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
-        info!(
-            "====================\nDownloading playlist from {:?}\n---------",
-            url
-        );
-        
-        // Fetch tracks from playlist
-        let playlist_tracks = fetcher::get_playlist_tracks_from_url(url, &self.config).await?;
-        info!("Found {} tracks in playlist", playlist_tracks.len());
+    pub async fn sync_playlist_from_url(&self, url: &str, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
+        tracing::info!("====================\nDownloading playlist from {:?}\n---------", url);
 
-        let mut new_tracks = Vec::new();
-        let mut existing_tracks = Vec::new();
-        for playlist_track in &playlist_tracks {
-            let track = &playlist_track.track;
+        let fetcher = Fetcher::new().await;
+        let playlist_tracks = fetcher.get_playlist_tracks_from_url(url).await?;
+        let total_tracks = playlist_tracks.len();
+        tracing::info!("Found {} tracks in playlist", total_tracks);
+
+        // Filter out existing tracks and collect new ones
+        let mut new_tracks: Vec<Track> = Vec::new();
+        let mut existing_count = 0;
+        for pt in playlist_tracks {
+            let track = &pt.track;
             let url = track.get_source()
                 .and_then(|s| s.external_url.clone())
                 .unwrap_or_else(|| "unknown".to_string());
-            info!(" - {} ({})", track.display(), url);
-
-            // Check if track already exists in DB
-            if let Some(t) = self.track_service.get_by_url(conn, &url) {
-                warn!("   -> Track already exists in DB, skipping download");
-                existing_tracks.push(t);
-                continue;
-            }
-
-            // Orchestrator workflow
-            match self.orchestrator_workflow(conn, track.clone()).await {
-                Ok(t) => new_tracks.push(t),
-                Err(e) => {
-                    error!("Error downloading track {}: {:?}", track.display(), e);
-                }
+            if self.track_service.get_by_url(conn, &url).is_some() {
+                tracing::warn!("   -> Track already exists in DB, skipping: {}", track.display());
+                existing_count += 1;
+            } else {
+                new_tracks.push(track.clone());
             }
         }
 
-        info!(
+        tracing::info!("{} new tracks to download after filtering existing ones", new_tracks.len());
+
+        // Clean metadata for all new tracks
+        if let Err(e) = fetcher.clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>()).await {
+            tracing::info!("Failed to clean tracks title and artist name: {}", e);
+        }
+
+        // Process each new track
+        let mut new_processed_tracks = Vec::new();
+        for track in &new_tracks {
+            tracing::info!("Processing track: {}", track.display());
+            match self.orchestrator_workflow(conn, track.clone()).await {
+                Ok(t) => {
+                    tracing::info!("Successfully processed track: {}", t.display());
+                    new_processed_tracks.push(t);
+                },
+                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e)
+            }
+        }
+
+        tracing::info!(
             "Downloaded {}/{} tracks from playlist, {} existing tracks and {} errors",
-            new_tracks.len(),
-            playlist_tracks.len(),
-            existing_tracks.len(),
-            playlist_tracks.len() - (new_tracks.len() + existing_tracks.len())
+            new_processed_tracks.len(),
+            total_tracks,
+            existing_count,
+            new_tracks.len() - new_processed_tracks.len(),
         );
 
-        Ok(new_tracks)
+        Ok(new_processed_tracks)
     }
 
     // ============================================================================================
@@ -101,28 +110,44 @@ impl DownloadService {
 
     async fn orchestrator_workflow(&self, conn: &mut SqliteConnection, mut track: Track) -> SoundomeResult<Track> {
         // Step 2: Enrichissement des métadonnées via MusicBrainz
-        info!("Getting metadata via MusicBrainz");
+        tracing::info!("Getting metadata via MusicBrainz");
         let (enriched_track, should_continue_download) = self.enrich_metada(conn, track).await?;
 
         // TODO: temporary, see Class level todo comment
         if !should_continue_download {
-            warn!("Stopping workflow - marked for validation");
+            tracing::warn!("Stopping workflow - marked for validation");
             return Ok(enriched_track);
         }
 
+        // // Step 3: Déduplication
+        // tracing::info!("Deduping track in database");
+        // let existing_track = self.dedupe_track(conn, &enriched_track).await;
+
+        // if let Some(existing_track) = existing_track {
+        //     tracing::warn!("Track already exists in DB: {}, skipping download", existing_track.display());
+        //     return Ok(existing_track);
+        // }
+
+        // Ok(enriched_track)
+
         // Step 3: Téléchargement
-        info!("Searching and downloading track from provider");
+        tracing::info!("Searching and downloading track from provider");
         let (downloaded_track, file_path) = self.download_track(enriched_track).await?;
 
         // Step 4: Déduplication
-        info!("Deduping track in database");
+        tracing::info!("Deduping track in database");
         let existing_track = self.dedupe_track(conn, &downloaded_track).await;
 
-        // Step 5: Quality comparison and deduplication if existing
+        if let Some(existing_track) = existing_track {
+            tracing::warn!("Track already exists in DB: {}, skipping download", existing_track.display());
+            return Ok(existing_track);
+        }
+
+        // // Step 5: Quality comparison and deduplication if existing
         // track = self.compare_quality_and_dedupe(&existing_track, &track).await?;
 
         // Final Step: Tagging, moving and saving in DB
-        info!("Tagging, moving and saving track in database");
+        tracing::info!("Tagging, moving and saving track in database");
         track = self.process_track(conn, downloaded_track, &file_path).await?;
 
         Ok(track)
@@ -159,18 +184,18 @@ impl DownloadService {
         // Apply best match metadata
         let should_validate = if let Match::Exact(matched_track) = best_match {
             // TODO: Check if MusicBrainz ref already exists in DB, if yes then apply references recursively to track and unfound album/artists
-            info!("Exact match found from MusicBrainz");
+            tracing::info!("Exact match found from MusicBrainz: {:?}", matched_track.get_metadata().and_then(|m| m.external_url));
             
             // find for existing tracks in tthe database 
             enriched_track.transpose_metadata(&matched_track);
             false // no need to validate
         } else if let Match::Partial(_) = best_match {
             // TODO: Handle partial match -> no transpose, but associate MusicBrainz ref and mark as "to validate"
-            warn!("Partial match found from MusicBrainz");
+            tracing::warn!("Partial match found from MusicBrainz");
             true // should validate
         } else {
             // TODO: No match -> mark as "to validate"
-            warn!("No match found from MusicBrainz");
+            tracing::warn!("No match found from MusicBrainz");
             true // should validate
         };
 
@@ -181,8 +206,8 @@ impl DownloadService {
         let mut downloaded_track = track;
 
         // Get the best download URL
-        let provider_ref = downloader::search(&downloaded_track, &self.config).await?;
-        info!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
+        let provider_ref = downloader::search(&downloaded_track).await?;
+        tracing::info!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
         downloaded_track.references.push(provider_ref.clone());
 
         // Download the track
@@ -190,10 +215,9 @@ impl DownloadService {
             &downloaded_track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
             &provider_ref,
             &downloaded_track.title,
-            &self.config,
         )
         .await?;
-        info!("Downloaded track to {:?}", file_path);
+        tracing::info!("Downloaded track to {:?}", file_path);
         downloaded_track.file_path = file_path.clone().into();
 
         Ok((downloaded_track, file_path))
@@ -205,7 +229,7 @@ impl DownloadService {
 
         match result {
             Some(existing_track) => {
-                warn!("Similar track found in DB: {}, will compare quality", existing_track.display());
+                tracing::warn!("Similar track found in DB: {}, will compare quality", existing_track.display());
                 Some(existing_track)
             },
             None => {
@@ -223,15 +247,16 @@ impl DownloadService {
         let mut track = track;
 
         tagger::file::tag_file_with_track(&file_path.clone(), &track)?;
-        info!("Tagged file with downloaded_track metadata");
+        tracing::info!("Tagged file with downloaded_track metadata");
 
         // Move the file to the correct location
-        organizer::move_track_file(&mut track, &self.config.general.base_library_dir)?;
+        let base_library_dir = Config::get().general.base_library_dir.clone();
+        organizer::move_track_file(&mut track, &base_library_dir)?;
 
         // Save in the database
         self.track_service.create_or_ignore(conn, &track)?; 
 
-        info!("Saved track in the database");
+        tracing::info!("Saved track in the database");
 
         Ok(track)
     }

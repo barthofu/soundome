@@ -10,25 +10,23 @@ pub async fn domain_tests(services: &Arc<ServiceLayer>, conn: &mut SqliteConnect
 
 async fn download_track(services: &Arc<ServiceLayer>, conn: &mut SqliteConnection) {
 
-    let url = "https://open.spotify.com/track/678pEsntcD7rb6eQiy4sKf";
+    // Sheng - DIS-MOI PK (remix feat. HONNOJ)
+    // let url = "https://open.spotify.com/track/678pEsntcD7rb6eQiy4sKf";
+    // let url = "https://soundcloud.com/midori141/sheng-dis-moi-pk";
 
-    let res = services.download_service.download_track_from_url(url, conn).await;
+    // let url = "https://soundcloud.com/crystaldistortion23/crystal-d-fonkoff-ozone-version";
+
+    // let res = services.download_service.download_track_from_url(url, conn).await;
+    // match res {
+    //     Ok(track) => println!("Downloaded track: {}", track.display()),
+    //     Err(e) => eprintln!("Error downloading track: {:?}", e),
+    // }
+
+    let playlist_url = "https://soundcloud.com/barthohm/sets/a-la-derive";
+
+    let res = services.download_service.sync_playlist_from_url(playlist_url, conn).await;
     match res {
-        Ok(track) => println!("Downloaded track: {}", track.display()),
-        Err(e) => eprintln!("Error downloading track: {:?}", e),
+        Ok(_) => println!("Downloaded playlist"),
+        Err(e) => eprintln!("Error downloading playlist: {:?}", e),
     }
-
-
-    // // let playlist_url = "https://open.spotify.com/playlist/22HjWHbry4q3DzVMOhRqBU?si=ca4f7ddb9afd4ed7";
-    // let playlist_url = "https://soundcloud.com/bartho-az/sets/euphoria-part-4";
-    // let _ = core.download_playlist_from_url(playlist_url).await.map_err(|e| {
-    //     eprintln!("Error: {:?}", e);
-    //     std::process::exit(1);
-    // });
-
-    // let track_url = "https://soundcloud.com/jeannindamix/mamakkat-jeannine-synaptic-highway";
-    // let _ = core.download_track_from_url(track_url).await.map_err(|e| {
-    //     eprintln!("Error: {:?}", e);
-    //     std::process::exit(1);
-    // });
 }

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
-use config::model::OpenRouterConfig;
+use config::{models::OpenRouterConfig, Config};
 use openrouter_api::{
     ChatCompletionRequest, JsonSchema, Message, OpenRouterClient, ProviderPreferences, Ready,
     ResponseFormat, Unconfigured,
@@ -22,11 +22,13 @@ pub struct OpenRouterAI {
 }
 
 impl OpenRouterAI {
-    const DEFAULT_MODEL: &str = "google/gemini-flash-1.5-8b";
+    // const DEFAULT_MODEL: &str = "google/gemini-flash-1.5-8b";
+    const DEFAULT_MODEL: &str = "google/gemini-2.0-flash-lite-001";
 
-    pub fn new(config: &OpenRouterConfig) -> SoundomeResult<Self> {
-        let base_url = with_default(config.base_url.clone(), "https://openrouter.ai/api/v1/".to_string());
-        let client = OpenRouterClient::<Unconfigured>::new()
+    pub fn new(openrouter_config: &OpenRouterConfig) -> SoundomeResult<Self> {
+        let base_url = with_default(openrouter_config.base_url.clone(), "https://openrouter.ai/api/v1/".to_string());
+        
+        let client_builder = OpenRouterClient::<Unconfigured>::new()
             .with_base_url(base_url.clone())
             .map_err(|_| {
                 Error::Network(format!(
@@ -34,18 +36,28 @@ impl OpenRouterAI {
                     base_url
                 ))
             })?
-            .with_timeout(Duration::from_secs(with_default(config.timeout, 60)))
+            .with_timeout(Duration::from_secs(with_default(openrouter_config.timeout, 60)))
             .with_http_referer("")
-            .with_site_title("Soudome")
-            .with_api_key(&config.api_key)
+            .with_site_title("Soudome");
+
+        // TODO: If the openrouter_api library supports proxy configuration,
+        // it should be added here. For now, we document this limitation.
+        if let Some(proxy) = Config::get().proxy.as_ref() {
+            if proxy.enabled {
+                tracing::warn!("Proxy configuration for OpenRouter is not yet supported by the openrouter_api library");
+            }
+        }
+
+        let client = client_builder
+            .with_api_key(&openrouter_config.api_key)
             .map_err(|err| {
                 Error::Config(format!("Failed to configure OpenRouter API key: {}", err))
             })?;
 
         Ok(Self {
             client: client,
-            model: with_default(config.model.clone(), Self::DEFAULT_MODEL.to_string()),
-            provider: config.provider.clone(),
+            model: with_default(openrouter_config.model.clone(), Self::DEFAULT_MODEL.to_string()),
+            provider: openrouter_config.provider.clone(),
         })
     }
 

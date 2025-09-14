@@ -13,6 +13,7 @@ target/
 # data
 data/
 !data/.gitkeep
+library/
 
 # misc
 tmp/

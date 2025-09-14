@@ -23,7 +23,6 @@ pub struct ServiceLayer {
 impl ServiceLayer {
     pub fn new(
         repositories: Arc<repositories::RepositoryLayer>,
-        config: Arc<config::model::AppConfig>,
     ) -> Self {
 
         // Resource services
@@ -43,7 +42,6 @@ impl ServiceLayer {
             track_service.clone(),
             album_service.clone(),
             artist_service.clone(),
-            config,
         ));
 
         Self {

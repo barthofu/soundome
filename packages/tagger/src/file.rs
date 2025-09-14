@@ -13,7 +13,7 @@ use std::{path::PathBuf, str::FromStr};
  * Reads the tag from a file and returns a converted Track object.
  */
 pub fn get_track_from_file(file_path: &PathBuf) -> SoundomeResult<Track> {
-    println!("Reading tag from file: {:?}", file_path);
+    tracing::info!("Reading tag from file: {:?}", file_path);
 
     Tag::new()
         .read_from_path(file_path)

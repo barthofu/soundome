@@ -4,7 +4,7 @@ pub mod youtube;
 pub mod youtube_music;
 
 use async_trait::async_trait;
-use config::model::AppConfig;
+use config::Config;
 use shared::{
     errors::Error,
     models::{Platform, Reference, ReferenceType, Track}, types::SoundomeResult,
@@ -33,10 +33,10 @@ pub trait Matcher {
 // Exposed functions
 // ==============================
 
-pub async fn search(track: &Track, config: &AppConfig) -> SoundomeResult<Reference> {
+pub async fn search(track: &Track) -> SoundomeResult<Reference> {
     // providers
     let youtube = youtube::Youtube::new(
-        config
+        Config::get()
             .providers
             .youtube
             .as_ref()
@@ -92,7 +92,6 @@ pub async fn download(
     source: &Reference,
     provider: &Reference,
     track_title: &str,
-    config: &AppConfig,
 ) -> SoundomeResult<PathBuf> {
     if source.ref_type != ReferenceType::Source {
         return Err(Error::Custom(
@@ -113,7 +112,7 @@ pub async fn download(
     match source.platform {
         Platform::Spotify => {
             let mut youtube = youtube::Youtube::new(
-                config
+                Config::get()
                     .providers
                     .youtube
                     .as_ref()
@@ -122,12 +121,12 @@ pub async fn download(
             );
 
             youtube
-                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
+                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
                 .await
         }
         Platform::Youtube => {
             let mut youtube = youtube::Youtube::new(
-                config
+                Config::get()
                     .providers
                     .youtube
                     .as_ref()
@@ -135,19 +134,19 @@ pub async fn download(
                     .flatten(),
             );
             youtube
-                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
+                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
                 .await
         }
         Platform::YoutubeMusic => {
             let mut youtube_music = youtube_music::YoutubeMusic::new();
             youtube_music
-                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
+                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
                 .await
         }
         Platform::SoundCloud => {
-            let mut soundcloud = soundcloud::SoundCloud::new(config.ai.clone()).await?;
+            let mut soundcloud = soundcloud::SoundCloud::new().await?;
             soundcloud
-                .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
+                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
                 .await
         }
         _ => Err(Error::Unknown),

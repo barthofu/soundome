@@ -110,7 +110,7 @@ pub fn convert_track(
         artists: vec![convert_basic_artist(&user)],
         album: album.as_ref().map(|a| convert_basic_album(&a)),
         genre: track.genre.clone(), // TODO: check if this is correct instead of tag_list
-        duration: Some(track.duration.clone()),
+        duration: Some((track.duration / 1000) as i32),
         file_path: None,
         track_number: album.as_ref().and_then(|a| {
             a.album_playlist

@@ -33,13 +33,18 @@
             pkgs-master.yt-dlp
 
             id3v2
+            glibcLocales
           ];
+
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
           PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+          LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
 
           shellHook = ''
             # export PATH=$PWD/assets/bin:$HOME/.cargo/bin:$PATH
             export PATH=$HOME/.cargo/bin:$PATH
+
+            ssh -C -N -D 1080 vps.lab &
           '';
         };
       }

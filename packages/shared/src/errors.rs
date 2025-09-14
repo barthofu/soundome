@@ -18,6 +18,12 @@ pub enum Error {
     Internal(String),
     #[error("config error: {0}")]
     Config(String),
+    #[error("cache error: {0}")]
+    Cache(String),
+    #[error("rate limit exceeded: {0}")]
+    RateLimit(String),
+    #[error("not implemented error: {0}")]
+    NotImplemented(String),
 
     // ============================================================================================
     // Domain errors
@@ -34,6 +40,9 @@ pub enum Error {
     TrackProcessingFailed(String),
     #[error("track metadata error: {0}")]
     TrackMetadataError(String),
+    
+    #[error("{0} provider is not available")]
+    ProviderUnavailable(String),
 
     // ============================================================================================
     // Technical errors
