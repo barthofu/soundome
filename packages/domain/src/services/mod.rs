@@ -34,6 +34,7 @@ impl ServiceLayer {
         ));
         let album_service = Arc::new(album_service::AlbumService::new(
             repositories.album.clone(),
+            repositories.artist.clone(),
         ));
         let artist_service = Arc::new(artist_service::ArtistService::new(repositories.artist.clone()));
 

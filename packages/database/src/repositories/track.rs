@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use shared::types::SoundomeResult;
 
 use crate::{
-    entities::{AlbumEntity, ArtistEntity, ArtistTrackEntity, NewTrackEntity, TrackEntity, TrackRefEntity, UpdateTrackEntity}, macros, schema,
+    entities::{AlbumEntity, ArtistEntity, ArtistTrackEntity, NewTrackEntity, TrackEntity, TrackRefEntity, UpdateTrackEntity, NewTrackRefEntity}, macros, schema,
 };
 
 pub struct DieselTrackRepository {}
@@ -177,6 +177,22 @@ impl TrackRepository for DieselTrackRepository {
         self.get_by_id(conn, track_ref.track_id)
     }
 
+    fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()> {
+        for reference in references {
+            let new_track_ref = NewTrackRefEntity::convert_from_domain(reference, track_id);
+            
+            diesel::insert_into(schema::track_ref::table)
+                .values(&new_track_ref)
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to create track reference: {}",
+                        err
+                    ))
+                })?;
+        }
+        Ok(())
+    }
 }
 
 

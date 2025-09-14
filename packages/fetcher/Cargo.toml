@@ -8,12 +8,12 @@ shared = { path = "../shared" }
 config = { path = "../config" }
 ai = { path = "../ai" }
 
-rspotify = { version = "0.14.0", default-features = false, features = [
+rspotify = { version = "0.15.1", default-features = false, features = [
   "env-file",
   "client-ureq",
   "ureq-rustls-tls",
 ] }
-rustypipe = "0.11.0"
+rustypipe = "0.11.4"
 rsoundcloud = { version = "0.2.3" }
 # rsoundcloud = { path = "../../../rsoundcloud" } # for local testing purposes
 

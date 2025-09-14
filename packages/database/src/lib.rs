@@ -5,7 +5,6 @@ extern crate diesel;
 
 pub mod entities;
 pub mod repositories;
-pub mod services;
 pub mod mappers;
 pub mod schema;
 pub mod macros;

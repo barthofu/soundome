@@ -135,7 +135,10 @@ impl Provider for Youtube<'_> {
     }
 
     async fn download(&mut self, url: &str, file_name: &str, base_library_dir: PathBuf) -> SoundomeResult<PathBuf> {
-        download_with_ytdlp(url, file_name, base_library_dir).await
+        // if the url is a youtube music one, convert it to a youtube one
+        // let url = url.replace("music.youtube.com", "www.youtube.com");
+
+        download_with_ytdlp(&url, file_name, base_library_dir).await
     }
 
     fn is_valid_url(url: &str) -> bool {

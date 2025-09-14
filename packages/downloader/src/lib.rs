@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use config::model::AppConfig;
 use shared::{
     errors::Error,
-    models::{Platform, Reference, Track}, types::SoundomeResult,
+    models::{Platform, Reference, ReferenceType, Track}, types::SoundomeResult,
 };
 use std::path::PathBuf;
 
@@ -89,17 +89,26 @@ pub async fn search(track: &Track, config: &AppConfig) -> SoundomeResult<Referen
 }
 
 pub async fn download(
-    track: &Track,
+    source: &Reference,
+    provider: &Reference,
+    track_title: &str,
     config: &AppConfig,
 ) -> SoundomeResult<PathBuf> {
-    let source = track.get_source();
-    let source = source
-        .as_ref()
-        .ok_or(Error::Custom("track source not defined".to_string()))?;
-    let url = source.external_url.clone().ok_or(Error::Custom(
+    if source.ref_type != ReferenceType::Source {
+        return Err(Error::Custom(
+            "source reference type must be Source".to_string(),
+        ));
+    }
+
+    if provider.ref_type != ReferenceType::Provider {
+        return Err(Error::Custom(
+            "provider reference type must be Provider".to_string(),
+        ));
+    }
+
+    let url = provider.external_url.clone().ok_or(Error::Custom(
         "track source url not defined".to_string(),
     ))?;
-    let track_title = track.title.clone();
 
     match source.platform {
         Platform::Spotify => {
@@ -111,6 +120,7 @@ pub async fn download(
                     .map(|youtube| youtube.invidious_instance.clone())
                     .flatten(),
             );
+
             youtube
                 .download(&url, &track_title, PathBuf::from(&config.general.base_library_dir))
                 .await

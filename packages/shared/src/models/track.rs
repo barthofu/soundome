@@ -112,6 +112,7 @@ impl Weights {
 }
 
 impl Track {
+
     pub fn get_primary_artist(&self) -> Artist {
         self.album
             .as_ref()
@@ -127,6 +128,14 @@ impl Track {
             .cloned()
     }
 
+    pub fn get_sources(&self) -> Vec<Reference> {
+        self.references
+            .iter()
+            .filter(|r| r.ref_type == ReferenceType::Source)
+            .cloned()
+            .collect()
+    }
+
     pub fn get_source_platform(&self) -> Platform {
         self.get_source()
             .map(|s| s.platform)
@@ -137,6 +146,21 @@ impl Track {
         self.references
             .iter()
             .find(|r| r.ref_type == ReferenceType::Provider)
+            .cloned()
+    }
+
+    pub fn get_providers(&self) -> Vec<Reference> {
+        self.references
+            .iter()
+            .filter(|r| r.ref_type == ReferenceType::Provider)
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_metadata(&self) -> Option<Reference> {
+        self.references
+            .iter()
+            .find(|r| r.ref_type == ReferenceType::Metadata)
             .cloned()
     }
 
@@ -228,16 +252,10 @@ impl Track {
         }
     }
 
-    /// Transpose metadata from a source track to a destination track
+    /// Transpose metadata from an other track
     pub fn transpose_metadata(&mut self, other: &Track) {
         self.title = other.title.clone();
-        if let Some(val) = &other.album {
-            match &mut self.album {
-                Some(album) => album.transpose_metadata(val),
-                None => self.album = Some(val.clone()),
-            }
-        }
-        self.artists = other.artists.clone();
+        
         if let Some(val) = &other.date { self.date = Some(val.clone()); };
         if let Some(val) = &other.genre { self.genre = Some(val.clone()); };
         if let Some(val) = &other.cover { self.cover = Some(val.clone()); };
@@ -245,10 +263,46 @@ impl Track {
         if let Some(val) = &other.track_number { self.track_number = Some(val.clone()); };
         if let Some(val) = &other.disc_number { self.disc_number = Some(val.clone()); };
         if let Some(val) = &other.label { self.label = Some(val.clone()); };
+        
+        // only add new references, do not overwrite existing ones
         for ref_item in &other.references {
-            if !self.references.iter().any(|r| r.platform == ref_item.platform && r.external_id == ref_item.external_id && r.ref_type == ref_item.ref_type) {
+            let reference_already_exists = self.references
+                .iter()
+                .any(|r| 
+                    r.platform == ref_item.platform && 
+                    r.external_id == ref_item.external_id && 
+                    r.ref_type == ref_item.ref_type
+                );
+
+            if !reference_already_exists {
                 self.references.push(ref_item.clone());
             }
         }
+
+        // transpose album
+        if let Some(val) = &other.album {
+            match &mut self.album {
+                Some(album) => album.transpose_metadata(val),
+                None => self.album = Some(val.clone()),
+            }
+        }
+
+        // transpose artists
+        // Pour chaque artiste du self, si un artiste similaire existe dans other, on le transpose
+        const SIMILARITY_THRESHOLD: f64 = 0.8;
+        for artist in &mut self.artists {
+            if let Some(matching_artist) = other.artists.iter().find(|a| a.compare(artist) > SIMILARITY_THRESHOLD) {
+                artist.transpose_metadata(matching_artist);
+            }
+        }
+
+        // TODO: really needed ? + ça induit un problème de duplication d'artistes
+        // Pour chaque artiste du other, si aucun artiste similaire n'existe dans self, on l'ajoute
+        // for other_artist in &other.artists {
+        //     let exists_in_self = self.artists.iter().any(|a| a.compare(other_artist) > 0.8);
+        //     if !exists_in_self {
+        //         self.artists.push(other_artist.clone());
+        //     }
+        // }
     }
 }

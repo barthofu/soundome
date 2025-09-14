@@ -1,7 +1,7 @@
 use musicbrainz_rs::entity::recording::RecordingSearchQuery;
 use musicbrainz_rs::entity::{artist_credit::ArtistCredit, recording::Recording, release::Release};
 use musicbrainz_rs::prelude::*;
-use shared::models::{Reference, ReferenceType};
+use shared::models::{AlbumType, Platform, Reference, ReferenceType};
 use shared::utils::enums::Match;
 use shared::utils::string::{string_similarity, SimilarityAlgorithm};
 use shared::{
@@ -132,7 +132,7 @@ fn convert_to_artist(artist: &ArtistCredit) -> Artist {
             Reference {
                 id: None,
                 ref_type: ReferenceType::Metadata,
-                platform: shared::models::Platform::Spotify,
+                platform: Platform::MusicBrainz,
                 external_id: Some(artist.artist.id.clone()),
                 external_url: Some("https://musicbrainz.org/artist/".to_string() + &artist.artist.id),
             }
@@ -153,14 +153,14 @@ fn convert_to_album(release: &Release) -> Album {
             .date
             .as_ref()
             .map(|date| format_date(&date, Format::DATE)),
-        album_type: shared::models::AlbumType::Unknown,
+        album_type: AlbumType::Unknown,
         // cover: release.get_coverart().res_1200().execute().await.unwrap().
         cover: None,
         references: vec![
             Reference {
                 id: None,
                 ref_type: ReferenceType::Metadata,
-                platform: shared::models::Platform::Spotify,
+                platform: Platform::Spotify,
                 external_id: Some(release.id.clone()),
                 external_url: Some("https://musicbrainz.org/release/".to_string() + &release.id),
             }
@@ -206,7 +206,7 @@ fn convert_to_track(recording: &Recording) -> Track {
             Reference {
                 id: None,
                 ref_type: ReferenceType::Metadata,
-                platform: shared::models::Platform::Spotify,
+                platform: Platform::Spotify,
                 external_id: Some(recording.id.clone()),
                 external_url: Some("https://musicbrainz.org/recording/".to_string() + &recording.id),
             }

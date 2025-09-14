@@ -10,7 +10,7 @@ pub async fn domain_tests(services: &Arc<ServiceLayer>, conn: &mut SqliteConnect
 
 async fn download_track(services: &Arc<ServiceLayer>, conn: &mut SqliteConnection) {
 
-    let url = "https://soundcloud.com/jeannindamix/mamakkat-jeannine-synaptic-highway";
+    let url = "https://open.spotify.com/track/678pEsntcD7rb6eQiy4sKf";
 
     let res = services.download_service.download_track_from_url(url, conn).await;
     match res {

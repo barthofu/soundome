@@ -14,8 +14,8 @@ async-trait = "0.1.86"
 slug = "0.1.6"
 ngrammatic = "0.4.0"
 fuzzy-matcher = "0.3.7"
-invidious = { version = "0.7.6", default-features = false, features = [
+invidious = { version = "0.7.8", default-features = false, features = [
     "reqwest_async"
 ]}
 tokio = { version = "1.44.2", features = ["time", "process", "io-util"] }
-rustypipe = "0.11.0"
+rustypipe = "0.11.4"

@@ -5,7 +5,8 @@ use shared::types::SoundomeResult;
 
 use crate::{
     entities::{
-        ArtistEntity, ArtistRefEntity, ArtistTrackEntity, NewArtistEntity, TrackEntity, UpdateArtistEntity
+        ArtistEntity, ArtistRefEntity, ArtistTrackEntity, NewArtistEntity, TrackEntity, UpdateArtistEntity,
+        NewArtistRefEntity, ArtistAlbumEntity
     }, macros, schema
 };
 
@@ -134,6 +135,76 @@ impl ArtistRepository for DieselArtistRepository {
             })?;
 
         self.get_by_id(conn, artist_ref.artist_id)
+    }
+
+    fn create_references(&self, conn: &mut SqliteConnection, artist_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()> {
+        for reference in references {
+            let new_artist_ref = NewArtistRefEntity::convert_from_domain(reference, artist_id);
+            
+            diesel::insert_into(schema::artist_ref::table)
+                .values(&new_artist_ref)
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to create artist reference: {}",
+                        err
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
+    fn create_track_relationship(&self, conn: &mut SqliteConnection, artist_id: i32, track_id: i32) -> SoundomeResult<()> {
+        let artist_track = ArtistTrackEntity {
+            track_id,
+            artist_id,
+        };
+        
+        diesel::insert_into(schema::artist_tracks::table)
+            .values(&artist_track)
+            .execute(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to create artist-track relationship: {}",
+                    err
+                ))
+            })?;
+        Ok(())
+    }
+
+    fn create_album_relationship(&self, conn: &mut SqliteConnection, artist_id: i32, album_id: i32) -> SoundomeResult<()> {
+        let artist_album = ArtistAlbumEntity {
+            album_id,
+            artist_id,
+        };
+        
+        diesel::insert_into(schema::artist_albums::table)
+            .values(&artist_album)
+            .execute(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to create artist-album relationship: {}",
+                    err
+                ))
+            })?;
+        Ok(())
+    }
+
+    fn create_or_ignore(&self, conn: &mut SqliteConnection, artist: &shared::models::Artist) -> SoundomeResult<shared::models::Artist> {
+        // If artist already has an ID, return it as-is (ignore creation)
+        if artist.id.is_some() {
+            return Ok(artist.clone());
+        }
+        
+        // Otherwise, create the artist and its references
+        let created_artist = self.create(conn, artist)?;
+        let artist_id = created_artist.id.unwrap();
+        
+        // Create artist references
+        self.create_references(conn, artist_id, &artist.references)?;
+        
+        // Return the created artist with references
+        self.get_by_id(conn, artist_id)
     }
 }
 

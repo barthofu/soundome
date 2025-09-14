@@ -7,7 +7,8 @@ use shared::types::SoundomeResult;
 
 use crate::{
     entities::{
-        AlbumEntity, AlbumRefEntity, ArtistAlbumEntity, ArtistEntity, NewAlbumEntity, UpdateAlbumEntity
+        AlbumEntity, AlbumRefEntity, ArtistAlbumEntity, ArtistEntity, NewAlbumEntity, UpdateAlbumEntity,
+        NewAlbumRefEntity
     }, macros, schema
 };
 
@@ -126,6 +127,40 @@ impl AlbumRepository for DieselAlbumRepository {
             })?;
 
         self.get_by_id(conn, album_ref.album_id)
+    }
+
+    fn create_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()> {
+        for reference in references {
+            let new_album_ref = NewAlbumRefEntity::convert_from_domain(reference, album_id);
+            
+            diesel::insert_into(schema::album_ref::table)
+                .values(&new_album_ref)
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to create album reference: {}",
+                        err
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
+    fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {
+        // If album already has an ID, return it as-is (ignore creation)
+        if album.id.is_some() {
+            return Ok(album.clone());
+        }
+        
+        // Otherwise, create the album and its references
+        let created_album = self.create(conn, album)?;
+        let album_id = created_album.id.unwrap();
+        
+        // Create album references
+        self.create_references(conn, album_id, &album.references)?;
+        
+        // Return the created album with references
+        self.get_by_id(conn, album_id)
     }
 }
 

@@ -143,6 +143,7 @@ pub fn convert_playlist_item(item: &PlaylistItem, pos: u32) -> Option<PlaylistTr
             position: Some(pos),
         }),
         PlayableItem::Episode(_) => None,
+        PlayableItem::Unknown(_) => None,
     })
 }
 

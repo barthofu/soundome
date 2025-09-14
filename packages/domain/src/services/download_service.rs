@@ -160,6 +160,8 @@ impl DownloadService {
         let should_validate = if let Match::Exact(matched_track) = best_match {
             // TODO: Check if MusicBrainz ref already exists in DB, if yes then apply references recursively to track and unfound album/artists
             info!("Exact match found from MusicBrainz");
+            
+            // find for existing tracks in tthe database 
             enriched_track.transpose_metadata(&matched_track);
             false // no need to validate
         } else if let Match::Partial(_) = best_match {
@@ -181,11 +183,13 @@ impl DownloadService {
         // Get the best download URL
         let provider_ref = downloader::search(&downloaded_track, &self.config).await?;
         info!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
-        downloaded_track.references.push(provider_ref);
+        downloaded_track.references.push(provider_ref.clone());
 
         // Download the track
         let file_path = downloader::download(
-            &downloaded_track,
+            &downloaded_track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
+            &provider_ref,
+            &downloaded_track.title,
             &self.config,
         )
         .await?;
@@ -205,7 +209,6 @@ impl DownloadService {
                 Some(existing_track)
             },
             None => {
-                info!("No similar track found in DB, proceeding with download");
                 None
             },
         }
@@ -216,7 +219,7 @@ impl DownloadService {
         todo!()
     }
 
-    async fn process_track(&self, _conn: &mut SqliteConnection, track: Track, file_path: &PathBuf) -> SoundomeResult<Track> {
+    async fn process_track(&self, conn: &mut SqliteConnection, track: Track, file_path: &PathBuf) -> SoundomeResult<Track> {
         let mut track = track;
 
         tagger::file::tag_file_with_track(&file_path.clone(), &track)?;
@@ -226,8 +229,8 @@ impl DownloadService {
         organizer::move_track_file(&mut track, &self.config.general.base_library_dir)?;
 
         // Save in the database
-        // let mut conn = database::get_connection(&self.config.database.url);
-        // database::services::track::create_track(&mut conn, &downloaded_track).unwrap(); // TODO: tmp
+        self.track_service.create_or_ignore(conn, &track)?; 
+
         info!("Saved track in the database");
 
         Ok(track)

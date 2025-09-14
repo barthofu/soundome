@@ -18,6 +18,7 @@ pub trait TrackRepository: Send + Sync {
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &Track) -> SoundomeResult<Track>;
 
     fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Track>;
+    fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
 }
 
 pub trait AlbumRepository: Send + Sync {
@@ -26,6 +27,8 @@ pub trait AlbumRepository: Send + Sync {
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_album: &Album) -> SoundomeResult<Album>;
 
     fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Album>;
+    fn create_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
+    fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Album>;
 }
 
 pub trait ArtistRepository: Send + Sync {
@@ -35,4 +38,8 @@ pub trait ArtistRepository: Send + Sync {
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_artist: &Artist) -> SoundomeResult<Artist>;
 
     fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Artist>;
+    fn create_references(&self, conn: &mut SqliteConnection, artist_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
+    fn create_track_relationship(&self, conn: &mut SqliteConnection, artist_id: i32, track_id: i32) -> SoundomeResult<()>;
+    fn create_album_relationship(&self, conn: &mut SqliteConnection, artist_id: i32, album_id: i32) -> SoundomeResult<()>;
+    fn create_or_ignore(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Artist>;
 }
