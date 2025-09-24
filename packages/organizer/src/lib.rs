@@ -1,7 +1,11 @@
 use std::path::PathBuf;
 
 use shared::{errors::Error, models::Track, types::SoundomeResult};
+use std::fs;
 
+/// Moves the track file to the organized library structure based on artist and album.
+/// Updates the track's file_path to the new location.
+/// If the destination file already exists, it will be replaced.
 pub fn move_track_file(track: &mut Track, base_library_dir: &str) -> SoundomeResult<()> {
 
     tracing::info!("Moving track file: {:?}", track.file_path);
@@ -30,8 +34,16 @@ pub fn move_track_file(track: &mut Track, base_library_dir: &str) -> SoundomeRes
 
     let destination_path = target_folder.join(file_name);
 
-    std::fs::create_dir_all(&target_folder).unwrap();
-    std::fs::rename(file_path, &destination_path)
+    fs::create_dir_all(&target_folder).unwrap();
+
+    // If destination exists, remove it first to force replace
+    if destination_path.exists() {
+        fs::remove_file(&destination_path).map_err(|e| {
+            Error::Custom(format!("Failed to remove existing file: {}", e))
+        })?;
+    }
+
+    fs::rename(file_path, &destination_path)
         .map(|_| {
             tracing::info!("File moved successfully");
             track.file_path = Some(destination_path);

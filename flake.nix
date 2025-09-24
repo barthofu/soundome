@@ -41,10 +41,12 @@
           LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
 
           shellHook = ''
+            export TEMPDIR="$(mktemp -d /tmp/nix-shell-12345)"
+            
             # export PATH=$PWD/assets/bin:$HOME/.cargo/bin:$PATH
             export PATH=$HOME/.cargo/bin:$PATH
 
-            ssh -C -N -D 1080 vps.lab &
+            ssh -C -N -D 1080 vps.lab || true &
           '';
         };
       }

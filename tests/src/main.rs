@@ -27,8 +27,10 @@ struct Track {
 #[tokio::main]
 async fn main() {
 
+    println!("Starting tests...");
+
     init_globals().unwrap_or_else(|err| {
-        tracing::error!("Failed to initialize globals: {}", err);
+        eprintln!("Failed to initialize globals: {}", err);
         std::process::exit(1);
     });
 

@@ -151,16 +151,44 @@ impl AlbumRepository for DieselAlbumRepository {
         if album.id.is_some() {
             return Ok(album.clone());
         }
-        
         // Otherwise, create the album and its references
         let created_album = self.create(conn, album)?;
         let album_id = created_album.id.unwrap();
-        
         // Create album references
         self.create_references(conn, album_id, &album.references)?;
-        
         // Return the created album with references
         self.get_by_id(conn, album_id)
+    }
+
+    fn find_by_unique_fields(&self, conn: &mut SqliteConnection, album: &shared::models::Album) -> SoundomeResult<Option<shared::models::Album>> {
+        use diesel::prelude::*;
+        use crate::schema;
+        use crate::schema::album::dsl::*;
+        let mut query = album.into_boxed();
+        query = query.filter(title.eq(&album.title));
+        if let Some(ref d) = album.date {
+            query = query.filter(date.eq(d));
+        }
+        let found: Option<AlbumEntity> = query
+            .first::<AlbumEntity>(conn)
+            .optional()
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to find album by unique fields: {}", err)))?;
+        if let Some(entity) = found {
+            // Charger les artistes et références si besoin
+            let artists: Vec<ArtistEntity> = schema::artist_albums::table
+                .inner_join(schema::artist::table.on(schema::artist_albums::artist_id.eq(schema::artist::id)))
+                .filter(schema::artist_albums::album_id.eq(entity.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .unwrap_or_default();
+            let references: Vec<AlbumRefEntity> = schema::album_ref::table
+                .filter(schema::album_ref::album_id.eq(entity.id))
+                .load(conn)
+                .unwrap_or_default();
+            Ok(Some(AlbumEntity::convert_to_domain(entity, artists, references)))
+        } else {
+            Ok(None)
+        }
     }
 }
 

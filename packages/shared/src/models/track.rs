@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fs::File, path::PathBuf};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -166,6 +166,31 @@ impl Track {
 
     pub fn get_year(&self) -> Option<String> {
         self.date.as_ref().and_then(|d| d.split('-').next().map(|s| s.to_string()))
+    }
+
+    pub fn get_bitrate(&self) -> Option<u32> {
+        let path = self.file_path.as_ref()?;
+
+        // Use symphonia for audio probing
+        use symphonia::core::io::MediaSourceStream;
+
+        let file = File::open(path).ok()?;
+        let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+        let probed = match symphonia::default::get_probe().format(
+            &Default::default(),
+            mss,
+            &Default::default(),
+            &Default::default(),
+        ) {
+            Ok(probed) => probed,
+            Err(_) => return None,
+        };
+        let format = probed.format;
+        
+        // Find the first audio track with a defined bits_per_coded_sample
+        let track = format.tracks().iter().find(|t| t.codec_params.bits_per_coded_sample.is_some())?;
+        track.codec_params.bits_per_coded_sample.map(|bps| bps as u32)
     }
 
     /// Display a track in a user-friendly format

@@ -108,18 +108,20 @@ impl DownloadService {
     // == Sub private and utils methods
     // ============================================================================================
 
-    async fn orchestrator_workflow(&self, conn: &mut SqliteConnection, mut track: Track) -> SoundomeResult<Track> {
-        // Step 2: Enrichissement des métadonnées via MusicBrainz
+    async fn orchestrator_workflow(&self, conn: &mut SqliteConnection, track: Track) -> SoundomeResult<Track> {
+        let mut track = track;
+
+        // Step 1: Enrichissement des métadonnées via MusicBrainz
         tracing::info!("Getting metadata via MusicBrainz");
-        let (enriched_track, should_continue_download) = self.enrich_metada(conn, track).await?;
+        let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track).await?;
 
         // TODO: temporary, see Class level todo comment
-        if !should_continue_download {
+        if should_validate {
             tracing::warn!("Stopping workflow - marked for validation");
-            return Ok(enriched_track);
+            return Ok(track);
         }
 
-        // // Step 3: Déduplication
+        // // Step 2: Déduplication
         // tracing::info!("Deduping track in database");
         // let existing_track = self.dedupe_track(conn, &enriched_track).await;
 
@@ -130,44 +132,74 @@ impl DownloadService {
 
         // Ok(enriched_track)
 
-        // Step 3: Téléchargement
+        // Step 2: Téléchargement
         tracing::info!("Searching and downloading track from provider");
-        let (downloaded_track, file_path) = self.download_track(enriched_track).await?;
+        let file_path = self.download_track(&mut track).await?;
 
-        // Step 4: Déduplication
-        tracing::info!("Deduping track in database");
-        let existing_track = self.dedupe_track(conn, &downloaded_track).await;
-
-        if let Some(existing_track) = existing_track {
-            tracing::warn!("Track already exists in DB: {}, skipping download", existing_track.display());
-            return Ok(existing_track);
+        // Step 3: Déduplication
+        if existing_track.is_none() {
+            tracing::info!("Deduping track in database");
+            existing_track = self.dedupe_track(conn, &track).await;
         }
 
-        // // Step 5: Quality comparison and deduplication if existing
-        // track = self.compare_quality_and_dedupe(&existing_track, &track).await?;
+        match existing_track {
+            Some(existing_track) => {
+                tracing::info!("Existing track found in DB: {}, will compare quality", existing_track.display());
+
+                // existing_track.transpose_refs(track);
+
+                let new_track_is_better_quality = self.track_service.is_better_quality(&existing_track, &track);
+
+                if new_track_is_better_quality {
+                    tracing::warn!("New one has better quality, will replace");
+                    self.process_track(conn, existing_track, &file_path).await?;
+                    return Ok(existing_track);
+                } else {
+                    tracing::warn!("New one has no better quality, skipping");
+                    return Ok(existing_track.clone());
+                }
+            }
+            None => {
+
+            }
+        }
+        
+
+        // l
+        // if let Some(existing_track) = existing_track {
+        //     if new_track_is_better_quality {
+        //         tracing::warn!("A similar track exists in DB: {}, but the new one has better quality, will replace", existing_track.display());
+        //     } else {
+        //         tracing::warn!("A similar track exists in DB: {}, skipping download", existing_track.display());
+        //         return Ok(existing_track);
+        //     }
+        // }
 
         // Final Step: Tagging, moving and saving in DB
         tracing::info!("Tagging, moving and saving track in database");
-        track = self.process_track(conn, downloaded_track, &file_path).await?;
+        track = self.process_track(conn, track, &file_path).await?;
 
         Ok(track)
     }
 
     /// Enrich metadata using metadata providers, and deduplicate entities in DB
-    async fn enrich_metada(&self, conn: &mut SqliteConnection, track: Track) -> SoundomeResult<(Track, bool)> {
-        let mut enriched_track = track;
-
-        // Check if album/artists exist in DB and associate them
-        let existing_album = enriched_track
+    /// 
+    /// Returns:
+    /// - boolean indicating if the track should be marked as "to validate"
+    /// - boolean indicating if the track should be compared in quality (already exists in DB)
+    async fn enrich_metada(&self, conn: &mut SqliteConnection, track: &mut Track) -> SoundomeResult<(bool, Option<Track>)> {
+        // Check if album/artists with same source ref url exist in DB and associate them
+        let existing_album = track
             .album
+            .as_ref()
             .and_then(|a|
                 a.get_source().and_then(|s| s.external_url).and_then(|url| {
                     self.album_service.get_by_url(conn, &url)
                 }
             ));
-        enriched_track.album = existing_album;
+        track.album = existing_album;
 
-        for artist in &mut enriched_track.artists {
+        for artist in &mut track.artists {
             if let Some(existing_artist) = artist.get_source().and_then(|s| s.external_url).and_then(|url| {
                 self.artist_service.get_by_url(conn, &url)
             }) {
@@ -178,49 +210,76 @@ impl DownloadService {
         // Get MusicBrainz metadata
         let musicbrainz = tagger::providers::musicbrainz::MusicBrainz::new();
         let best_match = musicbrainz
-            .get_best_match_from_track(&enriched_track)
+            .get_best_match_from_track(&track)
             .await;
 
         // Apply best match metadata
-        let should_validate = if let Match::Exact(matched_track) = best_match {
+        if let Match::Exact(matched_track) = best_match {
             // TODO: Check if MusicBrainz ref already exists in DB, if yes then apply references recursively to track and unfound album/artists
             tracing::info!("Exact match found from MusicBrainz: {:?}", matched_track.get_metadata().and_then(|m| m.external_url));
-            
-            // find for existing tracks in tthe database 
-            enriched_track.transpose_metadata(&matched_track);
-            false // no need to validate
+            // find for existing tracks in the database 
+
+            if let Some(mb_ref) = matched_track.get_source().and_then(|s| s.external_url.clone()) {
+                if let Some(existing_track) = self.track_service.get_by_url(conn, &mb_ref) {
+                    tracing::warn!("Track already exists in DB with MusicBrainz ref: {}, skipping enrichment", existing_track.display());
+                    return Ok((false, Some(existing_track)));
+                }
+            }
+
+            // Check if album/artists with same musicbrainz source url exist in DB and associate them
+            let existing_album = track
+
+                .album
+                .as_ref()
+                .and_then(|a|
+                    a.get_metadata().and_then(|s| s.external_url).and_then(|url| {
+                        self.album_service.get_by_url(conn, &url)
+                    }
+                ));
+            track.album = existing_album;
+
+            for artist in &mut track.artists {
+                if let Some(existing_artist) = artist.get_metadata().and_then(|s| s.external_url).and_then(|url| {
+                    self.artist_service.get_by_url(conn, &url)
+                }) {
+                    *artist = existing_artist;
+                }
+            }
+
+            track.transpose_metadata(&matched_track);
+            Ok((false, None)) // no need to validate
         } else if let Match::Partial(_) = best_match {
             // TODO: Handle partial match -> no transpose, but associate MusicBrainz ref and mark as "to validate"
             tracing::warn!("Partial match found from MusicBrainz");
-            true // should validate
+            Ok((true, None)) // should validate
         } else {
             // TODO: No match -> mark as "to validate"
             tracing::warn!("No match found from MusicBrainz");
-            true // should validate
-        };
-
-        Ok((enriched_track, should_validate))
+            // TODO: change to true
+            Ok((true, None)) // should validate
+        }
     }
 
-    async fn download_track(&self, track: Track) -> SoundomeResult<(Track, PathBuf)> {
-        let mut downloaded_track = track;
-
+    /// Searches for the best download URL and downloads the track
+    /// 
+    /// Returns the downloaded track with updated references and file_path
+    async fn download_track(&self, track: &mut Track) -> SoundomeResult<PathBuf> {
         // Get the best download URL
-        let provider_ref = downloader::search(&downloaded_track).await?;
+        let provider_ref = downloader::search(&track).await?;
         tracing::info!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
-        downloaded_track.references.push(provider_ref.clone());
+        track.references.push(provider_ref.clone());
 
         // Download the track
         let file_path = downloader::download(
-            &downloaded_track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
+            &track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
             &provider_ref,
-            &downloaded_track.title,
+            &track.title,
         )
         .await?;
         tracing::info!("Downloaded track to {:?}", file_path);
-        downloaded_track.file_path = file_path.clone().into();
+        track.file_path = file_path.clone().into();
 
-        Ok((downloaded_track, file_path))
+        Ok(file_path)
     }
 
     /// Simple deduplication based on comparition of title and artist(s) against existing tracks in DB
@@ -238,11 +297,6 @@ impl DownloadService {
         }
     }
 
-    async fn compare_quality_and_dedupe(&self, track: &Track) -> SoundomeResult<()> {
-        // TODO: if found, dedupe based on quality
-        todo!()
-    }
-
     async fn process_track(&self, conn: &mut SqliteConnection, track: Track, file_path: &PathBuf) -> SoundomeResult<Track> {
         let mut track = track;
 
@@ -255,7 +309,6 @@ impl DownloadService {
 
         // Save in the database
         self.track_service.create_or_ignore(conn, &track)?; 
-
         tracing::info!("Saved track in the database");
 
         Ok(track)

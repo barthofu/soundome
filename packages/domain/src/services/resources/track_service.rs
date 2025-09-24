@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use diesel::SqliteConnection;
-use shared::types::SoundomeResult;
+use shared::{models::{Album, AlbumType, Track}, types::SoundomeResult};
 
 use crate::ports::repositories::{AlbumRepository, ArtistRepository, TrackRepository};
 
@@ -29,25 +29,25 @@ impl TrackService {
 
     // CRUD
 
-    pub fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Track> {
+    pub fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Track> {
         self.track_repo.get_by_id(conn, id)
     }
 
-    pub fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<shared::models::Track>> {
+    pub fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
         self.track_repo.get_all(conn)
     }
 
-    pub fn create(&self, conn: &mut SqliteConnection, new_track: &shared::models::Track) -> SoundomeResult<shared::models::Track> {
+    pub fn create(&self, conn: &mut SqliteConnection, new_track: &Track) -> SoundomeResult<Track> {
         self.track_repo.create(conn, new_track)
     }
 
-    pub fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &shared::models::Track) -> SoundomeResult<shared::models::Track> {
+    pub fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &Track) -> SoundomeResult<Track> {
         self.track_repo.update(conn, id, updated_track)
     }
 
     // Getters
 
-    pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<shared::models::Track> {
+    pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<Track> {
         self.track_repo.get_by_url(conn, url).ok()
     }
 
@@ -57,12 +57,12 @@ impl TrackService {
     pub fn find_track_by_title_and_artist(
         &self,
         conn: &mut SqliteConnection,
-        track: &shared::models::Track,
-    ) -> Option<shared::models::Track> {
+        track: &Track,
+    ) -> Option<Track> {
 
         // First, we need to get comparative tracks
         let comparative_tracks = self.get_all(conn).ok()?;
-        let mut best_match: Option<(&shared::models::Track, f64)> = None;
+        let mut best_match: Option<(&Track, f64)> = None;
 
         // Then, we iterate through them to find the best match using the .compare method
         for comparative_track in &comparative_tracks {
@@ -82,59 +82,101 @@ impl TrackService {
             .map(|(track, _)| track.clone())
     }
 
-    /// Creates a track along with its associated artists, album, and references.
-    pub fn create_or_ignore(&self, conn: &mut SqliteConnection, track: &shared::models::Track) -> SoundomeResult<shared::models::Track> {
-        // Step 1: Handle album - use create_or_ignore
+    /// Creates or updates a track in the database along with its associated artists, album, and references.
+    /// Si une entité existe (par ID ou clé unique), elle est mise à jour, sinon créée. Les relations sont maintenues.
+    pub fn create_or_update(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Track> {
+        // Step 1: Album (create or update)
         let album_id = if let Some(album) = &track.album {
-            let created_album = self.album_repo.create_or_ignore(conn, album)?;
-            let album_id = created_album.id.unwrap();
-            
-            // Handle album artists using create_or_ignore
+            let album_to_save = album.clone();
+            let saved_album = if let Some(id) = album.id {
+                // update album
+                self.album_repo.update(conn, id, &album_to_save)?
+            } else {
+                // try to find by unique fields (e.g. title, artists, date)
+                match self.album_repo.find_by_unique_fields(conn, &album_to_save) {
+                    Ok(Some(existing_album)) => {
+                        self.album_repo.update(conn, existing_album.id.unwrap(), &album_to_save)?
+                    },
+                    _ => self.album_repo.create(conn, &album_to_save)?
+                }
+            };
+            let album_id = saved_album.id.unwrap();
+            // Album artists (create or update)
             for artist in &album.artists {
-                let created_artist = self.artist_repo.create_or_ignore(conn, artist)?;
-                let artist_id = created_artist.id.unwrap();
-                
-                // Create artist-album relationship
+                let saved_artist = if let Some(id) = artist.id {
+                    self.artist_repo.update(conn, id, artist)?
+                } else {
+                    match self.artist_repo.find_by_unique_fields(conn, artist) {
+                        Ok(Some(existing_artist)) => self.artist_repo.update(conn, existing_artist.id.unwrap(), artist)?,
+                        _ => self.artist_repo.create(conn, artist)?
+                    }
+                };
+                let artist_id = saved_artist.id.unwrap();
                 self.artist_repo.create_album_relationship(conn, artist_id, album_id)?;
             }
-            
             Some(album_id)
         } else {
             None
         };
-        
-        // Step 2: Create the track using repository
-        // First, create a track copy with the resolved album_id
-        let mut track_to_create = track.clone();
+
+        // Step 2: Track (create or update)
+        let mut track_to_save = track.clone();
         if let Some(album_id) = album_id {
-            // If we have an album_id, create an album instance with just the ID
-            track_to_create.album = Some(shared::models::Album {
+            track_to_save.album = Some(Album {
                 id: Some(album_id),
-                title: String::new(), // Repository will ignore these when converting
+                title: String::new(),
                 artists: Vec::new(),
-                album_type: shared::models::AlbumType::Album,
+                album_type: AlbumType::Album,
                 cover: None,
                 date: None,
                 references: Vec::new(),
             });
         }
-        
-        let created_track = self.track_repo.create(conn, &track_to_create)?;
-        let track_id = created_track.id.unwrap();
-        
-        // Step 3: Handle track artists using create_or_ignore
+        let saved_track = if let Some(id) = track.id {
+            self.track_repo.update(conn, id, &track_to_save)?
+        } else {
+            match self.track_repo.find_by_unique_fields(conn, &track_to_save) {
+                Ok(Some(existing_track)) => self.track_repo.update(conn, existing_track.id.unwrap(), &track_to_save)?,
+                _ => self.track_repo.create(conn, &track_to_save)?
+            }
+        };
+        let track_id = saved_track.id.unwrap();
+
+        // Step 3: Track artists (create or update)
         for artist in &track.artists {
-            let created_artist = self.artist_repo.create_or_ignore(conn, artist)?;
-            let artist_id = created_artist.id.unwrap();
-            
-            // Create artist-track relationship
+            let saved_artist = if let Some(id) = artist.id {
+                self.artist_repo.update(conn, id, artist)?
+            } else {
+                match self.artist_repo.find_by_unique_fields(conn, artist) {
+                    Ok(Some(existing_artist)) => self.artist_repo.update(conn, existing_artist.id.unwrap(), artist)?,
+                    _ => self.artist_repo.create(conn, artist)?
+                }
+            };
+            let artist_id = saved_artist.id.unwrap();
             self.artist_repo.create_track_relationship(conn, artist_id, track_id)?;
         }
-        
-        // Step 4: Create track references
+
+        // Step 4: Track references (replace all)
         self.track_repo.create_references(conn, track_id, &track.references)?;
-        
-        // Step 5: Load the complete track with all relationships for return
+
+        // Step 5: Reload full track
         self.track_repo.get_by_id(conn, track_id)
     }
+
+    /// Compares file quality of two tracks.
+    /// Currently, this is a simple comparison based on bitrate.
+    /// 
+    /// Returns true if the new track has better quality.
+    pub fn is_better_quality(&self, existing_track: &Track, new_track: &Track) -> bool {
+
+        let existing_bitrate = existing_track.get_bitrate();
+        let new_bitrate = new_track.get_bitrate();
+
+        match (existing_bitrate, new_bitrate) {
+            (Some(e), Some(n)) => n > e,
+            // if we can't determine, default to false
+            _ => false,
+        }
+    }
+    
 }

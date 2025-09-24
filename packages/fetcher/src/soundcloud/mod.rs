@@ -120,12 +120,7 @@ impl Source for Soundcloud {
             .await
             .map_err(|_| Error::NotFound(format!("Soundcloud track from {}", url).to_string()))?;
 
-        let mut track = self.get_complete_track_from_music_track(track).await;
-        let _ = self.clean_tracks_title_and_artist_name(&mut vec![&mut track]).await
-            .map_err(|e| {
-                tracing::info!("Failed to clean SoundCloud track title and artist name: {}", e);
-            });
-        Ok(track)
+        Ok(self.get_complete_track_from_music_track(track).await)
     }
 
     async fn get_tracks_from_query(&self, query: &str) -> Result<Vec<Track>, Error> {
@@ -135,20 +130,14 @@ impl Source for Soundcloud {
             .await
             .map_err(mappers::convert_error)?;
 
-        let mut tracks = join_all(
-            tracks
-                .iter()
-                .map(|track| self.get_complete_track_from_music_track(track.clone())),
+        Ok(
+            join_all(
+                tracks
+                    .iter()
+                    .map(|track| self.get_complete_track_from_music_track(track.clone())),
+            )
+        .await
         )
-        .await;
-
-        let mut tracks_refs: Vec<&mut Track> = tracks.iter_mut().collect();
-        let _ = self.clean_tracks_title_and_artist_name(&mut tracks_refs).await
-            .map_err(|e| {
-                tracing::info!("Failed to clean SoundCloud tracks title and artist name: {}", e);
-            });
-
-        Ok(tracks)
     }
 
     async fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error> {
@@ -158,29 +147,19 @@ impl Source for Soundcloud {
             .await
             .map_err(mappers::convert_error)?;
 
-        let mut tracks = join_all(
-            tracks
-                .iter()
-                .map(|track| self.get_complete_track_from_music_track(track.clone())),
+        Ok(
+            join_all(tracks.into_iter().map(|track| self.get_complete_track_from_music_track(track)))
+                .await
+                .into_iter()
+                .enumerate()
+                .map(|(i, track)| PlaylistTrack {
+                    id: None,
+                    track,
+                    added_at: None,
+                    position: Some(i as u32),
+                })
+                .collect()
         )
-        .await;
-
-        let mut tracks_refs: Vec<&mut Track> = tracks.iter_mut().collect();
-        let _ = self.clean_tracks_title_and_artist_name(&mut tracks_refs).await
-            .map_err(|e| {
-                tracing::info!("Failed to clean SoundCloud track title and artist name: {}", e);
-            });
-
-        Ok(tracks
-            .iter()
-            .enumerate()
-            .map(|(i, track)| PlaylistTrack {
-                id: None,
-                track: track.clone(),
-                added_at: None,
-                position: Some(i as u32),
-            })
-            .collect())
     }
 
     async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {

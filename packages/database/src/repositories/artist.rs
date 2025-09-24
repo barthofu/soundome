@@ -195,16 +195,33 @@ impl ArtistRepository for DieselArtistRepository {
         if artist.id.is_some() {
             return Ok(artist.clone());
         }
-        
-        // Otherwise, create the artist and its references
+        // Otherwise, create the artist and ses références
         let created_artist = self.create(conn, artist)?;
         let artist_id = created_artist.id.unwrap();
-        
         // Create artist references
         self.create_references(conn, artist_id, &artist.references)?;
-        
         // Return the created artist with references
         self.get_by_id(conn, artist_id)
+    }
+
+    fn find_by_unique_fields(&self, conn: &mut SqliteConnection, artist: &shared::models::Artist) -> SoundomeResult<Option<shared::models::Artist>> {
+        use diesel::prelude::*;
+        use crate::schema;
+        use crate::schema::artist::dsl::*;
+        let found: Option<ArtistEntity> = artist
+            .filter(name.eq(&artist.name))
+            .first::<ArtistEntity>(conn)
+            .optional()
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to find artist by unique fields: {}", err)))?;
+        if let Some(entity) = found {
+            let references: Vec<ArtistRefEntity> = schema::artist_ref::table
+                .filter(schema::artist_ref::artist_id.eq(entity.id))
+                .load(conn)
+                .unwrap_or_default();
+            Ok(Some(ArtistEntity::convert_to_domain(entity, references)))
+        } else {
+            Ok(None)
+        }
     }
 }
 

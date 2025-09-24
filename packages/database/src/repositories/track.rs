@@ -17,6 +17,75 @@ impl DieselTrackRepository {
 
 impl TrackRepository for DieselTrackRepository {
 
+
+    // =================================================================================
+    // Custom
+    // =================================================================================
+
+    fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<shared::models::Track> {
+        let track_ref = schema::track_ref::table
+            .filter(schema::track_ref::external_url.eq(url))
+            .first::<TrackRefEntity>(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get resource by url: {}",
+                    err
+                ))
+            })?;
+
+        self.get_by_id(conn, track_ref.track_id)
+    }
+
+    fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()> {
+        for reference in references {
+            let new_track_ref = NewTrackRefEntity::convert_from_domain(reference, track_id);
+            
+            diesel::insert_into(schema::track_ref::table)
+                .values(&new_track_ref)
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to create track reference: {}",
+                        erra
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
+    fn find_by_unique_fields(&self, conn: &mut SqliteConnection, track: &shared::models::Track) -> SoundomeResult<Option<shared::models::Track>> {
+        use diesel::prelude::*;
+        use crate::schema;
+        use crate::schema::track::dsl::*;
+        let mut query = track.into_boxed();
+        query = query.filter(title.eq(&track.title));
+        if let Some(album) = &track.album {
+            if let Some(album_id_val) = album.id {
+                query = query.filter(album_id.eq(album_id_val));
+            }
+        }
+        let found: Option<TrackEntity> = query
+            .first::<TrackEntity>(conn)
+            .optional()
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to find track by unique fields: {}", err)))?;
+        if let Some(entity) = found {
+            let album = super::album::find_one(conn, entity.album_id.unwrap_or_default()).ok();
+            let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+                .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+                .filter(schema::artist_tracks::track_id.eq(entity.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .unwrap_or_default();
+            let references: Vec<TrackRefEntity> = schema::track_ref::table
+                .filter(schema::track_ref::track_id.eq(entity.id))
+                .load(conn)
+                .unwrap_or_default();
+            Ok(Some(TrackEntity::convert_to_domain(entity, album, artists, references)))
+        } else {
+            Ok(None)
+        }
+    }
+
     // =================================================================================
     // CRUD
     // =================================================================================
@@ -157,41 +226,6 @@ impl TrackRepository for DieselTrackRepository {
             vec![],
             vec![],
         ))
-    }
-
-    // =================================================================================
-    // Custom
-    // =================================================================================
-
-    fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<shared::models::Track> {
-        let track_ref = schema::track_ref::table
-            .filter(schema::track_ref::external_url.eq(url))
-            .first::<TrackRefEntity>(conn)
-            .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by url: {}",
-                    err
-                ))
-            })?;
-
-        self.get_by_id(conn, track_ref.track_id)
-    }
-
-    fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()> {
-        for reference in references {
-            let new_track_ref = NewTrackRefEntity::convert_from_domain(reference, track_id);
-            
-            diesel::insert_into(schema::track_ref::table)
-                .values(&new_track_ref)
-                .execute(conn)
-                .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to create track reference: {}",
-                        err
-                    ))
-                })?;
-        }
-        Ok(())
     }
 }
 
