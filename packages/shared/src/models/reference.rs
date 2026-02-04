@@ -25,7 +25,7 @@ pub enum ReferenceType {
 
 impl ReferenceType {
     pub fn from_str(s: &str) -> Self {
-        match s {
+        match s.to_lowercase().as_str() {
             "source" => ReferenceType::Source,
             "provider" => ReferenceType::Provider,
             "metadata" => ReferenceType::Metadata,
@@ -51,7 +51,7 @@ pub enum Platform {
 
 impl Platform {
     pub fn from_str(s: &str) -> Self {
-        match s {
+        match s.to_lowercase().as_str() {
             "spotify" => Platform::Spotify,
             "soundcloud" => Platform::SoundCloud,
             "musicbrainz" => Platform::MusicBrainz,

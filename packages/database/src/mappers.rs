@@ -89,7 +89,7 @@ impl NewAlbumEntity {
     pub fn convert_from_domain(album: &shared::models::Album) -> NewAlbumEntity {
         NewAlbumEntity {
             title: album.title.clone(),
-            album_type: album.album_type.as_ref().to_string(),
+            album_type: album.album_type.as_ref().to_string().to_lowercase(),
             cover: album.cover.clone(),
             date: album.date.clone(),
         }
@@ -101,7 +101,7 @@ impl UpdateAlbumEntity {
     pub fn convert_from_domain(album: &shared::models::Album) -> UpdateAlbumEntity {
         UpdateAlbumEntity {
             title: Some(album.title.clone()),
-            album_type: Some(album.album_type.as_ref().to_string()),
+            album_type: Some(album.album_type.as_ref().to_string().to_lowercase()),
             cover: album.cover.clone(),
             date: album.date.clone(),
         }
@@ -166,8 +166,8 @@ impl NewTrackRefEntity {
     pub fn convert_from_domain(track_ref: &shared::models::Reference, track_id: i32) -> NewTrackRefEntity {
         NewTrackRefEntity {
             track_id,
-            ref_type: track_ref.ref_type.as_ref().to_string(),
-            platform: track_ref.platform.as_ref().to_string(),
+            ref_type: track_ref.ref_type.as_ref().to_string().to_lowercase(),
+            platform: track_ref.platform.as_ref().to_string().to_lowercase(),
             external_id: track_ref.external_id.clone(),
             external_url: track_ref.external_url.clone(),
         }
@@ -179,8 +179,8 @@ impl UpdateTrackRefEntity {
     pub fn convert_from_domain(track_ref: &shared::models::Reference) -> UpdateTrackRefEntity {
         UpdateTrackRefEntity {
             track_id: track_ref.id,
-            ref_type: Some(track_ref.ref_type.as_ref().to_string()),
-            platform: Some(track_ref.platform.as_ref().to_string()),
+            ref_type: Some(track_ref.ref_type.as_ref().to_string().to_lowercase()),
+            platform: Some(track_ref.platform.as_ref().to_string().to_lowercase()),
             external_id: track_ref.external_id.clone(),
             external_url: track_ref.external_url.clone(),
         }
@@ -205,8 +205,8 @@ impl NewAlbumRefEntity {
     pub fn convert_from_domain(album_ref: &shared::models::Reference, album_id: i32) -> NewAlbumRefEntity {
         NewAlbumRefEntity {
             album_id,
-            ref_type: album_ref.ref_type.as_ref().to_string(),
-            platform: album_ref.platform.as_ref().to_string(),
+            ref_type: album_ref.ref_type.as_ref().to_string().to_lowercase(),
+            platform: album_ref.platform.as_ref().to_string().to_lowercase(),
             external_id: album_ref.external_id.clone(),
             external_url: album_ref.external_url.clone(),
         }
@@ -218,8 +218,8 @@ impl UpdateAlbumRefEntity {
     pub fn convert_from_domain(album_ref: &shared::models::Reference) -> UpdateAlbumRefEntity {
         UpdateAlbumRefEntity {
             album_id: album_ref.id,
-            ref_type: Some(album_ref.ref_type.as_ref().to_string()),
-            platform: Some(album_ref.platform.as_ref().to_string()),
+            ref_type: Some(album_ref.ref_type.as_ref().to_string().to_lowercase()),
+            platform: Some(album_ref.platform.as_ref().to_string().to_lowercase()),
             external_id: album_ref.external_id.clone(),
             external_url: album_ref.external_url.clone(),
         }
@@ -244,8 +244,8 @@ impl NewArtistRefEntity {
     pub fn convert_from_domain(artist_ref: &shared::models::Reference, artist_id: i32) -> NewArtistRefEntity {
         NewArtistRefEntity {
             artist_id,
-            ref_type: artist_ref.ref_type.as_ref().to_string(),
-            platform: artist_ref.platform.as_ref().to_string(),
+            ref_type: artist_ref.ref_type.as_ref().to_string().to_lowercase(),
+            platform: artist_ref.platform.as_ref().to_string().to_lowercase(),
             external_id: artist_ref.external_id.clone(),
             external_url: artist_ref.external_url.clone(),
         }
@@ -257,8 +257,8 @@ impl UpdateArtistRefEntity {
     pub fn convert_from_domain(artist_ref: &shared::models::Reference) -> UpdateArtistRefEntity {
         UpdateArtistRefEntity {
             artist_id: artist_ref.id,
-            ref_type: Some(artist_ref.ref_type.as_ref().to_string()),
-            platform: Some(artist_ref.platform.as_ref().to_string()),
+            ref_type: Some(artist_ref.ref_type.as_ref().to_string().to_lowercase()),
+            platform: Some(artist_ref.platform.as_ref().to_string().to_lowercase()),
             external_id: artist_ref.external_id.clone(),
             external_url: artist_ref.external_url.clone(),
         }

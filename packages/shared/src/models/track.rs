@@ -333,5 +333,45 @@ impl Track {
                 self.references.push(ref_item.clone());
             }
         }
+
+        // Also merge references on nested album
+        if let Some(other_album) = &other.album {
+            match &mut self.album {
+                Some(self_album) => {
+                    for ref_item in &other_album.references {
+                        let exists = self_album.references.iter().any(|r|
+                            r.platform == ref_item.platform &&
+                            r.external_id == ref_item.external_id &&
+                            r.ref_type == ref_item.ref_type
+                        );
+                        if !exists {
+                            self_album.references.push(ref_item.clone());
+                        }
+                    }
+                }
+                None => self.album = Some(other_album.clone()),
+            }
+        }
+
+        // And merge references on artists (match by similarity)
+        const SIMILARITY_THRESHOLD: f64 = 0.8;
+        for self_artist in &mut self.artists {
+            if let Some(other_artist) = other
+                .artists
+                .iter()
+                .find(|a| a.compare(self_artist) > SIMILARITY_THRESHOLD)
+            {
+                for ref_item in &other_artist.references {
+                    let exists = self_artist.references.iter().any(|r|
+                        r.platform == ref_item.platform &&
+                        r.external_id == ref_item.external_id &&
+                        r.ref_type == ref_item.ref_type
+                    );
+                    if !exists {
+                        self_artist.references.push(ref_item.clone());
+                    }
+                }
+            }
+        }
     }
 }

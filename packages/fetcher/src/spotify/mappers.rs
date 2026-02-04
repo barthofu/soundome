@@ -25,7 +25,7 @@ pub fn convert_artist(artist: &SimplifiedArtist) -> Artist {
         icon: None,
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::Spotify,
             external_id: artist.id.as_ref().map(|id| id.to_string()),
             external_url: artist.external_urls.get("spotify").cloned(),
@@ -41,7 +41,7 @@ pub fn convert_full_artist(artist: &FullArtist) -> Artist {
         icon: artist.images.get(0).map(|image| image.url.clone()),
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::Spotify,
             external_id: Some(artist.id.to_string()),
             external_url: artist.external_urls.get("spotify").cloned(),
@@ -69,7 +69,7 @@ pub fn convert_simplified_album(album: &SimplifiedAlbum) -> Album {
         date: album.release_date.clone(),
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::Spotify,
             external_id: album.id.as_ref().map(|id| id.to_string()),
             external_url: album.external_urls.get("spotify").cloned(),
@@ -97,7 +97,7 @@ pub fn convert_full_album(album: &FullAlbum) -> Album {
         date: Some(album.release_date.clone()),
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::Spotify,
             external_id: Some(album.id.to_string()),
             external_url: album.external_urls.get("spotify").cloned(),

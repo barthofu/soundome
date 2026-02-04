@@ -51,7 +51,6 @@ impl TagProvider for MusicBrainz {
         }
 
         // Execute the query
-        // let query_result = Recording::search(query_builder.build()).execute_with_client(&self.client).await;
         let query_result = Recording::search(query_builder.build()).execute().await;
 
         // Process the results to find the best match
@@ -176,7 +175,7 @@ fn convert_to_album(release: &Release) -> Album {
             Reference {
                 id: None,
                 ref_type: ReferenceType::Metadata,
-                platform: Platform::Spotify,
+                platform: Platform::MusicBrainz,
                 external_id: Some(release.id.clone()),
                 external_url: Some("https://musicbrainz.org/release/".to_string() + &release.id),
             }
@@ -222,7 +221,7 @@ fn convert_to_track(recording: &Recording) -> Track {
             Reference {
                 id: None,
                 ref_type: ReferenceType::Metadata,
-                platform: Platform::Spotify,
+                platform: Platform::MusicBrainz,
                 external_id: Some(recording.id.clone()),
                 external_url: Some("https://musicbrainz.org/recording/".to_string() + &recording.id),
             }

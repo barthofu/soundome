@@ -29,7 +29,7 @@ pub fn convert_artist(user: &rsoundcloud::models::user::User) -> Artist {
         icon: Some(user.user.avatar_url.clone()),
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::SoundCloud,
             external_id: Some(user.user.id.to_string()),
             external_url: Some(user.user.permalink_url.clone()),
@@ -45,7 +45,7 @@ pub fn convert_basic_artist(basic_user: &rsoundcloud::models::user::BasicUser) -
         icon: Some(basic_user.avatar_url.clone()),
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::SoundCloud,
             external_id: Some(basic_user.id.to_string()),
             external_url: Some(basic_user.permalink_url.clone()),
@@ -66,7 +66,7 @@ pub fn convert_album(album_playlist: &rsoundcloud::models::playlist::AlbumPlayli
         date: album.release_date.clone(),
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::SoundCloud,
             external_id: Some(album.id.to_string()),
             external_url: Some(album.permalink_url.clone()),
@@ -89,7 +89,7 @@ pub fn convert_basic_album(
         date: album.release_date.clone(),
         references: vec![Reference {
             id: None,
-            ref_type: ReferenceType::Source,
+            ref_type: ReferenceType::Metadata,
             platform: shared::models::Platform::SoundCloud,
             external_id: Some(album.id.to_string()),
             external_url: Some(album.permalink_url.clone()),

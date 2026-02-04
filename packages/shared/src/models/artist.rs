@@ -64,7 +64,7 @@ impl Artist {
             SimilarityAlgorithm::Smart,
         );
 
-        name_similarity / 100.00
+        name_similarity
     }
     
     pub fn transpose_metadata(&mut self, other: &Artist) {

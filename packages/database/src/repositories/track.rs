@@ -1,6 +1,7 @@
 use domain::ports::repositories::TrackRepository;
 
 use diesel::prelude::*;
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use shared::{models::{Reference, Track}, types::SoundomeResult};
 
 use crate::{
@@ -50,6 +51,89 @@ impl TrackRepository for DieselTrackRepository {
                     ))
                 })?;
         }
+        Ok(())
+    }
+
+    fn set_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[Reference]) -> SoundomeResult<()> {
+        // Semantics:
+        // - Source/Provider: replace (ensure single row): delete existing of that type then insert.
+        // - Metadata/Reference: merge (insert missing only), preserving existing ids.
+        if references.is_empty() {
+            return Ok(());
+        }
+
+        // Handle Source and Provider replacement first
+        for reference in references {
+            let ref_type = reference.ref_type.as_ref().to_string().to_lowercase();
+            if ref_type == "source" || ref_type == "provider" {
+                diesel::delete(
+                    schema::track_ref::table
+                        .filter(schema::track_ref::track_id.eq(track_id))
+                        .filter(schema::track_ref::type_.eq(&ref_type)),
+                )
+                .execute(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to replace track {} reference: {}",
+                        ref_type, err
+                    ))
+                })?;
+
+                if reference.external_id.is_none() && reference.external_url.is_none() {
+                    continue;
+                }
+
+                let new_track_ref = NewTrackRefEntity::convert_from_domain(reference, track_id);
+                diesel::insert_into(schema::track_ref::table)
+                    .values(&new_track_ref)
+                    .execute(conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to create track {} reference: {}",
+                            ref_type, err
+                        ))
+                    })?;
+            }
+        }
+
+        // Then merge everything else
+        let existing: Vec<TrackRefEntity> = schema::track_ref::table
+            .filter(schema::track_ref::track_id.eq(track_id))
+            .load(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to load track references: {}", err)))?;
+
+        for reference in references {
+            let ref_type = reference.ref_type.as_ref().to_string().to_lowercase();
+            if ref_type == "source" || ref_type == "provider" {
+                continue;
+            }
+            if reference.external_id.is_none() && reference.external_url.is_none() {
+                continue;
+            }
+
+            let platform = reference.platform.as_ref().to_string().to_lowercase();
+
+            let already_exists = existing.iter().any(|r| {
+                r.ref_type.to_lowercase() == ref_type
+                    && r.platform.to_lowercase() == platform
+                    && r.external_id == reference.external_id
+                    && r.external_url == reference.external_url
+            });
+
+            if !already_exists {
+                let new_track_ref = NewTrackRefEntity::convert_from_domain(reference, track_id);
+                diesel::insert_into(schema::track_ref::table)
+                    .values(&new_track_ref)
+                    .execute(conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to create track reference: {}",
+                            err
+                        ))
+                    })?;
+            }
+        }
+
         Ok(())
     }
 

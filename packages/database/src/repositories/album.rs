@@ -58,6 +58,49 @@ impl AlbumRepository for DieselAlbumRepository {
         Ok(())
     }
 
+    fn set_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[Reference]) -> SoundomeResult<()> {
+        // Merge semantics: keep existing rows (and their ids), only insert missing refs.
+        if references.is_empty() {
+            return Ok(());
+        }
+
+        let existing: Vec<AlbumRefEntity> = schema::album_ref::table
+            .filter(schema::album_ref::album_id.eq(album_id))
+            .load(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to load album references: {}", err)))?;
+
+        for reference in references {
+            if reference.external_id.is_none() && reference.external_url.is_none() {
+                continue;
+            }
+
+            let ref_type = reference.ref_type.as_ref().to_string().to_lowercase();
+            let platform = reference.platform.as_ref().to_string().to_lowercase();
+
+            let already_exists = existing.iter().any(|r| {
+                r.ref_type.to_lowercase() == ref_type
+                    && r.platform.to_lowercase() == platform
+                    && r.external_id == reference.external_id
+                    && r.external_url == reference.external_url
+            });
+
+            if !already_exists {
+                let new_album_ref = NewAlbumRefEntity::convert_from_domain(reference, album_id);
+                diesel::insert_into(schema::album_ref::table)
+                    .values(&new_album_ref)
+                    .execute(conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to create album reference: {}",
+                            err
+                        ))
+                    })?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Album> {
         // If album already has an ID, return it as-is (ignore creation)
         if album.id.is_some() {

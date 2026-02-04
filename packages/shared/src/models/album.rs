@@ -88,7 +88,7 @@ impl Album {
 
         let release_date_similarity = if let (Some(date1), Some(date2)) = (&self.date, &other.date) {
             if date1 == date2 {
-                100.0
+                1.0
             } else {
                 0.0
             }
@@ -147,7 +147,7 @@ pub enum AlbumType {
 
 impl AlbumType {
     pub fn from_str(s: &str) -> Self {
-        match s {
+        match s.to_lowercase().as_str() {
             "album" => AlbumType::Album,
             "single" => AlbumType::Single,
             "compilation" => AlbumType::Compilation,

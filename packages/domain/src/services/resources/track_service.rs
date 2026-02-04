@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use diesel::SqliteConnection;
-use shared::{models::{Album, AlbumType, Track}, types::SoundomeResult};
+use diesel::{Connection, SqliteConnection};
+use shared::{errors::Error, models::{Album, AlbumType, ReferenceType, Track}, types::SoundomeResult};
 
 use crate::ports::repositories::{AlbumRepository, ArtistRepository, TrackRepository};
 
@@ -89,68 +89,99 @@ impl TrackService {
     /// Creates or updates a track in the database along with its associated artists, album, and references.
     /// Si une entité existe (par ID ou clé unique), elle est mise à jour, sinon créée. Les relations sont maintenues.
     pub fn create_or_update(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Track> {
-        // 1) Album
-        let album_id = if let Some(album) = &track.album {
-            let saved_album = if let Some(id) = album.id {
-                self.album_repo.update(conn, id, album)?
-            } else {
-                self.album_repo.create(conn, album)?
-            };
-            let album_id = saved_album.id.unwrap();
-
-            // Artistes de l’album
-            for artist in &album.artists {
-                let saved_artist = if let Some(id) = artist.id {
-                    self.artist_repo.update(conn, id, artist)?
+        conn.transaction(|tx| {
+            // 1) Album (+ artistes + références album)
+            let album_id_opt = if let Some(album) = &track.album {
+                // create or update album
+                let saved_album = if let Some(id) = album.id {
+                    self.album_repo.update(tx, id, album)?
                 } else {
-                    self.artist_repo.create(conn, artist)?
+                    self.album_repo.create(tx, album)?
                 };
-                let artist_id = saved_artist.id.unwrap();
-                self.artist_repo.create_album_relationship(conn, artist_id, album_id)?;
+                let album_id = saved_album.id.ok_or_else(|| Error::Internal("missing album id after create/update".into()))?;
+
+                // Upsert artists of album and collect IDs
+                let mut album_artist_ids: Vec<i32> = Vec::with_capacity(album.artists.len());
+                for artist in &album.artists {
+                    let saved_artist = if let Some(id) = artist.id {
+                        self.artist_repo.update(tx, id, artist)?
+                    } else {
+                        self.artist_repo.create(tx, artist)?
+                    };
+                    let artist_id = saved_artist.id.ok_or_else(|| Error::Internal("missing artist id after create/update".into()))?;
+                    // album/artist refs are stored as metadata only
+                    let mut refs = artist.references.clone();
+                    for r in &mut refs {
+                        r.ref_type = ReferenceType::Metadata;
+                        r.id = None;
+                    }
+                    self.artist_repo.set_references(tx, artist_id, &refs)?;
+                    album_artist_ids.push(artist_id);
+                }
+                // Replace album artists relationships only if the caller provided them
+                if !album.artists.is_empty() {
+                    self.artist_repo.set_album_artists(tx, album_id, &album_artist_ids)?;
+                }
+                // Replace/merge album references (metadata only)
+                let mut album_refs = album.references.clone();
+                for r in &mut album_refs {
+                    r.ref_type = ReferenceType::Metadata;
+                    r.id = None;
+                }
+                self.album_repo.set_references(tx, album_id, &album_refs)?;
+
+                Some(album_id)
+            } else {
+                None
+            };
+
+            // 2) Track (lier à l'album si présent)
+            let mut track_to_save = track.clone();
+            if let Some(album_id) = album_id_opt {
+                track_to_save.album = Some(Album {
+                    id: Some(album_id),
+                    title: String::new(),
+                    artists: Vec::new(),
+                    album_type: AlbumType::Album,
+                    cover: None,
+                    date: None,
+                    references: Vec::new(),
+                });
             }
 
-            Some(album_id)
-        } else {
-            None
-        };
-
-        // 2) Track
-        let mut track_to_save = track.clone();
-        if let Some(album_id) = album_id {
-            track_to_save.album = Some(Album {
-                id: Some(album_id),
-                title: String::new(),
-                artists: Vec::new(),
-                album_type: AlbumType::Album,
-                cover: None,
-                date: None,
-                references: Vec::new(),
-            });
-        }
-
-        let saved_track = if let Some(id) = track.id {
-            self.track_repo.update(conn, id, &track_to_save)?
-        } else {
-            self.track_repo.create(conn, &track_to_save)?
-        };
-        let track_id = saved_track.id.unwrap();
-
-        // 3) Artistes du track
-        for artist in &track.artists {
-            let saved_artist = if let Some(id) = artist.id {
-                self.artist_repo.update(conn, id, artist)?
+            let saved_track = if let Some(id) = track.id {
+                self.track_repo.update(tx, id, &track_to_save)?
             } else {
-                self.artist_repo.create(conn, artist)?
+                self.track_repo.create(tx, &track_to_save)?
             };
-            let artist_id = saved_artist.id.unwrap();
-            self.artist_repo.create_track_relationship(conn, artist_id, track_id)?;
-        }
+            let track_id = saved_track.id.ok_or_else(|| Error::Internal("missing track id after create/update".into()))?;
 
-        // 4) Références du track (remplacement)
-        self.track_repo.create_references(conn, track_id, &track.references)?;
+            // 3) Artistes du track (remplacement)
+            let mut track_artist_ids: Vec<i32> = Vec::with_capacity(track.artists.len());
+            for artist in &track.artists {
+                let saved_artist = if let Some(id) = artist.id {
+                    self.artist_repo.update(tx, id, artist)?
+                } else {
+                    self.artist_repo.create(tx, artist)?
+                };
+                let artist_id = saved_artist.id.ok_or_else(|| Error::Internal("missing artist id after create/update".into()))?;
+                // artist refs are stored as metadata only
+                let mut refs = artist.references.clone();
+                for r in &mut refs {
+                    r.ref_type = ReferenceType::Metadata;
+                    r.id = None;
+                }
+                self.artist_repo.set_references(tx, artist_id, &refs)?;
+                track_artist_ids.push(artist_id);
+            }
+            self.artist_repo.set_track_artists(tx, track_id, &track_artist_ids)?;
 
-        // 5) Reload complet
-        self.track_repo.get_by_id(conn, track_id)
+            // 4) Références du track (remplacement)
+            self.track_repo.set_references(tx, track_id, &track.references)?;
+
+            // 5) Reload complet
+            self.track_repo.get_by_id(tx, track_id)
+        })
     }
 
     /// Compares file quality of two tracks.

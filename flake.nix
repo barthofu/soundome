@@ -53,7 +53,7 @@
               fi
             fi
 
-            ssh -C -N -D 1080 vps.lab || true &
+            ssh -C -N -D 1080 vps.public || true &
           '';
         };
       }

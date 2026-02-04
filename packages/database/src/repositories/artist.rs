@@ -56,6 +56,49 @@ impl ArtistRepository for DieselArtistRepository {
         Ok(())
     }
 
+    fn set_references(&self, conn: &mut SqliteConnection, artist_id: i32, references: &[Reference]) -> SoundomeResult<()> {
+        // Merge semantics: keep existing rows (and their ids), only insert missing refs.
+        if references.is_empty() {
+            return Ok(());
+        }
+
+        let existing: Vec<ArtistRefEntity> = schema::artist_ref::table
+            .filter(schema::artist_ref::artist_id.eq(artist_id))
+            .load(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to load artist references: {}", err)))?;
+
+        for reference in references {
+            if reference.external_id.is_none() && reference.external_url.is_none() {
+                continue;
+            }
+
+            let ref_type = reference.ref_type.as_ref().to_string().to_lowercase();
+            let platform = reference.platform.as_ref().to_string().to_lowercase();
+
+            let already_exists = existing.iter().any(|r| {
+                r.ref_type.to_lowercase() == ref_type
+                    && r.platform.to_lowercase() == platform
+                    && r.external_id == reference.external_id
+                    && r.external_url == reference.external_url
+            });
+
+            if !already_exists {
+                let new_artist_ref = NewArtistRefEntity::convert_from_domain(reference, artist_id);
+                diesel::insert_into(schema::artist_ref::table)
+                    .values(&new_artist_ref)
+                    .execute(conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to create artist reference: {}",
+                            err
+                        ))
+                    })?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn create_track_relationship(&self, conn: &mut SqliteConnection, artist_id: i32, track_id: i32) -> SoundomeResult<()> {
         let artist_track = ArtistTrackEntity {
             track_id,
@@ -74,6 +117,22 @@ impl ArtistRepository for DieselArtistRepository {
         Ok(())
     }
 
+    fn set_track_artists(&self, conn: &mut SqliteConnection, track_id: i32, artist_ids: &[i32]) -> SoundomeResult<()> {
+        // clear existing
+        diesel::delete(schema::artist_tracks::table.filter(schema::artist_tracks::track_id.eq(track_id)))
+            .execute(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to clear artist-track relationships: {}", err)))?;
+        // insert current
+        for artist_id in artist_ids {
+            let rel = ArtistTrackEntity { track_id, artist_id: *artist_id };
+            diesel::insert_into(schema::artist_tracks::table)
+                .values(&rel)
+                .execute(conn)
+                .map_err(|err| shared::errors::Error::Database(format!("Failed to create artist-track relationship: {}", err)))?;
+        }
+        Ok(())
+    }
+
     fn create_album_relationship(&self, conn: &mut SqliteConnection, artist_id: i32, album_id: i32) -> SoundomeResult<()> {
         let artist_album = ArtistAlbumEntity {
             album_id,
@@ -89,6 +148,22 @@ impl ArtistRepository for DieselArtistRepository {
                     err
                 ))
             })?;
+        Ok(())
+    }
+
+    fn set_album_artists(&self, conn: &mut SqliteConnection, album_id: i32, artist_ids: &[i32]) -> SoundomeResult<()> {
+        // clear existing
+        diesel::delete(schema::artist_albums::table.filter(schema::artist_albums::album_id.eq(album_id)))
+            .execute(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to clear artist-album relationships: {}", err)))?;
+        // insert current
+        for artist_id in artist_ids {
+            let rel = ArtistAlbumEntity { album_id, artist_id: *artist_id };
+            diesel::insert_into(schema::artist_albums::table)
+                .values(&rel)
+                .execute(conn)
+                .map_err(|err| shared::errors::Error::Database(format!("Failed to create artist-album relationship: {}", err)))?;
+        }
         Ok(())
     }
 

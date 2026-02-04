@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-shared = { path = "../shared" }
+shared = { path = "../shared", features = ["diesel_integration"] }
 config = { path = "../config" }
 downloader = { path = "../downloader" }
 fetcher = { path = "../fetcher" }
