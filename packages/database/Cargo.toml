@@ -7,6 +7,8 @@ edition = "2021"
 shared = { path = "../shared" }
 domain = { path = "../domain" }
 
+tracing = { workspace = true }
+
 diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }
 libsqlite3-sys = { version = "0.31.0", features = ["bundled"] }
 rocket = { version = "0.5.1", features = ["json"] }

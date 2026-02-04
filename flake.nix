@@ -41,10 +41,17 @@
           LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
 
           shellHook = ''
-            export TEMPDIR="$(mktemp -d /tmp/nix-shell-12345)"
-            
-            # export PATH=$PWD/assets/bin:$HOME/.cargo/bin:$PATH
+            export TEMPDIR="$(mktemp -d /tmp/nix-shell-XXXXXX)"
             export PATH=$HOME/.cargo/bin:$PATH
+
+            if [[ ! -d data ]]; then
+              mkdir -p ./data
+              if [[ ! -f ./data/soundome.db ]]; then
+                cargo install diesel_cli --no-default-features --features sqlite
+                diesel setup
+                diesel migration run
+              fi
+            fi
 
             ssh -C -N -D 1080 vps.lab || true &
           '';

@@ -111,7 +111,7 @@ impl DownloadService {
     async fn orchestrator_workflow(&self, conn: &mut SqliteConnection, track: Track) -> SoundomeResult<Track> {
         let mut track = track;
 
-        // Step 1: Enrichissement des métadonnées via MusicBrainz
+        // Step 1: Enrich metadata
         tracing::info!("Getting metadata via MusicBrainz");
         let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track).await?;
 
@@ -121,22 +121,11 @@ impl DownloadService {
             return Ok(track);
         }
 
-        // // Step 2: Déduplication
-        // tracing::info!("Deduping track in database");
-        // let existing_track = self.dedupe_track(conn, &enriched_track).await;
-
-        // if let Some(existing_track) = existing_track {
-        //     tracing::warn!("Track already exists in DB: {}, skipping download", existing_track.display());
-        //     return Ok(existing_track);
-        // }
-
-        // Ok(enriched_track)
-
-        // Step 2: Téléchargement
+        // Step 2: Download
         tracing::info!("Searching and downloading track from provider");
         let file_path = self.download_track(&mut track).await?;
 
-        // Step 3: Déduplication
+        // Step 3: Deduplication
         if existing_track.is_none() {
             tracing::info!("Deduping track in database");
             existing_track = self.dedupe_track(conn, &track).await;
@@ -145,41 +134,32 @@ impl DownloadService {
         match existing_track {
             Some(existing_track) => {
                 tracing::info!("Existing track found in DB: {}, will compare quality", existing_track.display());
-
-                // existing_track.transpose_refs(track);
+                
+                let mut existing_track = existing_track;
+                existing_track.transpose_refs(&track);
 
                 let new_track_is_better_quality = self.track_service.is_better_quality(&existing_track, &track);
 
                 if new_track_is_better_quality {
                     tracing::warn!("New one has better quality, will replace");
-                    self.process_track(conn, existing_track, &file_path).await?;
-                    return Ok(existing_track);
+                    self.process_track_file(&mut existing_track, &file_path).await?;
+                    let updated_track = self.save_track(conn, &existing_track).await?;
+                    return Ok(updated_track);
                 } else {
                     tracing::warn!("New one has no better quality, skipping");
-                    return Ok(existing_track.clone());
+                    let updated_track = self.save_track(conn, &existing_track).await?;
+                    let _ = self.track_service.delete_track_file(&track)?;
+                    return Ok(updated_track);
                 }
             }
             None => {
-
+                tracing::info!("No existing track found in DB, processing new track");
+                // Final Step: Tagging, moving and saving in DB
+                self.process_track_file(&mut track, &file_path).await?;
+                let inserted_track = self.save_track(conn, &track).await?;
+                return Ok(inserted_track);
             }
         }
-        
-
-        // l
-        // if let Some(existing_track) = existing_track {
-        //     if new_track_is_better_quality {
-        //         tracing::warn!("A similar track exists in DB: {}, but the new one has better quality, will replace", existing_track.display());
-        //     } else {
-        //         tracing::warn!("A similar track exists in DB: {}, skipping download", existing_track.display());
-        //         return Ok(existing_track);
-        //     }
-        // }
-
-        // Final Step: Tagging, moving and saving in DB
-        tracing::info!("Tagging, moving and saving track in database");
-        track = self.process_track(conn, track, &file_path).await?;
-
-        Ok(track)
     }
 
     /// Enrich metadata using metadata providers, and deduplicate entities in DB
@@ -270,12 +250,13 @@ impl DownloadService {
         track.references.push(provider_ref.clone());
 
         // Download the track
-        let file_path = downloader::download(
-            &track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
-            &provider_ref,
-            &track.title,
-        )
-        .await?;
+        // let file_path = downloader::download(
+        //     &track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
+        //     &provider_ref,
+        //     &track.title,
+        // )
+        // .await?;
+        let file_path = PathBuf::from("/home/coder/soundome/library/Générations.mp3");
         tracing::info!("Downloaded track to {:?}", file_path);
         track.file_path = file_path.clone().into();
 
@@ -297,20 +278,20 @@ impl DownloadService {
         }
     }
 
-    async fn process_track(&self, conn: &mut SqliteConnection, track: Track, file_path: &PathBuf) -> SoundomeResult<Track> {
-        let mut track = track;
-
+    async fn process_track_file(&self, track: &mut Track, file_path: &PathBuf) -> SoundomeResult<()> {
         tagger::file::tag_file_with_track(&file_path.clone(), &track)?;
         tracing::info!("Tagged file with downloaded_track metadata");
 
         // Move the file to the correct location
         let base_library_dir = Config::get().general.base_library_dir.clone();
-        organizer::move_track_file(&mut track, &base_library_dir)?;
+        organizer::move_track_file(track, &base_library_dir)?;
 
-        // Save in the database
-        self.track_service.create_or_ignore(conn, &track)?; 
+        Ok(())
+    }
+
+    async fn save_track(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Track> {
+        let inserted_track = self.track_service.create_or_update(conn, track)?;
         tracing::info!("Saved track in the database");
-
-        Ok(track)
+        Ok(inserted_track)
     }
 }

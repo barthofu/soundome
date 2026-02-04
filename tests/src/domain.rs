@@ -23,7 +23,7 @@ async fn download_track(services: &Arc<ServiceLayer>, conn: &mut SqliteConnectio
         Err(e) => eprintln!("Error downloading track: {:?}", e),
     }
 
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    // tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let url = "https://open.spotify.com/track/0vlYmeolmAWluXfdPZskor?si=6e5b593dd5304b26";
     let res = services.download_service.download_track_from_url(url, conn).await;

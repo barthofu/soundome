@@ -290,19 +290,7 @@ impl Track {
         if let Some(val) = &other.label { self.label = Some(val.clone()); };
         
         // only add new references, do not overwrite existing ones
-        for ref_item in &other.references {
-            let reference_already_exists = self.references
-                .iter()
-                .any(|r| 
-                    r.platform == ref_item.platform && 
-                    r.external_id == ref_item.external_id && 
-                    r.ref_type == ref_item.ref_type
-                );
-
-            if !reference_already_exists {
-                self.references.push(ref_item.clone());
-            }
-        }
+        self.transpose_refs(other);
 
         // transpose album
         if let Some(val) = &other.album {
@@ -329,5 +317,21 @@ impl Track {
         //         self.artists.push(other_artist.clone());
         //     }
         // }
+    }
+
+    /// Transpose references from another track (add only new references)
+    pub fn transpose_refs(&mut self, other: &Track) {
+        for ref_item in &other.references {
+            let reference_already_exists = self.references
+                .iter()
+                .any(|r|
+                    r.platform == ref_item.platform && 
+                    r.external_id == ref_item.external_id && 
+                    r.ref_type == ref_item.ref_type
+                );
+            if !reference_already_exists {
+                self.references.push(ref_item.clone());
+            }
+        }
     }
 }

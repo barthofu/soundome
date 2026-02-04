@@ -89,6 +89,12 @@ pub enum Error {
     ExitCode { code: i32, stderr: String },
 }
 
+// impl From<diesel::result::Error> for Error {
+//     fn from(err: diesel::result::Error) -> Self {
+//         Error::Database(format!("Database error: {}", err))
+//     }
+// }
+
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::Io(err)

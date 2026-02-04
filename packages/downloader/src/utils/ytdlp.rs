@@ -10,6 +10,7 @@ pub async fn download_with_ytdlp(url: &str, file_name: &str, base_library_dir: P
     let output_path = format!("{}/{}.%(ext)s", base_library_dir, file_name);
 
     let args = build_args(url, &output_path);
+    tracing::info!("Running yt-dlp with args: {:?}", args);
     let mut child = Command::new("yt-dlp")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

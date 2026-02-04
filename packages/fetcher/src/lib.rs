@@ -44,9 +44,24 @@ impl Fetcher {
             spotify: Spotify::new(
                 &Config::get().providers.spotify.client_id,
                 &Config::get().providers.spotify.client_secret,
-            ).ok(),
-            youtube_music: YoutubeMusic::new().ok(),
-            soundcloud: Soundcloud::new().await.ok(),
+            )
+                .map_err(|e| {
+                    tracing::error!("Failed to initialize Spotify source: {:?}", e);
+                    e
+                })
+                .ok(),
+            youtube_music: YoutubeMusic::new()
+                .map_err(|e| {
+                    tracing::error!("Failed to initialize YouTube Music source: {:?}", e);
+                    e
+                })
+                .ok(),
+            soundcloud: Soundcloud::new().await
+                .map_err(|e| {
+                    tracing::error!("Failed to initialize SoundCloud source: {:?}", e);
+                    e
+                })
+                .ok(),
         }
     }
 }

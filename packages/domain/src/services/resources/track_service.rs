@@ -45,6 +45,10 @@ impl TrackService {
         self.track_repo.update(conn, id, updated_track)
     }
 
+    pub fn delete_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
+        self.track_repo.delete(conn, id)
+    }
+
     // Getters
 
     pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<Track> {
@@ -85,41 +89,32 @@ impl TrackService {
     /// Creates or updates a track in the database along with its associated artists, album, and references.
     /// Si une entité existe (par ID ou clé unique), elle est mise à jour, sinon créée. Les relations sont maintenues.
     pub fn create_or_update(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Track> {
-        // Step 1: Album (create or update)
+        // 1) Album
         let album_id = if let Some(album) = &track.album {
-            let album_to_save = album.clone();
             let saved_album = if let Some(id) = album.id {
-                // update album
-                self.album_repo.update(conn, id, &album_to_save)?
+                self.album_repo.update(conn, id, album)?
             } else {
-                // try to find by unique fields (e.g. title, artists, date)
-                match self.album_repo.find_by_unique_fields(conn, &album_to_save) {
-                    Ok(Some(existing_album)) => {
-                        self.album_repo.update(conn, existing_album.id.unwrap(), &album_to_save)?
-                    },
-                    _ => self.album_repo.create(conn, &album_to_save)?
-                }
+                self.album_repo.create(conn, album)?
             };
             let album_id = saved_album.id.unwrap();
-            // Album artists (create or update)
+
+            // Artistes de l’album
             for artist in &album.artists {
                 let saved_artist = if let Some(id) = artist.id {
                     self.artist_repo.update(conn, id, artist)?
                 } else {
-                    match self.artist_repo.find_by_unique_fields(conn, artist) {
-                        Ok(Some(existing_artist)) => self.artist_repo.update(conn, existing_artist.id.unwrap(), artist)?,
-                        _ => self.artist_repo.create(conn, artist)?
-                    }
+                    self.artist_repo.create(conn, artist)?
                 };
                 let artist_id = saved_artist.id.unwrap();
                 self.artist_repo.create_album_relationship(conn, artist_id, album_id)?;
             }
+
             Some(album_id)
         } else {
             None
         };
 
-        // Step 2: Track (create or update)
+        // 2) Track
         let mut track_to_save = track.clone();
         if let Some(album_id) = album_id {
             track_to_save.album = Some(Album {
@@ -132,34 +127,29 @@ impl TrackService {
                 references: Vec::new(),
             });
         }
+
         let saved_track = if let Some(id) = track.id {
             self.track_repo.update(conn, id, &track_to_save)?
         } else {
-            match self.track_repo.find_by_unique_fields(conn, &track_to_save) {
-                Ok(Some(existing_track)) => self.track_repo.update(conn, existing_track.id.unwrap(), &track_to_save)?,
-                _ => self.track_repo.create(conn, &track_to_save)?
-            }
+            self.track_repo.create(conn, &track_to_save)?
         };
         let track_id = saved_track.id.unwrap();
 
-        // Step 3: Track artists (create or update)
+        // 3) Artistes du track
         for artist in &track.artists {
             let saved_artist = if let Some(id) = artist.id {
                 self.artist_repo.update(conn, id, artist)?
             } else {
-                match self.artist_repo.find_by_unique_fields(conn, artist) {
-                    Ok(Some(existing_artist)) => self.artist_repo.update(conn, existing_artist.id.unwrap(), artist)?,
-                    _ => self.artist_repo.create(conn, artist)?
-                }
+                self.artist_repo.create(conn, artist)?
             };
             let artist_id = saved_artist.id.unwrap();
             self.artist_repo.create_track_relationship(conn, artist_id, track_id)?;
         }
 
-        // Step 4: Track references (replace all)
+        // 4) Références du track (remplacement)
         self.track_repo.create_references(conn, track_id, &track.references)?;
 
-        // Step 5: Reload full track
+        // 5) Reload complet
         self.track_repo.get_by_id(conn, track_id)
     }
 
@@ -177,6 +167,17 @@ impl TrackService {
             // if we can't determine, default to false
             _ => false,
         }
+    }
+
+    /// Delete track file
+    pub fn delete_track_file(&self, track: &Track) -> SoundomeResult<bool> {
+        let file_deleted = if let Some(file_path) = &track.file_path {
+            std::fs::remove_file(file_path).is_ok()
+        } else {
+            false
+        };
+        
+        Ok(file_deleted)
     }
     
 }
