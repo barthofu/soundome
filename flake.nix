@@ -41,7 +41,7 @@
           LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
 
           shellHook = ''
-            export TEMPDIR="$(mktemp -d /tmp/nix-shell-XXXXXX)"
+            # export TEMPDIR="$(mktemp -d /tmp/nix-shell-XXXXXX)"
             export PATH=$HOME/.cargo/bin:$PATH
 
             if [[ ! -d data ]]; then
@@ -53,7 +53,8 @@
               fi
             fi
 
-            ssh -C -N -D 1080 vps.public || true &
+            # Been moved to .zshrc
+            # ssh -C -N -D 1080 vps.public || true &
           '';
         };
       }

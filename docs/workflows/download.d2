@@ -52,10 +52,36 @@ search_and_download: "Search and download track from provider" {
     style.fill: "lightgreen"
 }
 
+# Refs policy
+refs_policy: "Refs policy\n- Track: Source + Provider + Metadata\n- Album/Artist: Metadata only" {
+    shape: note
+    style.fill: "lightyellow"
+}
+
+normalize_refs: "Normalize refs\n(album/artist => Metadata only)" {
+    shape: oval
+    style.fill: "lightgreen"
+}
+
 # Step 6: Déduplication qualité
 check_duplicate_quality: "Check duplicate by name/artist/year\nand compare quality if needed" {
     shape: diamond
     style.fill: "yellow"
+}
+
+dedupe_existing: "Existing track found\nMerge new refs" {
+    shape: oval
+    style.fill: "lightgreen"
+}
+
+audio_replace: "If new audio is better\n- replace file\n- swap Track Source/Provider\n- demote old Source/Provider => Metadata" {
+    shape: oval
+    style.fill: "lightgreen"
+}
+
+audio_keep: "If existing audio is better\n- keep file\n- demote NEW Track Source/Provider => Metadata\n- keep Track Source/Provider unchanged" {
+    shape: oval
+    style.fill: "lightgreen"
 }
 
 # Step 7: Organisation
@@ -126,22 +152,33 @@ get_track_info_from_url -> check_album_artists_in_db: "track object"
 
 check_album_artists_in_db -> enrich_musicbrainz: "track object (with/without IDs)"
 
+refs_policy -> normalize_refs: "applies to"
+
 enrich_musicbrainz -> score_matching: "results"
 
 score_matching -> check_musicbrainz_ref: "if full match"
 score_matching -> web_validation: "if partial match"
+score_matching -> normalize_refs: "if no match"
 
 
-check_musicbrainz_ref -> search_and_download: "if exists (use & dedupe quality)"
-check_musicbrainz_ref -> search_and_download: "if not exists (transpose & continue)"
+check_musicbrainz_ref -> normalize_refs: "if exists (use & dedupe quality)"
+check_musicbrainz_ref -> normalize_refs: "if not exists (transpose & continue)"
 
-web_validation -> search_and_download: "after validation"
+web_validation -> normalize_refs: "after validation"
+
+normalize_refs -> search_and_download: "ready"
 
 search_and_download -> fs_cache: "download"
 fs_cache -> check_duplicate_quality: "downloaded file"
 
-check_duplicate_quality -> stop: "if existing better quality"
-check_duplicate_quality -> move_and_organize: "if new version better/unique"
+check_duplicate_quality -> dedupe_existing: "if duplicate"
+check_duplicate_quality -> move_and_organize: "if unique"
+
+dedupe_existing -> audio_keep: "if existing better"
+dedupe_existing -> audio_replace: "if new better"
+
+audio_keep -> save_to_db: "save merged refs"
+audio_replace -> move_and_organize: "replace file + update refs"
 
 move_and_organize -> fs_library: "organized file"
 move_and_organize -> tag_track: "file path"
