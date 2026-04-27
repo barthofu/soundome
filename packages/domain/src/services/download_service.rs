@@ -121,7 +121,9 @@ impl DownloadService {
         // TODO: temporary, see Class level todo comment
         if should_validate {
             tracing::warn!("Stopping workflow - marked for validation");
-            return Ok(track);
+            track.needs_validation = true;
+            let saved_track = self.save_track(conn, &track).await?;
+            return Ok(saved_track);
         }
 
         // Step 2: Download
@@ -254,15 +256,21 @@ impl DownloadService {
 
             track.transpose_metadata(&matched_track);
             Ok((false, None)) // no need to validate
-        } else if let Match::Partial(_) = best_match {
-            // TODO: Handle partial match -> no transpose, but associate MusicBrainz ref and mark as "to validate"
-            tracing::warn!("Partial match found from MusicBrainz");
-            Ok((true, None)) // should validate
+        } else if let Match::Partial(matched_track) = best_match {
+            // Partial match: keep current (source) metadata, but attach MusicBrainz IDs/URLs for later review.
+            tracing::warn!("Partial match found from MusicBrainz - will mark for validation");
+
+            track.transpose_refs(&matched_track);
+            track.needs_validation = true;
+            track.validation_reason = Some("musicbrainz_partial_match".to_string());
+
+            Ok((true, None))
         } else {
             // TODO: No match -> mark as "to validate"
             tracing::warn!("No match found from MusicBrainz");
-            // TODO: change to true
-            Ok((true, None)) // should validate
+            track.needs_validation = true;
+            track.validation_reason = Some("musicbrainz_no_match".to_string());
+            Ok((true, None))
         }
     }
 

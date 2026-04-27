@@ -203,6 +203,8 @@ fn convert_to_track(recording: &Recording) -> Track {
 
     Track {
         id: None,
+        needs_validation: false,
+        validation_reason: None,
         title: recording.title.clone(),
         artists,
         album,

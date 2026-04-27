@@ -19,6 +19,9 @@ pub struct TrackEntity {
     pub genre: Option<String>,
     pub cover: Option<String>,
     pub file_path: Option<String>,
+
+    pub needs_validation: bool,
+    pub validation_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize, JsonSchema)]
@@ -34,6 +37,9 @@ pub struct NewTrackEntity {
     pub genre: Option<String>,
     pub cover: Option<String>,
     pub file_path: Option<String>,
+
+    pub needs_validation: bool,
+    pub validation_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, AsChangeset, Deserialize, JsonSchema)]
@@ -49,6 +55,9 @@ pub struct UpdateTrackEntity {
     pub genre: Option<String>,
     pub cover: Option<String>,
     pub file_path: Option<String>,
+
+    pub needs_validation: Option<bool>,
+    pub validation_reason: Option<String>,
 }
 
 // ================================================================================================

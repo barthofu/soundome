@@ -18,6 +18,7 @@ pub trait TrackRepository: Send + Sync {
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &Track) -> SoundomeResult<Track>;
     fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
 
+    fn get_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>>;
     fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Track>;
     fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
     /// Replace all references for a track (delete existing, then insert provided ones)

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use config::Config;
 use database::repositories;
 use domain::{ports::repositories::RepositoryLayer, services::ServiceLayer};
-use rocket::{catchers, launch};
+use rocket::{catchers, fs::FileServer, launch};
 use rocket_okapi::{
     openapi_get_routes,
     swagger_ui::{make_swagger_ui, SwaggerUIConfig},
@@ -60,6 +60,7 @@ fn rocket() -> _ {
             openapi_get_routes![
                 routes::misc::index,
                 routes::misc::get_all,
+                routes::validations::get_pending,
                 // routes::tracks::get,
                 // routes::tracks::get_all,
                 // routes::tracks::create,
@@ -77,4 +78,5 @@ fn rocket() -> _ {
         )
         // .mount("/api", routes![routes::audio::stream,])
         .mount("/swagger", make_swagger_ui(&get_docs()))
+        .mount("/", FileServer::from("data/web"))
 }

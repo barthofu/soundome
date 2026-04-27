@@ -55,6 +55,10 @@ impl TrackService {
         self.track_repo.get_by_url(conn, url).ok()
     }
 
+    pub fn get_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
+        self.track_repo.get_pending_validations(conn)
+    }
+
     // Custom
 
     /// Finds a track by comparing title and artists using a similarity metric.

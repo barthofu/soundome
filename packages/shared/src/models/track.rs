@@ -73,6 +73,10 @@ impl TrackProvider {
 pub struct Track {
     pub id: Option<i32>,
 
+    // Validation (for later manual review in the web UI)
+    pub needs_validation: bool,
+    pub validation_reason: Option<String>,
+
     // Audio metadata
     pub title: String,
     pub artists: Vec<Artist>,

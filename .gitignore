@@ -4,6 +4,10 @@
 # build
 target/
 
+# node
+node_modules/
+dist/
+
 # secrets
 .env
 

@@ -105,6 +105,8 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
 
     Track {
         id: None,
+        needs_validation: false,
+        validation_reason: None,
         title: tag
             .title()
             .map_or("Unknown".to_string(), |title| title.to_string()),

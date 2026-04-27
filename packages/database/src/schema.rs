@@ -95,6 +95,8 @@ diesel::table! {
         genre -> Nullable<Text>,
         cover -> Nullable<Text>,
         file_path -> Nullable<Text>,
+        needs_validation -> Bool,
+        validation_reason -> Nullable<Text>,
     }
 }
 

@@ -106,6 +106,8 @@ pub fn convert_track(
     let track = &track.track;
     Track {
         id: None,
+        needs_validation: false,
+        validation_reason: None,
         title: track.title.clone(),
         artists: vec![convert_basic_artist(&user)],
         album: album.as_ref().map(|a| convert_basic_album(&a)),

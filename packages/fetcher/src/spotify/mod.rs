@@ -5,13 +5,14 @@ use std::env;
 use async_trait::async_trait;
 use config::Config;
 use rspotify::{
-    model::{AlbumId, ArtistId, PlaylistId, SearchResult, SearchType, TrackId},
+    model::{AlbumId, ArtistId, Country, Market, PlaylistId, SearchResult, SearchType, TrackId},
     prelude::BaseClient,
     ClientCredsSpotify, Credentials,
 };
 use shared::{
     errors::Error, http::ProxyRotator, models::{Album, Artist, PlaylistTrack, Track}, types::SoundomeResult
 };
+use tracing::error;
 
 use crate::Source;
 
@@ -68,8 +69,11 @@ impl Source for Spotify {
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
         let track = self
             .client
-            .track(id, None)
-            .map_err(|_| Error::NotFound(format!("Spotify track from {}", url).to_string()))?;
+            .track(id, Some(Market::Country(Country::France)))
+            .map_err(|e| {
+                error!("Spotify API error for track {}: {}", url, e);
+                Error::NotFound(format!("Spotify track from {}", url).to_string())
+            })?;
         Ok(mappers::convert_track(&track))
     }
 

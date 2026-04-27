@@ -112,6 +112,8 @@ pub fn convert_track(track: &FullTrack) -> Track {
 
     Track {
         id: None,
+        needs_validation: false,
+        validation_reason: None,
         title: track.name.clone(),
         artists,
         album: Some(convert_simplified_album(album)),

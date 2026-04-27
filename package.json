@@ -3,8 +3,23 @@
   "version": "0.1.0",
   "description": "",
   "scripts": {
+    "dev": "concurrently \"pnpm web:dev\" \"pnpm server:dev\"",
+    "build": "pnpm web:build && pnpm server:build",
+    "web:dev": "pnpm --filter @soundome/web dev",
+    "web:build": "pnpm --filter @soundome/web build",
+    "web:check": "pnpm --filter @soundome/web check",
+    "server:dev": "cargo run -p soundome-server",
+    "server:build": "cargo build -p soundome-server --release",
+    "cargo:build": "cargo build --workspace",
+    "cargo:build:release": "cargo build --workspace --release",
+    "cargo:test": "cargo test -q",
+    "cargo:clippy": "cargo clippy --workspace --all-targets",
+    "cargo:fmt": "cargo fmt"
   },
   "keywords": [],
   "author": "dev.bartho@gmail.com",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }

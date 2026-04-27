@@ -10,13 +10,13 @@ ai = { path = "../ai" }
 
 tracing = { workspace = true }
 
-rspotify = { version = "0.15.3", default-features = false, features = [
+rspotify = { version = "0.16.0", default-features = false, features = [
   "env-file",
   "client-ureq",
   "ureq-rustls-tls",
 ] }
 rustypipe = "0.11.4"
-rsoundcloud = { version = "0.2.5" }
+rsoundcloud = { version = "0.2.6" }
 # rsoundcloud = { path = "../../../rsoundcloud" } # for local testing purposes
 
 futures = "0.3.31"

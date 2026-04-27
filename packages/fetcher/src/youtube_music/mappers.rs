@@ -123,6 +123,8 @@ pub fn convert_track(
 ) -> Track {
     Track {
         id: None,
+        needs_validation: false,
+        validation_reason: None,
         title: track.name.clone(),
         artists: artists.iter().map(convert_artist).collect(),
         album: album.as_ref().map(|a| convert_album(a)),

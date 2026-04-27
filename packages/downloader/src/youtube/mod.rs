@@ -86,6 +86,8 @@ impl Youtube<'_> {
         match search_item {
             SearchItem::Video(video) => Some(Track {
                 id: None,
+                needs_validation: false,
+                validation_reason: None,
                 title: video.title,
                 artists: vec![Artist {
                     id: None,

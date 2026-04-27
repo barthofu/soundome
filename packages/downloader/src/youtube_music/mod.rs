@@ -59,6 +59,8 @@ impl YoutubeMusic {
     fn convert_search_item_to_track(&self, search_item: TrackItem) -> Track {
         Track {
             id: None,
+            needs_validation: false,
+            validation_reason: None,
             title: search_item.name,
             artists: search_item
                 .artists

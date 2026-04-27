@@ -13,6 +13,8 @@ impl TrackEntity {
     pub fn convert_to_domain(track_entity: TrackEntity, album: Option<AlbumEntity>, artists: Vec<ArtistEntity>, references: Vec<TrackRefEntity>) -> shared::models::Track {
         shared::models::Track {
             id: Some(track_entity.id),
+            needs_validation: track_entity.needs_validation,
+            validation_reason: track_entity.validation_reason,
             title: track_entity.title,
             duration: track_entity.duration,
             track_number: track_entity.track_number,
@@ -43,6 +45,8 @@ impl NewTrackEntity {
             genre: track.genre.clone(),
             cover: track.cover.clone(),
             file_path: track.file_path.clone().map(|p| p.to_string_lossy().to_string()),
+            needs_validation: track.needs_validation,
+            validation_reason: track.validation_reason.clone(),
         }
     }
 }
@@ -61,6 +65,8 @@ impl UpdateTrackEntity {
             genre: track.genre.clone(),
             cover: track.cover.clone(),
             file_path: track.file_path.clone().map(|p| p.to_string_lossy().to_string()),
+            needs_validation: Some(track.needs_validation),
+            validation_reason: track.validation_reason.clone(),
         }
     }
 }
