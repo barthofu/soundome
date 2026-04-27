@@ -1,0 +1,57 @@
+use std::sync::Arc;
+
+use diesel::SqliteConnection;
+
+use crate::ports::repositories::TaskRepository;
+use shared::models::{Task, TaskStatus, TaskType};
+
+pub struct TaskService {
+    task_repo: Arc<dyn TaskRepository + Send + Sync>,
+}
+
+impl TaskService {
+    pub fn new(task_repo: Arc<dyn TaskRepository + Send + Sync>) -> Self {
+        Self { task_repo }
+    }
+
+    pub fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<Task> {
+        self.task_repo.get_by_id(conn, id)
+    }
+
+    pub fn get_all(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<Vec<Task>> {
+        self.task_repo.get_all(conn)
+    }
+
+    /// Create a new pending task for a playlist sync.
+    pub fn create_playlist_sync(&self, conn: &mut SqliteConnection, url: &str, label: Option<String>) -> shared::types::SoundomeResult<Task> {
+        let task = Task {
+            id: None,
+            task_type: TaskType::SyncPlaylist,
+            status: TaskStatus::Pending,
+            payload: serde_json::json!({ "url": url }).to_string(),
+            label,
+            progress: 0,
+            total: None,
+            error: None,
+            created_at: None,
+            updated_at: None,
+        };
+        self.task_repo.create(conn, &task)
+    }
+
+    pub fn set_running(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
+        self.task_repo.set_running(conn, id)
+    }
+
+    pub fn update_progress(&self, conn: &mut SqliteConnection, id: i32, progress: i32, total: i32) -> shared::types::SoundomeResult<()> {
+        self.task_repo.update_progress(conn, id, progress, total)
+    }
+
+    pub fn set_completed(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
+        self.task_repo.set_completed(conn, id)
+    }
+
+    pub fn set_failed(&self, conn: &mut SqliteConnection, id: i32, error: &str) -> shared::types::SoundomeResult<()> {
+        self.task_repo.set_failed(conn, id, error)
+    }
+}

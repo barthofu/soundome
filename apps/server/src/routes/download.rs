@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use config::Config;
 use domain::services::ServiceLayer;
 use rocket::{http::Status, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tokio::runtime::Handle;
 
 use crate::utils::{database::Db, error::CustomError};
 
@@ -46,6 +48,7 @@ fn is_playlist_url(url: &str) -> bool {
 // Routes
 // ================================================================================================
 
+/// Download a single track (synchronous) or start a background playlist sync (returns a task_id).
 #[openapi]
 #[post("/download", format = "json", data = "<body>")]
 pub async fn download(
@@ -57,32 +60,77 @@ pub async fn download(
     let services = Arc::clone(services);
 
     if is_playlist_url(&url) {
-        let tracks = db
+        // --- Async path: create task, spawn background thread, return task_id immediately ---
+
+        let url_clone = url.clone();
+        let services_for_db = services.clone();
+        let task = db
             .run(move |conn| {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(services.download_service.sync_playlist_from_url(&url, conn))
-                })
+                services_for_db.task_service.create_playlist_sync(conn, &url_clone, None)
             })
             .await
             .map_err(|err| {
                 crate::utils::error::Error::Custom(CustomError {
                     status: Status::InternalServerError,
-                    code: "DownloadFailed".to_string(),
+                    code: "TaskCreateFailed".to_string(),
                     message: err.to_string(),
                 })
             })?;
 
-        let downloaded = tracks.len();
+        let task_id = task.id.expect("created task must have an id");
+        let db_url = Config::get().database.url.clone();
+
+        // Spawn a dedicated OS thread with its own single-threaded Tokio runtime.
+        // This avoids `Send` constraints on `&mut SqliteConnection` across `.await` points.
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build background tokio runtime");
+
+            rt.block_on(async move {
+                let conn = &mut database::init_connection(&db_url);
+
+                if let Err(e) = services.task_service.set_running(conn, task_id) {
+                    tracing::error!("Failed to set task {} as running: {}", task_id, e);
+                }
+
+                match services
+                    .download_service
+                    .sync_playlist_from_url(&url, conn, Some(task_id))
+                    .await
+                {
+                    Ok(_) => {
+                        if let Err(e) = services.task_service.set_completed(conn, task_id) {
+                            tracing::error!("Failed to mark task {} as completed: {}", task_id, e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Playlist sync task {} failed: {}", task_id, e);
+                        if let Err(e2) =
+                            services.task_service.set_failed(conn, task_id, &e.to_string())
+                        {
+                            tracing::error!(
+                                "Failed to mark task {} as failed: {}",
+                                task_id,
+                                e2
+                            );
+                        }
+                    }
+                }
+            });
+        });
+
         Ok(Json(serde_json::json!({
             "type": "playlist",
-            "downloaded": downloaded,
+            "task_id": task_id,
         })))
     } else {
+        // --- Sync path: single track download, block until done ---
         let track = db
             .run(move |conn| {
                 tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
+                    Handle::current()
                         .block_on(services.download_service.download_track_from_url(&url, conn))
                 })
             })

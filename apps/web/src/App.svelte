@@ -1,31 +1,38 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getPendingCount } from './lib/api';
+  import { getPendingCount, getActiveTasksCount } from './lib/api';
   import Home from './pages/Home.svelte';
   import Validations from './pages/Validations.svelte';
+  import Tasks from './pages/Tasks.svelte';
 
-  type Page = 'home' | 'validations';
+  type Page = 'home' | 'validations' | 'tasks';
 
   let page: Page = $state('home');
   let pendingCount = $state(0);
+  let activeTasksCount = $state(0);
 
-  async function refreshCount() {
+  async function refreshCounts() {
     try {
       pendingCount = await getPendingCount();
     } catch {
       // API might not be up yet in dev
     }
+    try {
+      activeTasksCount = await getActiveTasksCount();
+    } catch {
+      // ignore
+    }
   }
 
   onMount(() => {
-    refreshCount();
-    const interval = setInterval(refreshCount, 30_000);
+    refreshCounts();
+    const interval = setInterval(refreshCounts, 5_000);
     return () => clearInterval(interval);
   });
 
   function navigate(to: Page) {
     page = to;
-    if (to === 'validations') refreshCount();
+    if (to === 'validations') refreshCounts();
   }
 </script>
 
@@ -49,14 +56,30 @@
         <span class="badge">{pendingCount}</span>
       {/if}
     </button>
+    <button
+      class="nav-link"
+      class:active={page === 'tasks'}
+      onclick={() => navigate('tasks')}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      Tasks
+      {#if activeTasksCount > 0}
+        <span class="badge">{activeTasksCount}</span>
+      {/if}
+    </button>
   </div>
 </nav>
 
 <main>
   {#if page === 'home'}
-    <Home />
+    <Home onNavigateTasks={() => navigate('tasks')} />
+  {:else if page === 'validations'}
+    <Validations onDownloaded={refreshCounts} />
   {:else}
-    <Validations onDownloaded={refreshCount} />
+    <Tasks />
   {/if}
 </main>
 

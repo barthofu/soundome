@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use shared::models::{Album, AlbumType, Platform};
 
-use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewTrackEntity, NewTrackRefEntity, PlaylistEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
+use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewTaskEntity, NewTrackEntity, NewTrackRefEntity, PlaylistEntity, TaskEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
 
 // ================================================================================================
 // Track
@@ -306,6 +306,40 @@ impl NewPlaylistEntity {
             source_url: playlist.source_url.clone(),
             cover: playlist.cover.clone(),
             last_sync: Some(chrono::Utc::now().naive_utc()),
+        }
+    }
+}
+
+// ================================================================================================
+// Task
+// ================================================================================================
+
+impl TaskEntity {
+    pub fn convert_to_domain(entity: TaskEntity) -> shared::models::Task {
+        shared::models::Task {
+            id: Some(entity.id),
+            task_type: shared::models::TaskType::from_str(&entity.task_type),
+            status: shared::models::TaskStatus::from_str(&entity.status),
+            payload: entity.payload,
+            label: entity.label,
+            progress: entity.progress,
+            total: entity.total,
+            error: entity.error,
+            created_at: Some(entity.created_at),
+            updated_at: Some(entity.updated_at),
+        }
+    }
+}
+
+impl NewTaskEntity {
+    pub fn convert_from_domain(task: &shared::models::Task) -> NewTaskEntity {
+        NewTaskEntity {
+            task_type: task.task_type.as_ref().to_string(),
+            status: task.status.as_ref().to_string(),
+            payload: task.payload.clone(),
+            label: task.label.clone(),
+            progress: task.progress,
+            total: task.total,
         }
     }
 }

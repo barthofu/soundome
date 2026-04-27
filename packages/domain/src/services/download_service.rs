@@ -7,13 +7,14 @@ use shared::{errors::Error, models::{Album, AlbumType, Artist, Track}, types::So
 use shared::models::ReferenceType;
 use tagger::TagProvider;
 
-use super::{album_service::AlbumService, artist_service::ArtistService, playlist_service::PlaylistService, track_service::{TrackService, ValidationPatch}};
+use super::{album_service::AlbumService, artist_service::ArtistService, playlist_service::PlaylistService, task_service::TaskService, track_service::{TrackService, ValidationPatch}};
 
 pub struct DownloadService {
     track_service: Arc<TrackService>,
     album_service: Arc<AlbumService>,
     artist_service: Arc<ArtistService>,
     playlist_service: Arc<PlaylistService>,
+    task_service: Arc<TaskService>,
 }
 
 // TODO: manage "to validate" tracks
@@ -23,12 +24,14 @@ impl DownloadService {
         album_service: Arc<AlbumService>,
         artist_service: Arc<ArtistService>,
         playlist_service: Arc<PlaylistService>,
+        task_service: Arc<TaskService>,
     ) -> Self {
         Self { 
             track_service,
             album_service,
             artist_service,
             playlist_service,
+            task_service,
         }
     }
 
@@ -53,8 +56,9 @@ impl DownloadService {
         Ok(final_track)
     } 
 
-    /// Main entry point for downloading a playlist from a given URL (from any supported platform)
-    pub async fn sync_playlist_from_url(&self, url: &str, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
+    /// Main entry point for downloading a playlist from a given URL (from any supported platform).
+    /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
+    pub async fn sync_playlist_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>) -> SoundomeResult<Vec<Track>> {
         tracing::info!("====================\nDownloading playlist from {:?}\n---------", url);
 
         let fetcher = Fetcher::new().await;
@@ -95,6 +99,12 @@ impl DownloadService {
                     tracing::error!("Failed to link existing track {} to playlist: {}", track_id, e);
                 }
                 existing_count += 1;
+                if let Some(tid) = task_id {
+                    let current = (existing_count) as i32;
+                    if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                        tracing::warn!("Failed to update task progress: {}", e);
+                    }
+                }
             } else {
                 new_tracks.push((position, track.clone()));
             }
@@ -124,6 +134,12 @@ impl DownloadService {
                     new_processed_tracks.push(t);
                 },
                 Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e)
+            }
+            if let Some(tid) = task_id {
+                let current = (existing_count as i32) + (i as i32) + 1;
+                if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                    tracing::warn!("Failed to update task progress: {}", e);
+                }
             }
         }
 

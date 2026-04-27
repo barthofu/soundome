@@ -1,4 +1,4 @@
-import type { PendingValidationDto, PatchValidationBody } from './types';
+import type { PendingValidationDto, PatchValidationBody, TaskDto } from './types';
 
 const BASE = '/api';
 
@@ -46,7 +46,7 @@ export type DownloadResultTrack = {
 
 export type DownloadResultPlaylist = {
   type: 'playlist';
-  downloaded: number;
+  task_id: number;
 };
 
 export type DownloadResult = DownloadResultTrack | DownloadResultPlaylist;
@@ -79,4 +79,15 @@ export async function getRecentTracks(limit = 20): Promise<RecentTrack[]> {
   const res = await fetch(`${BASE}/tracks/recent?limit=${limit}`);
   if (!res.ok) throw new Error(`Failed to fetch recent tracks: ${res.statusText}`);
   return res.json();
+}
+
+export async function getTasks(): Promise<TaskDto[]> {
+  const res = await fetch(`${BASE}/tasks`);
+  if (!res.ok) throw new Error(`Failed to fetch tasks: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getActiveTasksCount(): Promise<number> {
+  const tasks = await getTasks();
+  return tasks.filter((t) => t.status === 'Pending' || t.status === 'Running').length;
 }

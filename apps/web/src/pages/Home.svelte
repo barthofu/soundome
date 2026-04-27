@@ -3,6 +3,8 @@
   import { downloadUrl, getRecentTracks } from '../lib/api';
   import type { DownloadResult, RecentTrack } from '../lib/api';
 
+  let { onNavigateTasks = undefined }: { onNavigateTasks?: () => void } = $props();
+
   let url = $state('');
   let loading = $state(false);
   let result: DownloadResult | null = $state(null);
@@ -87,7 +89,11 @@
       </div>
     {:else}
       <div class="feedback success">
-        ✓ Playlist synced — <strong>{result.downloaded}</strong> track{result.downloaded > 1 ? 's' : ''} downloaded
+        ✓ Playlist syncing —
+        {#if onNavigateTasks}
+          <button class="tasks-link" onclick={onNavigateTasks}>view tasks</button>
+        {/if}
+        (task #{result.task_id})
       </div>
     {/if}
   {/if}
@@ -368,5 +374,15 @@
     font-size: 0.75rem;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
+  }
+
+  .tasks-link {
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
   }
 </style>

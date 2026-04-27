@@ -44,3 +44,18 @@ export interface PatchValidationBody {
   disc_number?: number;
   label?: string;
 }
+
+export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+export type TaskType = 'SyncPlaylist' | 'DownloadTrack';
+
+export interface TaskDto {
+  id: number;
+  task_type: TaskType;
+  status: TaskStatus;
+  label: string | null;
+  progress: number;
+  total: number | null;
+  error: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}

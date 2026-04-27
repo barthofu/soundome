@@ -40,12 +40,14 @@ fn rocket() -> _ {
     let album_repo = Arc::new(repositories::album::DieselAlbumRepository::new());
     let artist_repo = Arc::new(repositories::artist::DieselArtistRepository::new());
     let playlist_repo = Arc::new(repositories::playlist::DieselPlaylistRepository::new());
+    let task_repo = Arc::new(repositories::task::DieselTaskRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),
         album: album_repo.clone(),
         artist: artist_repo.clone(),
         playlist: playlist_repo.clone(),
+        task: task_repo.clone(),
     });
 
     let services = Arc::new(ServiceLayer::new(repositories));
@@ -67,6 +69,8 @@ fn rocket() -> _ {
                 routes::validations::approve_validation,
                 routes::validations::reject_validation,
                 routes::download::download,
+                routes::tasks::get_all,
+                routes::tasks::get_by_id,
                 // routes::tracks::get,
                 // routes::tracks::get_all,
                 // routes::tracks::create,

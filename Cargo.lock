@@ -805,6 +805,7 @@ dependencies = [
  "downloader",
  "fetcher",
  "organizer",
+ "serde_json",
  "shared",
  "tagger",
  "tokio",

@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use diesel::SqliteConnection;
-use shared::{models::{Album, Artist, Playlist, Track}, types::SoundomeResult};
+use shared::{models::{Album, Artist, Playlist, Task, Track}, types::SoundomeResult};
 
 pub struct RepositoryLayer {
     pub track: Arc<dyn TrackRepository>,
     pub album: Arc<dyn AlbumRepository>,
     pub artist: Arc<dyn ArtistRepository>,
     pub playlist: Arc<dyn PlaylistRepository>,
+    pub task: Arc<dyn TaskRepository>,
 }
 
 // ================================================================================================
@@ -76,4 +77,16 @@ pub trait PlaylistRepository: Send + Sync {
     fn update_last_sync(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     /// Link a track to a playlist. Silently ignores duplicate entries.
     fn add_track(&self, conn: &mut SqliteConnection, playlist_id: i32, track_id: i32, position: Option<i32>) -> SoundomeResult<()>;
+}
+
+// ================================================================================================
+
+pub trait TaskRepository: Send + Sync {
+    fn create(&self, conn: &mut SqliteConnection, task: &Task) -> SoundomeResult<Task>;
+    fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Task>;
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Task>>;
+    fn set_running(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
+    fn update_progress(&self, conn: &mut SqliteConnection, id: i32, progress: i32, total: i32) -> SoundomeResult<()>;
+    fn set_completed(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
+    fn set_failed(&self, conn: &mut SqliteConnection, id: i32, error: &str) -> SoundomeResult<()>;
 }

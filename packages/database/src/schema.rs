@@ -83,6 +83,21 @@ diesel::table! {
 }
 
 diesel::table! {
+    task (id) {
+        id -> Integer,
+        task_type -> Text,
+        status -> Text,
+        payload -> Text,
+        label -> Nullable<Text>,
+        progress -> Integer,
+        total -> Nullable<Integer>,
+        error -> Nullable<Text>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     track (id) {
         id -> Integer,
         title -> Text,
@@ -142,6 +157,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     genre,
     playlist,
     playlist_tracks,
+    task,
     track,
     track_genres,
     track_ref,
