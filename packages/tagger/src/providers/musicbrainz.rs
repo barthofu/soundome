@@ -216,7 +216,7 @@ fn convert_to_track(recording: &Recording) -> Track {
         track_number: Some(track_number),
         disc_number: None,
         cover: None,
-        duration: recording.length.map(|length| length as i32),
+        duration: recording.length.map(|length| length as i32 / 1000),
         label: None,
         file_path: None,
         references: vec![

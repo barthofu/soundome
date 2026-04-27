@@ -18,6 +18,7 @@ dist/
 data/
 !data/.gitkeep
 library/
+temp/
 
 # misc
 tmp/

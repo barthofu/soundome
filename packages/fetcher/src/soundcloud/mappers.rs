@@ -126,7 +126,7 @@ pub fn convert_track(
         }),
         disc_number: None,
         label: track.label_name.clone(),
-        date: track.release_date.clone(),
+        date: track.release_date.clone().or(Some(track.display_date.clone())),
         cover: track.artwork_url.clone(),
         references: vec![Reference {
             id: None,

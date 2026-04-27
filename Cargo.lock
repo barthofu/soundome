@@ -207,6 +207,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bandcamp"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc8f990cfc739590270d0413b821f09b28505d442204fd0f3fd99196df394d52"
+dependencies = [
+ "chrono",
+ "lazy_static",
+ "regex",
+ "reqwest 0.12.23",
+ "serde",
+ "serde_json",
+ "snafu",
+ "url",
+]
+
+[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3992,6 +4008,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
+name = "snafu"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e84b3f4eacbf3a1ce05eac6763b4d629d60cbc94d632e4092c54ade71f1e1a2"
+dependencies = [
+ "snafu-derive",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
 name = "socket2"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4381,6 +4418,7 @@ name = "tagger"
 version = "0.1.0"
 dependencies = [
  "audiotags",
+ "bandcamp",
  "chrono",
  "config 0.1.0",
  "id3",

@@ -2,6 +2,11 @@
 base_library_dir = "./library"
 temp_download_dir = "./temp"
 
+[tagger]
+# Metadata providers to use, in priority order.
+# Supported values: "musicbrainz", "bandcamp"
+metadata_providers = ["musicbrainz", "bandcamp"]
+
 [logs]
 level = "info" # Options: "error", "warn", "info", "debug", "trace"
 enable_reqwest_logging = false

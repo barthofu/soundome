@@ -95,6 +95,10 @@
   function artistNames(): string {
     return track.artists.map((a) => a.name).join(', ') || '—';
   }
+
+  let sourceUrl = $derived(
+    track.references.find((r) => r.ref_type === 'Source' && r.external_url)?.external_url ?? null
+  );
 </script>
 
 <article class="track-card" class:editing>
@@ -147,7 +151,11 @@
     {:else}
       <div class="info">
         <div class="row main">
-          <span class="title">{track.title}</span>
+          {#if sourceUrl}
+            <a class="title" href={sourceUrl} target="_blank" rel="noopener noreferrer">{track.title}</a>
+          {:else}
+            <span class="title">{track.title}</span>
+          {/if}
           <span class="artists">{artistNames()}</span>
         </div>
 
@@ -274,6 +282,15 @@
   .title {
     font-weight: 600;
     font-size: 1rem;
+  }
+
+  a.title {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a.title:hover {
+    text-decoration: underline;
   }
 
   .artists {

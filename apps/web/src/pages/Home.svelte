@@ -114,7 +114,7 @@
       <p class="status-msg">No tracks yet.</p>
     {:else}
       <ul class="track-list">
-        {#each recentTracks as track (track.id)}
+        {#each recentTracks.filter((t) => !t.needs_validation) as track (track.id)}
           <li class="track-row">
             <div class="cover">
               {#if track.cover}

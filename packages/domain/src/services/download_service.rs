@@ -228,7 +228,7 @@ impl DownloadService {
         let mut track = track;
 
         // Step 1: Enrich metadata
-        tracing::info!("Getting metadata via MusicBrainz");
+        tracing::info!("Getting metadata via tagger providers");
         let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track).await?;
 
         // Step 2: Always download to staging so the file is ready whenever validation happens
@@ -321,16 +321,13 @@ impl DownloadService {
             }
         }
 
-        // Get MusicBrainz metadata
-        let musicbrainz = tagger::providers::musicbrainz::MusicBrainz::new();
-        let best_match = musicbrainz
-            .get_best_match_from_track(&track)
-            .await;
+        // Get metadata from all enabled providers
+        let best_match = tagger::enricher::get_best_match_from_track(&track).await;
 
         // Apply best match metadata
         if let Match::Exact(matched_track) = best_match {
-            // TODO: Check if MusicBrainz ref already exists in DB, if yes then apply references recursively to track and unfound album/artists
-            tracing::info!("Exact match found from MusicBrainz: {:?}", matched_track.get_metadata().and_then(|m| m.external_url));
+            // TODO: Check if ref already exists in DB, if yes then apply references recursively to track and unfound album/artists
+            tracing::info!("Exact match found from metadata provider: {:?}", matched_track.get_metadata().and_then(|m| m.external_url));
             // find for existing tracks in the database 
 
             if let Some(mb_ref) = matched_track.get_metadata().and_then(|s| s.external_url.clone()) {
@@ -369,18 +366,18 @@ impl DownloadService {
             Ok((false, None)) // no need to validate
         } else if let Match::Partial(matched_track) = best_match {
             // Partial match: keep current (source) metadata, but attach MusicBrainz IDs/URLs for later review.
-            tracing::warn!("Partial match found from MusicBrainz - will mark for validation");
+            tracing::warn!("Partial match found from metadata providers - will mark for validation");
 
             track.transpose_refs(&matched_track);
             track.needs_validation = true;
-            track.validation_reason = Some("musicbrainz_partial_match".to_string());
+            track.validation_reason = Some("metadata_partial_match".to_string());
 
             Ok((true, None))
         } else {
             // TODO: No match -> mark as "to validate"
-            tracing::warn!("No match found from MusicBrainz");
+            tracing::warn!("No match found from metadata providers");
             track.needs_validation = true;
-            track.validation_reason = Some("musicbrainz_no_match".to_string());
+            track.validation_reason = Some("metadata_no_match".to_string());
             Ok((true, None))
         }
     }

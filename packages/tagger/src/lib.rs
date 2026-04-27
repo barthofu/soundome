@@ -1,5 +1,6 @@
 use shared::{models::Track, utils::enums::Match};
 
+pub mod enricher;
 pub mod file;
 pub mod providers;
 

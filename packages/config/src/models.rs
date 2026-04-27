@@ -9,6 +9,8 @@ pub struct Config {
     pub providers: ProvidersConfig,
     pub ai: AiConfig,
     pub proxy: Option<ProxyConfig>,
+    #[serde(default)]
+    pub tagger: TaggerConfig,
 }
 
 // ===============================================================================
@@ -88,6 +90,33 @@ pub struct OpenRouterConfig {
     pub provider: Option<String>,
     pub base_url: Option<String>,
     pub timeout: Option<u64>,
+}
+
+// ===============================================================================
+// Tagger
+// ===============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
+pub struct TaggerConfig {
+    /// List of enabled metadata provider names, in priority order.
+    /// Supported values: "musicbrainz", "bandcamp"
+    #[serde(default = "TaggerConfig::default_providers")]
+    pub metadata_providers: Vec<String>,
+}
+
+impl Default for TaggerConfig {
+    fn default() -> Self {
+        Self {
+            metadata_providers: Self::default_providers(),
+        }
+    }
+}
+
+impl TaggerConfig {
+    fn default_providers() -> Vec<String> {
+        vec!["musicbrainz".to_string()]
+    }
 }
 
 // ===============================================================================

@@ -46,6 +46,7 @@ pub enum Platform {
     MusicBrainz,
     YoutubeMusic,
     Youtube,
+    Bandcamp,
     Unknown
 }
 
@@ -57,6 +58,7 @@ impl Platform {
             "musicbrainz" => Platform::MusicBrainz,
             "youtube_music" => Platform::YoutubeMusic,
             "youtube" => Platform::Youtube,
+            "bandcamp" => Platform::Bandcamp,
             _ => Platform::Unknown,
         }
     }
