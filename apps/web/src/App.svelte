@@ -4,8 +4,9 @@
   import Home from './pages/Home.svelte';
   import Validations from './pages/Validations.svelte';
   import Tasks from './pages/Tasks.svelte';
+  import Library from './pages/Library.svelte';
 
-  type Page = 'home' | 'validations' | 'tasks';
+  type Page = 'home' | 'validations' | 'tasks' | 'library';
 
   let page: Page = $state('home');
   let pendingCount = $state(0);
@@ -48,6 +49,13 @@
     </button>
     <button
       class="nav-link"
+      class:active={page === 'library'}
+      onclick={() => navigate('library')}
+    >
+      Library
+    </button>
+    <button
+      class="nav-link"
       class:active={page === 'validations'}
       onclick={() => navigate('validations')}
     >
@@ -76,6 +84,8 @@
 <main>
   {#if page === 'home'}
     <Home onNavigateTasks={() => navigate('tasks')} />
+  {:else if page === 'library'}
+    <Library />
   {:else if page === 'validations'}
     <Validations onDownloaded={refreshCounts} />
   {:else}

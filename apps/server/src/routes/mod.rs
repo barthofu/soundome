@@ -6,6 +6,6 @@ pub mod download;
 pub mod tasks;
 
 /* resources */
-// pub mod artists;
-// pub mod audio;
-// pub mod tracks;
+pub mod albums;
+pub mod artists;
+pub mod tracks;

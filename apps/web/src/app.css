@@ -32,3 +32,77 @@ code {
   padding: 0.1em 0.35em;
   border-radius: 3px;
 }
+
+/* ── Library shared UI ──────────────────────────────────────────────────── */
+.btn-header { padding: 0.4rem 1rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; font-size: 0.875rem; font-family: inherit; }
+.btn-header:hover { background: var(--surface-2); }
+.btn-edit { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-edit:hover { background: var(--surface-2); }
+.btn-delete { background: transparent; color: var(--error); border: 1px solid var(--error); }
+.btn-delete:hover { background: color-mix(in srgb, var(--error) 12%, transparent); }
+.btn-save { background: var(--accent); color: #fff; border: none; padding: 0.4rem 1.1rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem; font-family: inherit; font-weight: 500; }
+.btn-save:hover:not(:disabled) { opacity: 0.9; }
+.btn-save:disabled { opacity: 0.5; cursor: default; }
+.btn-cancel { background: var(--surface); color: var(--muted); border: 1px solid var(--border); padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem; font-family: inherit; }
+.btn-cancel:hover { background: var(--surface-2); }
+.actions button { padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-right: 0.3rem; font-family: inherit; transition: background 0.15s, color 0.15s; }
+
+.toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.search { flex: 1; min-width: 180px; max-width: 280px; padding: 0.4rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.875rem; font-family: inherit; }
+.search::placeholder { color: var(--muted); }
+.search:focus { outline: none; border-color: var(--accent); }
+.count { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
+.filter-group { display: flex; gap: 0.25rem; }
+.filter-btn { padding: 0.25rem 0.7rem; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem; transition: all 0.15s; font-family: inherit; }
+.filter-btn:hover { border-color: var(--text); color: var(--text); }
+.filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mini-badge { background: var(--warning); color: #000; border-radius: 10px; padding: 0 0.3rem; font-size: 0.7rem; font-weight: 700; }
+.view-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.view-toggle button { background: transparent; border: none; padding: 0.3rem 0.5rem; color: var(--muted); cursor: pointer; display: flex; align-items: center; transition: background 0.1s, color 0.1s; }
+.view-toggle button:hover { background: var(--surface-2); color: var(--text); }
+.view-toggle button.active { background: var(--surface-2); color: var(--accent); }
+
+.table-wrap { overflow-x: auto; }
+.table-wrap table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.table-wrap thead th { text-align: left; padding: 0.5rem 0.75rem; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.col-actions { width: 140px; }
+.table-wrap tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.table-wrap tbody tr:hover { background: var(--surface); }
+.table-wrap tbody tr.needs-validation { background: color-mix(in srgb, var(--warning) 6%, transparent); }
+.table-wrap td { padding: 0.55rem 0.75rem; vertical-align: middle; }
+.table-wrap td.muted { color: var(--muted); }
+.table-wrap td.mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.8rem; }
+.title-cell { font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
+.title-link { font-weight: 500; cursor: pointer; }
+.title-link:hover { color: var(--accent); text-decoration: underline; }
+.actions { white-space: nowrap; }
+
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.85rem; }
+.card-grid.compact { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative; transition: border-color 0.15s, box-shadow 0.15s; }
+.card.clickable { cursor: pointer; }
+.card.clickable:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.card.warn-border { border-color: color-mix(in srgb, var(--warning) 50%, transparent); }
+.card-hover-actions { position: absolute; top: 0.4rem; right: 0.4rem; display: flex; flex-direction: column; gap: 0.25rem; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+.card:hover .card-hover-actions { opacity: 1; pointer-events: auto; }
+.card-hover-actions button { padding: 0.2rem 0.45rem; border-radius: 4px; border: 1px solid transparent; cursor: pointer; font-size: 0.75rem; font-family: inherit; backdrop-filter: blur(6px); }
+.card-hover-actions .btn-edit { background: color-mix(in srgb, var(--surface-2) 92%, transparent); color: var(--text); border-color: var(--border); }
+.card-hover-actions .btn-edit:hover { background: var(--surface-2); }
+.card-hover-actions .btn-delete { background: color-mix(in srgb, var(--error) 20%, transparent); color: var(--error); border-color: var(--error); }
+.card-hover-actions .btn-delete:hover { background: color-mix(in srgb, var(--error) 30%, transparent); }
+.cover-wrap { aspect-ratio: 1; overflow: hidden; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+.cover-wrap.artist-avatar { border-radius: 50%; }
+.cover-img { width: 100%; height: 100%; object-fit: cover; }
+.cover-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--border); }
+.cover-ph svg { width: 36%; height: 36%; }
+.card-body { padding: 0.55rem 0.65rem 0.65rem; }
+.card-title { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-sub { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.1rem; }
+.card-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+.card-meta.mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+.card-badge { position: absolute; top: 0.4rem; left: 0.4rem; }
+
+.badge-warn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--warning); color: #000; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+.section-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); margin-bottom: 0.75rem; }
+.status { text-align: center; color: var(--muted); padding: 3rem 0; }
+.status.error { color: var(--error); }

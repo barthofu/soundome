@@ -40,4 +40,8 @@ impl ArtistService {
     pub fn create_or_ignore(&self, conn: &mut SqliteConnection, artist: &shared::models::Artist) -> shared::types::SoundomeResult<shared::models::Artist> {
         self.artist_repo.create_or_ignore(conn, artist)
     }
+
+    pub fn delete_by_id(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
+        self.artist_repo.delete(conn, id)
+    }
 }

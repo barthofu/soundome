@@ -1,4 +1,14 @@
-import type { PendingValidationDto, PatchValidationBody, TaskDto } from './types';
+import type {
+  PendingValidationDto,
+  PatchValidationBody,
+  TaskDto,
+  LibraryTrackDto,
+  UpdateTrackBody,
+  LibraryAlbumDto,
+  UpdateAlbumBody,
+  LibraryArtistDto,
+  UpdateArtistBody,
+} from './types';
 
 const BASE = '/api';
 
@@ -91,3 +101,97 @@ export async function getActiveTasksCount(): Promise<number> {
   const tasks = await getTasks();
   return tasks.filter((t) => t.status === 'Pending' || t.status === 'Running').length;
 }
+
+// ================================================================================================
+// Library — Tracks
+// ================================================================================================
+
+export async function getTracks(): Promise<LibraryTrackDto[]> {
+  const res = await fetch(`${BASE}/tracks`);
+  if (!res.ok) throw new Error(`Failed to fetch tracks: ${res.statusText}`);
+  return res.json();
+}
+
+export async function updateTrack(id: number, body: UpdateTrackBody): Promise<LibraryTrackDto> {
+  const res = await fetch(`${BASE}/tracks/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function deleteTrack(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/tracks/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
+// ================================================================================================
+// Library — Albums
+// ================================================================================================
+
+export async function getAlbums(): Promise<LibraryAlbumDto[]> {
+  const res = await fetch(`${BASE}/albums`);
+  if (!res.ok) throw new Error(`Failed to fetch albums: ${res.statusText}`);
+  return res.json();
+}
+
+export async function updateAlbum(id: number, body: UpdateAlbumBody): Promise<LibraryAlbumDto> {
+  const res = await fetch(`${BASE}/albums/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function deleteAlbum(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/albums/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
+// ================================================================================================
+// Library — Artists
+// ================================================================================================
+
+export async function getArtists(): Promise<LibraryArtistDto[]> {
+  const res = await fetch(`${BASE}/artists`);
+  if (!res.ok) throw new Error(`Failed to fetch artists: ${res.statusText}`);
+  return res.json();
+}
+
+export async function updateArtist(id: number, body: UpdateArtistBody): Promise<LibraryArtistDto> {
+  const res = await fetch(`${BASE}/artists/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function deleteArtist(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/artists/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+

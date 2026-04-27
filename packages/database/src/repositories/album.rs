@@ -150,6 +150,46 @@ impl AlbumRepository for DieselAlbumRepository {
     // CRUD
     // =================================================================================
 
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Album>> {
+        let albums: Vec<AlbumEntity> = schema::album::table
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get all albums: {}",
+                    err
+                ))
+            })?;
+
+        let mut result = Vec::new();
+        for album in albums {
+            let artists: Vec<ArtistEntity> = schema::artist_albums::table
+                .inner_join(schema::artist::table.on(schema::artist_albums::artist_id.eq(schema::artist::id)))
+                .filter(schema::artist_albums::album_id.eq(album.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get album artists: {}",
+                        err
+                    ))
+                })?;
+
+            let references: Vec<AlbumRefEntity> = schema::album_ref::table
+                .filter(schema::album_ref::album_id.eq(album.id))
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get album references: {}",
+                        err
+                    ))
+                })?;
+
+            result.push(AlbumEntity::convert_to_domain(album, artists, references));
+        }
+
+        Ok(result)
+    }
+
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Album> {
         let album: AlbumEntity = schema::album::table
             .filter(schema::album::id.eq(id))

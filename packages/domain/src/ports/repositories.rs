@@ -32,6 +32,7 @@ pub trait TrackRepository: Send + Sync {
 
 pub trait AlbumRepository: Send + Sync {
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Album>;
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Album>>;
     fn create(&self, conn: &mut SqliteConnection, new_album: &Album) -> SoundomeResult<Album>;
     fn update(&self, conn: &mut SqliteConnection, id: i32, updated_album: &Album) -> SoundomeResult<Album>;
     fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;

@@ -27,12 +27,20 @@ impl AlbumService {
         self.album_repo.get_by_id(conn, id)
     }
 
+    pub fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<shared::models::Album>> {
+        self.album_repo.get_all(conn)
+    }
+
     pub fn create(&self, conn: &mut SqliteConnection, new_album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {
         self.album_repo.create(conn, new_album)
     }
 
     pub fn update(&self, conn: &mut SqliteConnection, id: i32, updated_album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {
         self.album_repo.update(conn, id, updated_album)
+    }
+
+    pub fn delete_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
+        self.album_repo.delete(conn, id)
     }
 
     // Getters
