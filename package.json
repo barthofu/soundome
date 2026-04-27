@@ -14,7 +14,8 @@
     "cargo:build:release": "cargo build --workspace --release",
     "cargo:test": "cargo test -q",
     "cargo:clippy": "cargo clippy --workspace --all-targets",
-    "cargo:fmt": "cargo fmt"
+    "cargo:fmt": "cargo fmt",
+    "reset": "rm -rf data/soundome.db* && rm -rf library && diesel setup"
   },
   "keywords": [],
   "author": "dev.bartho@gmail.com",

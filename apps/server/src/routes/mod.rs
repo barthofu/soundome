@@ -2,6 +2,7 @@
 pub mod errors;
 pub mod misc;
 pub mod validations;
+pub mod download;
 
 /* resources */
 // pub mod artists;

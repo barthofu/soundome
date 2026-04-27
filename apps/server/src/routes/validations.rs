@@ -132,3 +132,36 @@ pub async fn get_pending(
         })
     })
 }
+
+#[openapi]
+#[get("/tracks/recent?<limit>")]
+pub async fn get_recent(
+    limit: Option<i64>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<PendingValidationDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let limit = limit.unwrap_or(20).min(100);
+
+    db.run(move |conn| {
+        services
+            .track_service
+            .get_recent(conn, limit)
+    })
+    .await
+    .map(|tracks| {
+        Json(
+            tracks
+                .into_iter()
+                .filter_map(PendingValidationDto::from_track)
+                .collect(),
+        )
+    })
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
+}

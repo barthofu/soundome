@@ -3,6 +3,11 @@
   import TrackCard from '../lib/TrackCard.svelte';
   import type { PendingValidationDto } from '../lib/types';
 
+  interface Props {
+    onDownloaded?: () => void;
+  }
+  let { onDownloaded }: Props = $props();
+
   let tracks: PendingValidationDto[] = $state([]);
   let loading = $state(true);
   let error: string | null = $state(null);

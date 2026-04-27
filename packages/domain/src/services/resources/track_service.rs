@@ -55,6 +55,10 @@ impl TrackService {
         self.track_repo.get_by_url(conn, url).ok()
     }
 
+    pub fn get_recent(&self, conn: &mut SqliteConnection, limit: i64) -> SoundomeResult<Vec<Track>> {
+        self.track_repo.get_recent(conn, limit)
+    }
+
     pub fn get_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
         self.track_repo.get_pending_validations(conn)
     }

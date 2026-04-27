@@ -23,6 +23,57 @@ impl TrackRepository for DieselTrackRepository {
     // Custom
     // =================================================================================
 
+    fn get_recent(&self, conn: &mut SqliteConnection, limit: i64) -> SoundomeResult<Vec<Track>> {
+        let tracks: Vec<TrackEntity> = schema::track::table
+            .order(schema::track::id.desc())
+            .limit(limit)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get recent tracks: {}",
+                    err
+                ))
+            })?;
+
+        let mut result = Vec::new();
+        for track in tracks {
+            let album = if let Some(album_id) = track.album_id {
+                schema::album::table
+                    .filter(schema::album::id.eq(album_id))
+                    .first::<AlbumEntity>(conn)
+                    .ok()
+            } else {
+                None
+            };
+
+            let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+                .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+                .filter(schema::artist_tracks::track_id.eq(track.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get recent tracks: {}",
+                        err
+                    ))
+                })?;
+
+            let references: Vec<TrackRefEntity> = schema::track_ref::table
+                .filter(schema::track_ref::track_id.eq(track.id))
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get recent tracks: {}",
+                        err
+                    ))
+                })?;
+
+            result.push(TrackEntity::convert_to_domain(track, album, artists, references));
+        }
+
+        Ok(result)
+    }
+
     fn get_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
         let tracks: Vec<TrackEntity> = schema::track::table
             .filter(schema::track::needs_validation.eq(true))
