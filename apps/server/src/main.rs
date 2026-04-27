@@ -62,6 +62,8 @@ fn rocket() -> _ {
                 routes::misc::get_all,
                 routes::validations::get_pending,
                 routes::validations::get_recent,
+                routes::validations::approve_validation,
+                routes::validations::reject_validation,
                 routes::download::download,
                 // routes::tracks::get,
                 // routes::tracks::get_all,

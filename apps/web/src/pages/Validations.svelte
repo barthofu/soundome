@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { getPendingValidations } from '../lib/api';
+  import { getPendingValidations, approveValidation, rejectValidation } from '../lib/api';
   import TrackCard from '../lib/TrackCard.svelte';
   import type { PendingValidationDto } from '../lib/types';
+  import type { PatchValidationBody } from '../lib/types';
 
   interface Props {
     onDownloaded?: () => void;
@@ -27,6 +28,18 @@
   $effect(() => {
     load();
   });
+
+  async function handleApprove(id: number, patch: PatchValidationBody) {
+    await approveValidation(id, patch);
+    tracks = tracks.filter((t) => t.id !== id);
+    onDownloaded?.();
+  }
+
+  async function handleReject(id: number) {
+    await rejectValidation(id);
+    tracks = tracks.filter((t) => t.id !== id);
+    onDownloaded?.();
+  }
 </script>
 
 <div class="page">
@@ -48,7 +61,7 @@
     <ul class="track-list">
       {#each tracks as track (track.id)}
         <li>
-          <TrackCard {track} />
+          <TrackCard {track} onApprove={handleApprove} onReject={handleReject} />
         </li>
       {/each}
     </ul>

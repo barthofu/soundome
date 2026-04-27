@@ -92,6 +92,7 @@ pub async fn download(
     source: &Reference,
     provider: &Reference,
     track_title: &str,
+    output_dir: PathBuf,
 ) -> SoundomeResult<PathBuf> {
     if source.ref_type != ReferenceType::Source {
         return Err(Error::Custom(
@@ -121,7 +122,7 @@ pub async fn download(
             );
 
             youtube
-                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
+                .download(&url, &track_title, output_dir)
                 .await
         }
         Platform::Youtube => {
@@ -134,19 +135,19 @@ pub async fn download(
                     .flatten(),
             );
             youtube
-                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
+                .download(&url, &track_title, output_dir)
                 .await
         }
         Platform::YoutubeMusic => {
             let mut youtube_music = youtube_music::YoutubeMusic::new();
             youtube_music
-                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
+                .download(&url, &track_title, output_dir)
                 .await
         }
         Platform::SoundCloud => {
             let mut soundcloud = soundcloud::SoundCloud::new().await?;
             soundcloud
-                .download(&url, &track_title, PathBuf::from(&Config::get().general.base_library_dir))
+                .download(&url, &track_title, output_dir)
                 .await
         }
         _ => Err(Error::Unknown),

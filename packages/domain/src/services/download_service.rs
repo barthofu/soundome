@@ -3,11 +3,11 @@ use std::{path::PathBuf, sync::Arc};
 use config::Config;
 use diesel::SqliteConnection;
 use fetcher::{Fetcher, Source};
-use shared::{errors::Error, models::Track, types::SoundomeResult, utils::enums::Match};
+use shared::{errors::Error, models::{Album, AlbumType, Artist, Track}, types::SoundomeResult, utils::enums::Match};
 use shared::models::ReferenceType;
 use tagger::TagProvider;
 
-use super::{album_service::AlbumService, artist_service::ArtistService, track_service::TrackService};
+use super::{album_service::AlbumService, artist_service::ArtistService, track_service::{TrackService, ValidationPatch}};
 
 pub struct DownloadService {
     track_service: Arc<TrackService>,
@@ -111,6 +111,72 @@ impl DownloadService {
     // == Sub private and utils methods
     // ============================================================================================
 
+    /// Called after a user approves a pending validation through the web UI.
+    ///
+    /// The track already has an audio file in the staging folder (downloaded at fetch time).
+    /// This method applies the optional metadata `patch`, tags the staged file, moves it
+    /// to the library, and clears the validation flag.
+    pub async fn finalize_validated_track(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        patch: ValidationPatch,
+    ) -> SoundomeResult<Track> {
+        // 1. Load current track from DB
+        let mut track = self.track_service.get_by_id(conn, id)?;
+
+        // 2. Apply metadata patch
+        if let Some(title) = patch.title { track.title = title; }
+        if let Some(genre) = patch.genre { track.genre = Some(genre); }
+        if let Some(date) = patch.date { track.date = Some(date); }
+        if let Some(tn) = patch.track_number { track.track_number = Some(tn); }
+        if let Some(dn) = patch.disc_number { track.disc_number = Some(dn); }
+        if let Some(label) = patch.label { track.label = Some(label); }
+
+        if let Some(names) = patch.artists {
+            let mut artists: Vec<Artist> = Vec::with_capacity(names.len());
+            for name in names {
+                let artist = Artist { id: None, name, icon: None, references: vec![] };
+                let saved = self.artist_service.create_or_ignore(conn, &artist)?;
+                artists.push(saved);
+            }
+            track.artists = artists;
+        }
+
+        if let Some(album_title) = patch.album_title {
+            match track.album.as_mut() {
+                Some(album) => album.title = album_title,
+                None => {
+                    track.album = Some(Album {
+                        id: None,
+                        title: album_title,
+                        artists: vec![],
+                        album_type: AlbumType::Album,
+                        cover: None,
+                        date: None,
+                        references: vec![],
+                    });
+                }
+            }
+        }
+
+        // 3. Tag the staged file and move to library (file was downloaded at fetch time)
+        let file_path = track.file_path.clone().ok_or_else(|| {
+            Error::Custom(format!("track {} has no staged file — cannot finalize", id))
+        })?;
+        self.process_track_file(&mut track, &file_path).await?;
+
+        // 4. Clear validation flag and persist
+        track.needs_validation = false;
+        track.validation_reason = None;
+
+        self.save_track(conn, &track).await
+    }
+
+    // ============================================================================================
+    // == Sub private and utils methods (internal)
+    // ============================================================================================
+
     async fn orchestrator_workflow(&self, conn: &mut SqliteConnection, track: Track) -> SoundomeResult<Track> {
         let mut track = track;
 
@@ -118,17 +184,15 @@ impl DownloadService {
         tracing::info!("Getting metadata via MusicBrainz");
         let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track).await?;
 
-        // TODO: temporary, see Class level todo comment
+        // Step 2: Always download to staging so the file is ready whenever validation happens
+        tracing::info!("Searching and downloading track from provider (staging)");
+        let file_path = self.download_track(&mut track).await?;
+
         if should_validate {
-            tracing::warn!("Stopping workflow - marked for validation");
-            track.needs_validation = true;
+            tracing::warn!("Track marked for validation — saved with staging file_path, skipping tag/organize");
             let saved_track = self.save_track(conn, &track).await?;
             return Ok(saved_track);
         }
-
-        // Step 2: Download
-        tracing::info!("Searching and downloading track from provider");
-        let file_path = self.download_track(&mut track).await?;
 
         // Step 3: Deduplication
         if existing_track.is_none() {
@@ -277,21 +341,25 @@ impl DownloadService {
     /// Searches for the best download URL and downloads the track
     /// 
     /// Returns the downloaded track with updated references and file_path
+    /// Searches for the best download URL and downloads the track to the staging folder.
+    /// The staging path is stored in `track.file_path`.
     async fn download_track(&self, track: &mut Track) -> SoundomeResult<PathBuf> {
         // Get the best download URL
         let provider_ref = downloader::search(&track).await?;
         tracing::info!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
         track.references.push(provider_ref.clone());
 
-        // Download the track
+        let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
+
+        // Download the track to staging
         let file_path = downloader::download(
             &track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
             &provider_ref,
             &track.title,
+            staging_dir,
         )
         .await?;
-        // let file_path = PathBuf::from("/home/coder/soundome/library/Générations.mp3");
-        tracing::info!("Downloaded track to {:?}", file_path);
+        tracing::info!("Downloaded track to staging: {:?}", file_path);
         track.file_path = file_path.clone().into();
 
         Ok(file_path)

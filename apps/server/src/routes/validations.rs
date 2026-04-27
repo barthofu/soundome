@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use domain::services::ServiceLayer;
-use rocket::{get, http::Status, serde::json::Json};
+use domain::services::{track_service::ValidationPatch, ServiceLayer};
+use rocket::{delete, get, http::Status, patch, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use shared::models::{Reference, Track};
 
 use crate::utils::{database::Db, error::CustomError};
@@ -99,6 +99,23 @@ fn reference_to_dto(r: Reference) -> ReferenceDto {
 }
 
 // ================================================================================================
+// Approve / Reject DTOs
+// ================================================================================================
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ApproveValidationBody {
+    pub title: Option<String>,
+    /// Replace track artists by name (comma-separated split handled client-side).
+    pub artists: Option<Vec<String>>,
+    pub album_title: Option<String>,
+    pub genre: Option<String>,
+    pub date: Option<String>,
+    pub track_number: Option<i32>,
+    pub disc_number: Option<i32>,
+    pub label: Option<String>,
+}
+
+// ================================================================================================
 // Routes
 // ================================================================================================
 
@@ -131,6 +148,69 @@ pub async fn get_pending(
             message: err.to_string(),
         })
     })
+}
+
+#[openapi]
+#[patch("/validations/<id>", data = "<body>")]
+pub async fn approve_validation(
+    id: i32,
+    body: Json<ApproveValidationBody>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<PendingValidationDto>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let body = body.into_inner();
+
+    db.run(move |conn| {
+        let patch = ValidationPatch {
+            title: body.title,
+            artists: body.artists,
+            album_title: body.album_title,
+            genre: body.genre,
+            date: body.date,
+            track_number: body.track_number,
+            disc_number: body.disc_number,
+            label: body.label,
+        };
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(services.download_service.finalize_validated_track(conn, id, patch))
+        })
+    })
+    .await
+    .and_then(|track| {
+        PendingValidationDto::from_track(track)
+            .ok_or_else(|| shared::errors::Error::Internal("track has no id after validation".into()))
+    })
+    .map(Json)
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
+}
+
+#[openapi]
+#[delete("/validations/<id>")]
+pub async fn reject_validation(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<serde_json::Value>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    db.run(move |conn| services.track_service.delete_by_id(conn, id))
+        .await
+        .map(|_| Json(serde_json::json!({ "deleted": true })))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }
 
 #[openapi]

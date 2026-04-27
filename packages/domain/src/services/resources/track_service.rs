@@ -1,9 +1,24 @@
 use std::sync::Arc;
 
 use diesel::{Connection, SqliteConnection};
-use shared::{errors::Error, models::{Album, AlbumType, ReferenceType, Track}, types::SoundomeResult};
+use shared::{errors::Error, models::{Album, AlbumType, Artist, ReferenceType, Track}, types::SoundomeResult};
 
 use crate::ports::repositories::{AlbumRepository, ArtistRepository, TrackRepository};
+
+/// Patch applied when a user approves a pending validation.
+/// All fields are optional; only provided fields overwrite the existing value.
+pub struct ValidationPatch {
+    pub title: Option<String>,
+    /// Replaces the track's artists when provided (list of names).
+    pub artists: Option<Vec<String>>,
+    /// Updates or creates the album title when provided.
+    pub album_title: Option<String>,
+    pub genre: Option<String>,
+    pub date: Option<String>,
+    pub track_number: Option<i32>,
+    pub disc_number: Option<i32>,
+    pub label: Option<String>,
+}
 
 pub struct TrackService {
     track_repo: Arc<dyn TrackRepository + Send + Sync>,
@@ -61,6 +76,52 @@ impl TrackService {
 
     pub fn get_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
         self.track_repo.get_pending_validations(conn)
+    }
+
+    /// Applies `patch` to an existing track, clears its validation flag, and persists.
+    pub fn validate_track(&self, conn: &mut SqliteConnection, id: i32, patch: ValidationPatch) -> SoundomeResult<Track> {
+        conn.transaction(|tx| {
+            let mut track = self.track_repo.get_by_id(tx, id)?;
+
+            if let Some(title) = patch.title { track.title = title; }
+            if let Some(genre) = patch.genre { track.genre = Some(genre); }
+            if let Some(date) = patch.date { track.date = Some(date); }
+            if let Some(tn) = patch.track_number { track.track_number = Some(tn); }
+            if let Some(dn) = patch.disc_number { track.disc_number = Some(dn); }
+            if let Some(label) = patch.label { track.label = Some(label); }
+
+            if let Some(names) = patch.artists {
+                let mut artists: Vec<Artist> = Vec::with_capacity(names.len());
+                for name in names {
+                    let artist = Artist { id: None, name, icon: None, references: vec![] };
+                    let saved = self.artist_repo.create_or_ignore(tx, &artist)?;
+                    artists.push(saved);
+                }
+                track.artists = artists;
+            }
+
+            if let Some(album_title) = patch.album_title {
+                match track.album.as_mut() {
+                    Some(album) => album.title = album_title,
+                    None => {
+                        track.album = Some(Album {
+                            id: None,
+                            title: album_title,
+                            artists: vec![],
+                            album_type: AlbumType::Album,
+                            cover: None,
+                            date: None,
+                            references: vec![],
+                        });
+                    }
+                }
+            }
+
+            track.needs_validation = false;
+            track.validation_reason = None;
+
+            self.create_or_update(tx, &track)
+        })
     }
 
     // Custom

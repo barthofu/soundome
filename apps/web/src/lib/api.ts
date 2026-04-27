@@ -1,4 +1,4 @@
-import type { PendingValidationDto } from './types';
+import type { PendingValidationDto, PatchValidationBody } from './types';
 
 const BASE = '/api';
 
@@ -11,6 +11,30 @@ export async function getPendingValidations(): Promise<PendingValidationDto[]> {
 export async function getPendingCount(): Promise<number> {
   const tracks = await getPendingValidations();
   return tracks.length;
+}
+
+export async function approveValidation(
+  id: number,
+  patch: PatchValidationBody,
+): Promise<PendingValidationDto> {
+  const res = await fetch(`${BASE}/validations/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(body.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function rejectValidation(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/validations/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(body.message ?? res.statusText);
+  }
 }
 
 export type DownloadResultTrack = {

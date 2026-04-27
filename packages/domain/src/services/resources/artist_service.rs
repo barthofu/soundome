@@ -36,4 +36,8 @@ impl ArtistService {
     pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<shared::models::Artist> {
         self.artist_repo.get_by_url(conn, url).ok()
     }
+
+    pub fn create_or_ignore(&self, conn: &mut SqliteConnection, artist: &shared::models::Artist) -> shared::types::SoundomeResult<shared::models::Artist> {
+        self.artist_repo.create_or_ignore(conn, artist)
+    }
 }

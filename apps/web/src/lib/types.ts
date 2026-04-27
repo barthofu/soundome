@@ -33,3 +33,14 @@ export interface PendingValidationDto {
   validation_reason: string | null;
   references: ReferenceDto[];
 }
+
+export interface PatchValidationBody {
+  title?: string;
+  artists?: string[];
+  album_title?: string;
+  genre?: string;
+  date?: string;
+  track_number?: number;
+  disc_number?: number;
+  label?: string;
+}
