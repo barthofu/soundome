@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use diesel::SqliteConnection;
-use shared::{models::{Album, Artist, Track}, types::SoundomeResult};
+use shared::{models::{Album, Artist, Playlist, Track}, types::SoundomeResult};
 
 pub struct RepositoryLayer {
     pub track: Arc<dyn TrackRepository>,
     pub album: Arc<dyn AlbumRepository>,
     pub artist: Arc<dyn ArtistRepository>,
+    pub playlist: Arc<dyn PlaylistRepository>,
 }
 
 // ================================================================================================
@@ -63,4 +64,16 @@ pub trait ArtistRepository: Send + Sync {
     fn set_album_artists(&self, conn: &mut SqliteConnection, album_id: i32, artist_ids: &[i32]) -> SoundomeResult<()>;
     // /// Find an artist by unique fields (e.g. name)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Option<Artist>>;
+}
+
+// ================================================================================================
+
+pub trait PlaylistRepository: Send + Sync {
+    fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Playlist>;
+    /// Returns `None` if no playlist with this source URL exists yet.
+    fn get_by_source_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Option<Playlist>>;
+    fn create(&self, conn: &mut SqliteConnection, playlist: &Playlist) -> SoundomeResult<Playlist>;
+    fn update_last_sync(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
+    /// Link a track to a playlist. Silently ignores duplicate entries.
+    fn add_track(&self, conn: &mut SqliteConnection, playlist_id: i32, track_id: i32, position: Option<i32>) -> SoundomeResult<()>;
 }

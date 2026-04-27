@@ -11,7 +11,7 @@ use rsoundcloud::{
     TracksApi, UsersApi,
 };
 use shared::{
-    errors::Error, http::HttpClientBuilder, models::{Album, Artist, PlaylistTrack, SimplifiedTrack, Track}, types::SoundomeResult
+    errors::Error, http::HttpClientBuilder, models::{Album, Artist, Platform, Playlist, PlaylistTrack, SimplifiedTrack, Track}, types::SoundomeResult
 };
 
 use crate::Source;
@@ -138,6 +138,23 @@ impl Source for Soundcloud {
             )
         .await
         )
+    }
+
+    async fn get_playlist_from_url(&self, url: &str) -> SoundomeResult<Playlist> {
+        let playlist = self
+            .client
+            .get_playlist(ResourceId::Url(url.to_string()))
+            .await
+            .map_err(|_| Error::NotFound(format!("SoundCloud playlist from {}", url).to_string()))?;
+
+        let cover = playlist.album_playlist.artwork_url.clone();
+        Ok(Playlist {
+            id: None,
+            name: playlist.album_playlist.title.clone(),
+            source: Platform::SoundCloud,
+            source_url: Some(url.to_string()),
+            cover,
+        })
     }
 
     async fn get_playlist_tracks_from_url(&self, url: &str) -> Result<Vec<PlaylistTrack>, Error> {

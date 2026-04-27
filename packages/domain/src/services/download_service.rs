@@ -7,26 +7,28 @@ use shared::{errors::Error, models::{Album, AlbumType, Artist, Track}, types::So
 use shared::models::ReferenceType;
 use tagger::TagProvider;
 
-use super::{album_service::AlbumService, artist_service::ArtistService, track_service::{TrackService, ValidationPatch}};
+use super::{album_service::AlbumService, artist_service::ArtistService, playlist_service::PlaylistService, track_service::{TrackService, ValidationPatch}};
 
 pub struct DownloadService {
     track_service: Arc<TrackService>,
     album_service: Arc<AlbumService>,
     artist_service: Arc<ArtistService>,
+    playlist_service: Arc<PlaylistService>,
 }
 
-// TODO: gestion de la playlist
 // TODO: manage "to validate" tracks
 impl DownloadService {
     pub fn new(
         track_service: Arc<TrackService>,
         album_service: Arc<AlbumService>,
         artist_service: Arc<ArtistService>,
+        playlist_service: Arc<PlaylistService>,
     ) -> Self {
         Self { 
             track_service,
             album_service,
             artist_service,
+            playlist_service,
         }
     }
 
@@ -56,40 +58,69 @@ impl DownloadService {
         tracing::info!("====================\nDownloading playlist from {:?}\n---------", url);
 
         let fetcher = Fetcher::new().await;
+
+        // Fetch playlist metadata and upsert in DB
+        let playlist_meta = fetcher.get_playlist_from_url(url).await
+            .unwrap_or_else(|e| {
+                tracing::warn!("Could not fetch playlist metadata ({}), using URL as name", e);
+                shared::models::Playlist {
+                    id: None,
+                    name: url.to_string(),
+                    source: shared::models::Platform::Unknown,
+                    source_url: Some(url.to_string()),
+                    cover: None,
+                }
+            });
+        let playlist = self.playlist_service.upsert(conn, &playlist_meta)?;
+        let playlist_id = playlist.id.expect("persisted playlist must have an id");
+        tracing::info!("Playlist upserted in DB: \"{}\" (id={})", playlist.name, playlist_id);
+
         let playlist_tracks = fetcher.get_playlist_tracks_from_url(url).await?;
         let total_tracks = playlist_tracks.len();
         tracing::info!("Found {} tracks in playlist", total_tracks);
 
-        // Filter out existing tracks and collect new ones
-        let mut new_tracks: Vec<Track> = Vec::new();
+        // Filter out existing tracks (link them to the playlist anyway) and collect new ones
+        let mut new_tracks: Vec<(Option<i32>, Track)> = Vec::new();
         let mut existing_count = 0;
-        for pt in playlist_tracks {
+        for pt in &playlist_tracks {
             let track = &pt.track;
-            let url = track.get_source()
+            let track_url = track.get_source()
                 .and_then(|s| s.external_url.clone())
                 .unwrap_or_else(|| "unknown".to_string());
-            if self.track_service.get_by_url(conn, &url).is_some() {
-                tracing::warn!("   -> Track already exists in DB, skipping: {}", track.display());
+            let position = pt.position.map(|p| p as i32);
+            if let Some(existing) = self.track_service.get_by_url(conn, &track_url) {
+                tracing::warn!("   -> Track already exists in DB, linking to playlist: {}", track.display());
+                let track_id = existing.id.expect("persisted track must have an id");
+                if let Err(e) = self.playlist_service.add_track(conn, playlist_id, track_id, position) {
+                    tracing::error!("Failed to link existing track {} to playlist: {}", track_id, e);
+                }
                 existing_count += 1;
             } else {
-                new_tracks.push(track.clone());
+                new_tracks.push((position, track.clone()));
             }
         }
 
         tracing::info!("{} new tracks to download after filtering existing ones", new_tracks.len());
 
         // Clean metadata for all new tracks
-        if let Err(e) = fetcher.clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>()).await {
+        let mut new_track_values: Vec<Track> = new_tracks.iter().map(|(_, t)| t.clone()).collect();
+        if let Err(e) = fetcher.clean_tracks_metadata(&mut new_track_values.iter_mut().collect::<Vec<_>>()).await {
             tracing::info!("Failed to clean tracks title and artist name: {}", e);
         }
 
-        // Process each new track
+        // Process each new track and link it to the playlist
         let mut new_processed_tracks = Vec::new();
-        for track in &new_tracks {
+        for (i, (position, _)) in new_tracks.iter().enumerate() {
+            let track = &new_track_values[i];
             tracing::info!("Processing track: {}", track.display());
             match self.orchestrator_workflow(conn, track.clone()).await {
                 Ok(t) => {
                     tracing::info!("Successfully processed track: {}", t.display());
+                    if let Some(track_id) = t.id {
+                        if let Err(e) = self.playlist_service.add_track(conn, playlist_id, track_id, *position) {
+                            tracing::error!("Failed to link new track {} to playlist: {}", track_id, e);
+                        }
+                    }
                     new_processed_tracks.push(t);
                 },
                 Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e)

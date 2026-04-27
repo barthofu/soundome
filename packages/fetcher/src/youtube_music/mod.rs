@@ -10,7 +10,7 @@ use rustypipe::{
     model::{MusicArtist, TrackItem},
 };
 use shared::{
-    errors::Error, http::HttpClientBuilder, models::{Album, Artist, PlaylistTrack, Track}, types::SoundomeResult
+    errors::Error, http::HttpClientBuilder, models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track}, types::SoundomeResult
 };
 
 use crate::Source;
@@ -132,6 +132,27 @@ impl Source for YoutubeMusic {
         )
         .await;
         Ok(tracks)
+    }
+
+    async fn get_playlist_from_url(&self, url: &str) -> SoundomeResult<Playlist> {
+        let playlist_id = self
+            .get_playlist_id_from_url(url)
+            .ok_or(Error::InvalidUrl(url.to_string()))?;
+        let playlist = self
+            .client
+            .query()
+            .music_playlist(playlist_id)
+            .await
+            .map_err(|_| Error::NotFound("Youtube Music playlist".to_string()))?;
+
+        let cover = playlist.thumbnail.first().map(|t| t.url.clone());
+        Ok(Playlist {
+            id: None,
+            name: playlist.name,
+            source: Platform::YoutubeMusic,
+            source_url: Some(url.to_string()),
+            cover,
+        })
     }
 
     async fn get_playlist_tracks_from_url(&self, _url: &str) -> SoundomeResult<Vec<PlaylistTrack>> {

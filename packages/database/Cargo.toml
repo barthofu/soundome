@@ -9,8 +9,9 @@ domain = { path = "../domain" }
 
 tracing = { workspace = true }
 
-diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }
+diesel = { version = "2.2.7", features = ["sqlite", "r2d2", "chrono"] }
 libsqlite3-sys = { version = "0.31.0", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
 rocket = { version = "0.5.1", features = ["json"] }
 rocket_okapi = { version = "0.9.0", features = ["swagger"] }
 okapi = { version = "0.7.0" }

@@ -16,6 +16,7 @@ pub struct ServiceLayer {
     pub track_service: Arc<track_service::TrackService>,
     pub album_service: Arc<album_service::AlbumService>,
     pub artist_service: Arc<artist_service::ArtistService>,
+    pub playlist_service: Arc<playlist_service::PlaylistService>,
 
     pub download_service: Arc<download_service::DownloadService>,
 }
@@ -36,18 +37,21 @@ impl ServiceLayer {
             repositories.artist.clone(),
         ));
         let artist_service = Arc::new(artist_service::ArtistService::new(repositories.artist.clone()));
+        let playlist_service = Arc::new(playlist_service::PlaylistService::new(repositories.playlist.clone()));
 
         // Services
         let download_service = Arc::new(download_service::DownloadService::new(
             track_service.clone(),
             album_service.clone(),
             artist_service.clone(),
+            playlist_service.clone(),
         ));
 
         Self {
             track_service,
             album_service,
             artist_service,
+            playlist_service,
 
             download_service,
         }

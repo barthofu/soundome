@@ -10,7 +10,7 @@ use rspotify::{
     ClientCredsSpotify, Credentials,
 };
 use shared::{
-    errors::Error, http::ProxyRotator, models::{Album, Artist, PlaylistTrack, Track}, types::SoundomeResult
+    errors::Error, http::ProxyRotator, models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track}, types::SoundomeResult
 };
 use tracing::error;
 
@@ -92,6 +92,24 @@ impl Source for Spotify {
         } else {
             Ok(Vec::new())
         }
+    }
+
+    async fn get_playlist_from_url(&self, url: &str) -> SoundomeResult<Playlist> {
+        let id = PlaylistId::from_id(self.url_to_id(url))
+            .map_err(|_| Error::InvalidUrl(url.to_string()))?;
+        let playlist = self
+            .client
+            .playlist(id, None, None)
+            .map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
+
+        let cover = playlist.images.first().map(|img| img.url.clone());
+        Ok(Playlist {
+            id: None,
+            name: playlist.name,
+            source: Platform::Spotify,
+            source_url: Some(url.to_string()),
+            cover,
+        })
     }
 
     async fn get_playlist_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<PlaylistTrack>> {

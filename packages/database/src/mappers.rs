@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use shared::models::{Album, AlbumType};
+use shared::models::{Album, AlbumType, Platform};
 
-use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewTrackEntity, NewTrackRefEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
+use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewTrackEntity, NewTrackRefEntity, PlaylistEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
 
 // ================================================================================================
 // Track
@@ -279,5 +279,33 @@ pub fn map_error(err: diesel::result::Error) -> shared::errors::Error {
     match err {
         diesel::result::Error::NotFound => shared::errors::Error::NotFound("Database item".to_string()),
         _ => shared::errors::Error::Database(format!("Database error: {}", err)),
+    }
+}
+
+// ================================================================================================
+// Playlist
+// ================================================================================================
+
+impl PlaylistEntity {
+    pub fn convert_to_domain(entity: PlaylistEntity) -> shared::models::Playlist {
+        shared::models::Playlist {
+            id: Some(entity.id),
+            name: entity.name,
+            source: Platform::from_str(&entity.source),
+            source_url: entity.source_url,
+            cover: entity.cover,
+        }
+    }
+}
+
+impl NewPlaylistEntity {
+    pub fn convert_from_domain(playlist: &shared::models::Playlist) -> NewPlaylistEntity {
+        NewPlaylistEntity {
+            name: playlist.name.clone(),
+            source: playlist.source.as_ref().to_string().to_lowercase(),
+            source_url: playlist.source_url.clone(),
+            cover: playlist.cover.clone(),
+            last_sync: Some(chrono::Utc::now().naive_utc()),
+        }
     }
 }
