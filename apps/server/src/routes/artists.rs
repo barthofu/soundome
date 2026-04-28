@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain::services::ServiceLayer;
-use rocket::{delete, get, http::Status, patch, serde::json::Json};
+use rocket::{delete, get, http::Status, patch, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,14 @@ impl ArtistDto {
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateArtistBody {
     pub name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct MergeArtistsBody {
+    /// Artist IDs to merge into `target_id`. These will be deleted after the merge.
+    pub source_ids: Vec<i32>,
+    /// The artist to keep.
+    pub target_id: i32,
 }
 
 // ================================================================================================
@@ -118,6 +126,45 @@ pub async fn delete(
     db.run(move |conn| services.artist_service.delete_by_id(conn, id))
         .await
         .map(|_| Json(Success { success: true }))
+        .map_err(|err| crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        }))
+}
+
+#[openapi]
+#[post("/artists/merge", format = "application/json", data = "<body>")]
+pub async fn merge(
+    body: Json<MergeArtistsBody>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<ArtistDto>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let body = body.into_inner();
+
+    if body.source_ids.is_empty() {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BadRequest".to_string(),
+            message: "source_ids must not be empty".to_string(),
+        }));
+    }
+    if body.source_ids.contains(&body.target_id) {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BadRequest".to_string(),
+            message: "target_id must not appear in source_ids".to_string(),
+        }));
+    }
+
+    db.run(move |conn| services.artist_service.merge_into(conn, &body.source_ids, body.target_id))
+        .await
+        .and_then(|artist| {
+            ArtistDto::from_artist(artist)
+                .ok_or_else(|| shared::errors::Error::Database("Artist has no id".to_string()))
+        })
+        .map(Json)
         .map_err(|err| crate::utils::error::Error::Custom(CustomError {
             status: Status::InternalServerError,
             code: "Internal".to_string(),

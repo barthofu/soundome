@@ -343,4 +343,82 @@ impl ArtistRepository for DieselArtistRepository {
         Ok(())
     }
 
+    fn merge_into(&self, conn: &mut SqliteConnection, source_ids: &[i32], target_id: i32) -> SoundomeResult<()> {
+        use diesel::Connection as _;
+        conn.transaction(|conn| {
+            // --- Re-point artist_tracks -------------------------------------------------
+            // Load all track IDs already linked to the target to avoid duplicate PK insertion.
+            let target_track_ids: Vec<i32> = schema::artist_tracks::table
+                .filter(schema::artist_tracks::artist_id.eq(target_id))
+                .select(schema::artist_tracks::track_id)
+                .load(conn)
+                .map_err(|e| shared::errors::Error::Database(format!("merge: load target tracks: {e}")))?;
+
+            for &src in source_ids {
+                // Fetch track ids linked to this source artist.
+                let src_track_ids: Vec<i32> = schema::artist_tracks::table
+                    .filter(schema::artist_tracks::artist_id.eq(src))
+                    .select(schema::artist_tracks::track_id)
+                    .load(conn)
+                    .map_err(|e| shared::errors::Error::Database(format!("merge: load source tracks: {e}")))?;
+
+                for track_id in src_track_ids {
+                    if !target_track_ids.contains(&track_id) {
+                        diesel::insert_into(schema::artist_tracks::table)
+                            .values(ArtistTrackEntity { track_id, artist_id: target_id })
+                            .execute(conn)
+                            .map_err(|e| shared::errors::Error::Database(format!("merge: insert artist_track: {e}")))?;
+                    }
+                }
+                diesel::delete(schema::artist_tracks::table.filter(schema::artist_tracks::artist_id.eq(src)))
+                    .execute(conn)
+                    .map_err(|e| shared::errors::Error::Database(format!("merge: delete source artist_tracks: {e}")))?;
+            }
+
+            // --- Re-point artist_albums -------------------------------------------------
+            let target_album_ids: Vec<i32> = schema::artist_albums::table
+                .filter(schema::artist_albums::artist_id.eq(target_id))
+                .select(schema::artist_albums::album_id)
+                .load(conn)
+                .map_err(|e| shared::errors::Error::Database(format!("merge: load target albums: {e}")))?;
+
+            for &src in source_ids {
+                let src_album_ids: Vec<i32> = schema::artist_albums::table
+                    .filter(schema::artist_albums::artist_id.eq(src))
+                    .select(schema::artist_albums::album_id)
+                    .load(conn)
+                    .map_err(|e| shared::errors::Error::Database(format!("merge: load source albums: {e}")))?;
+
+                for album_id in src_album_ids {
+                    if !target_album_ids.contains(&album_id) {
+                        diesel::insert_into(schema::artist_albums::table)
+                            .values(ArtistAlbumEntity { album_id, artist_id: target_id })
+                            .execute(conn)
+                            .map_err(|e| shared::errors::Error::Database(format!("merge: insert artist_album: {e}")))?;
+                    }
+                }
+                diesel::delete(schema::artist_albums::table.filter(schema::artist_albums::artist_id.eq(src)))
+                    .execute(conn)
+                    .map_err(|e| shared::errors::Error::Database(format!("merge: delete source artist_albums: {e}")))?;
+            }
+
+            // --- Move artist_refs -------------------------------------------------------
+            for &src in source_ids {
+                diesel::update(schema::artist_ref::table.filter(schema::artist_ref::artist_id.eq(src)))
+                    .set(schema::artist_ref::artist_id.eq(target_id))
+                    .execute(conn)
+                    .map_err(|e| shared::errors::Error::Database(format!("merge: move artist_ref: {e}")))?;
+            }
+
+            // --- Delete source artists --------------------------------------------------
+            for &src in source_ids {
+                diesel::delete(schema::artist::table.filter(schema::artist::id.eq(src)))
+                    .execute(conn)
+                    .map_err(|e| shared::errors::Error::Database(format!("merge: delete source artist: {e}")))?;
+            }
+
+            Ok(())
+        })
+    }
+
 }

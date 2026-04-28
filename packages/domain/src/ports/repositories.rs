@@ -65,6 +65,8 @@ pub trait ArtistRepository: Send + Sync {
     fn set_track_artists(&self, conn: &mut SqliteConnection, track_id: i32, artist_ids: &[i32]) -> SoundomeResult<()>;
     /// Replace all artists attached to a given album
     fn set_album_artists(&self, conn: &mut SqliteConnection, album_id: i32, artist_ids: &[i32]) -> SoundomeResult<()>;
+    /// Merge all source artists into `target_id`: re-point tracks, albums, and references, then delete sources.
+    fn merge_into(&self, conn: &mut SqliteConnection, source_ids: &[i32], target_id: i32) -> SoundomeResult<()>;
     // /// Find an artist by unique fields (e.g. name)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Option<Artist>>;
 }

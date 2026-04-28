@@ -44,4 +44,9 @@ impl ArtistService {
     pub fn delete_by_id(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
         self.artist_repo.delete(conn, id)
     }
+
+    pub fn merge_into(&self, conn: &mut SqliteConnection, source_ids: &[i32], target_id: i32) -> shared::types::SoundomeResult<shared::models::Artist> {
+        self.artist_repo.merge_into(conn, source_ids, target_id)?;
+        self.artist_repo.get_by_id(conn, target_id)
+    }
 }

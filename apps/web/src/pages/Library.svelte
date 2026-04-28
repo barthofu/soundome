@@ -44,6 +44,13 @@
       } else if (e.key === 'Backspace' && !e.metaKey && !e.ctrlKey) {
         if (lib.drillAlbumId != null) { e.preventDefault(); lib.navigate(lib.tab, lib.drillArtistId ?? undefined); }
         else if (lib.drillArtistId != null) { e.preventDefault(); lib.navigate(lib.tab); }
+      } else if (e.key === 'Escape') {
+        if (lib.mergePicking) { e.preventDefault(); lib.cancelMergePicking(); }
+        else if (lib.selectedArtistIds.size > 0) { e.preventDefault(); lib.clearArtistSelection(); }
+      } else if (e.key === 'm' && lib.tab === 'artists' && lib.selectedArtistIds.size >= 2) {
+        e.preventDefault();
+        if (lib.mergePicking) lib.cancelMergePicking();
+        else lib.startMergePicking();
       }
     }
     document.addEventListener('keydown', onKeydown);

@@ -214,6 +214,22 @@ export async function deleteArtist(id: number): Promise<void> {
   }
 }
 
+export async function mergeArtists(
+  sourceIds: number[],
+  targetId: number,
+): Promise<LibraryArtistDto> {
+  const res = await fetch(`${BASE}/artists/merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_ids: sourceIds, target_id: targetId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
 // ================================================================================================
 // Sync Schedules
 // ================================================================================================
