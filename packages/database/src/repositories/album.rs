@@ -2,7 +2,7 @@
 
 use domain::ports::repositories::AlbumRepository;
 
-use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection};
+use diesel::{ExpressionMethods, JoinOnDsl, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::{models::{Album, Reference}, types::SoundomeResult};
 
 use crate::{
@@ -102,16 +102,31 @@ impl AlbumRepository for DieselAlbumRepository {
     }
 
     fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Album> {
-        // If album already has an ID, return it as-is (ignore creation)
-        if album.id.is_some() {
-            return Ok(album.clone());
+        // If album already has an ID, return it as-is
+        if let Some(id) = album.id {
+            return self.get_by_id(conn, id);
         }
-        // Otherwise, create the album and its references
+        // Exact-title fast path
+        let exact: Option<AlbumEntity> = schema::album::table
+            .filter(schema::album::title.eq(&album.title))
+            .first(conn)
+            .optional()
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to look up album: {}", err)))?;
+        if let Some(entity) = exact {
+            return self.get_by_id(conn, entity.id);
+        }
+        // Case-insensitive fallback (Unicode-safe: compare lowercased in Rust)
+        let title_lower = album.title.to_lowercase();
+        let all: Vec<AlbumEntity> = schema::album::table
+            .load(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to load albums for dedup: {}", err)))?;
+        if let Some(entity) = all.into_iter().find(|e| e.title.to_lowercase() == title_lower) {
+            return self.get_by_id(conn, entity.id);
+        }
+        // Not found: create the album and its references
         let created_album = self.create(conn, album)?;
         let album_id = created_album.id.unwrap();
-        // Create album references
         self.create_references(conn, album_id, &album.references)?;
-        // Return the created album with references
         self.get_by_id(conn, album_id)
     }
 

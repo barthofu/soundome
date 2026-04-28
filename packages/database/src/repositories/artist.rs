@@ -1,6 +1,6 @@
 use domain::ports::repositories::ArtistRepository;
 
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::{models::{Artist, Reference}, types::SoundomeResult};
 
 use crate::{
@@ -168,16 +168,39 @@ impl ArtistRepository for DieselArtistRepository {
     }
 
     fn create_or_ignore(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Artist> {
-        // If artist already has an ID, return it as-is (ignore creation)
-        if artist.id.is_some() {
-            return Ok(artist.clone());
+        // If artist already has an ID, return it as-is
+        if let Some(id) = artist.id {
+            return self.get_by_id(conn, id);
         }
-        // Otherwise, create the artist and ses références
+        // Exact-name fast path
+        let exact: Option<ArtistEntity> = schema::artist::table
+            .filter(schema::artist::name.eq(&artist.name))
+            .first(conn)
+            .optional()
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to look up artist: {}", err)))?;
+        if let Some(entity) = exact {
+            let references: Vec<ArtistRefEntity> = schema::artist_ref::table
+                .filter(schema::artist_ref::artist_id.eq(entity.id))
+                .load(conn)
+                .unwrap_or_default();
+            return Ok(ArtistEntity::convert_to_domain(entity, references));
+        }
+        // Case-insensitive fallback (Unicode-safe: compare lowercased in Rust)
+        let name_lower = artist.name.to_lowercase();
+        let all: Vec<ArtistEntity> = schema::artist::table
+            .load(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to load artists for dedup: {}", err)))?;
+        if let Some(entity) = all.into_iter().find(|e| e.name.to_lowercase() == name_lower) {
+            let references: Vec<ArtistRefEntity> = schema::artist_ref::table
+                .filter(schema::artist_ref::artist_id.eq(entity.id))
+                .load(conn)
+                .unwrap_or_default();
+            return Ok(ArtistEntity::convert_to_domain(entity, references));
+        }
+        // Not found: create the artist and its references
         let created_artist = self.create(conn, artist)?;
         let artist_id = created_artist.id.unwrap();
-        // Create artist references
         self.create_references(conn, artist_id, &artist.references)?;
-        // Return the created artist with references
         self.get_by_id(conn, artist_id)
     }
 
