@@ -205,3 +205,74 @@ export async function deleteArtist(id: number): Promise<void> {
   }
 }
 
+// ================================================================================================
+// Sync Schedules
+// ================================================================================================
+
+export interface SyncScheduleDto {
+  id: number;
+  playlist_url: string;
+  label: string | null;
+  interval_seconds: number;
+  enabled: boolean;
+  last_run: string | null;
+  next_run: string | null;
+  created_at: string | null;
+}
+
+export async function getSyncSchedules(): Promise<SyncScheduleDto[]> {
+  const res = await fetch(`${BASE}/sync-schedules`);
+  if (!res.ok) throw new Error(`Failed to fetch sync schedules: ${res.statusText}`);
+  return res.json();
+}
+
+export async function createSyncSchedule(
+  playlist_url: string,
+  label: string | null,
+  interval_seconds: number,
+): Promise<SyncScheduleDto> {
+  const res = await fetch(`${BASE}/sync-schedules`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlist_url, label: label || null, interval_seconds }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function updateSyncSchedule(
+  id: number,
+  patch: { label?: string; interval_seconds?: number; enabled?: boolean },
+): Promise<SyncScheduleDto> {
+  const res = await fetch(`${BASE}/sync-schedules/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function deleteSyncSchedule(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/sync-schedules/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
+export async function triggerSyncSchedule(id: number): Promise<{ task_id: number }> {
+  const res = await fetch(`${BASE}/sync-schedules/${id}/trigger`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+

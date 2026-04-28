@@ -17,6 +17,7 @@ pub struct ServiceLayer {
     pub album_service: Arc<album_service::AlbumService>,
     pub artist_service: Arc<artist_service::ArtistService>,
     pub playlist_service: Arc<playlist_service::PlaylistService>,
+    pub sync_schedule_service: Arc<sync_schedule_service::SyncScheduleService>,
     pub task_service: Arc<task_service::TaskService>,
 
     pub download_service: Arc<download_service::DownloadService>,
@@ -39,6 +40,7 @@ impl ServiceLayer {
         ));
         let artist_service = Arc::new(artist_service::ArtistService::new(repositories.artist.clone()));
         let playlist_service = Arc::new(playlist_service::PlaylistService::new(repositories.playlist.clone()));
+        let sync_schedule_service = Arc::new(sync_schedule_service::SyncScheduleService::new(repositories.sync_schedule.clone()));
         let task_service = Arc::new(task_service::TaskService::new(repositories.task.clone()));
 
         // Services
@@ -55,6 +57,7 @@ impl ServiceLayer {
             album_service,
             artist_service,
             playlist_service,
+            sync_schedule_service,
             task_service,
 
             download_service,

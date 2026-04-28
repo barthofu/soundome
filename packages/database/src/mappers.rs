@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use shared::models::{Album, AlbumType, Platform};
 
-use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewTaskEntity, NewTrackEntity, NewTrackRefEntity, PlaylistEntity, TaskEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
+use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewSyncScheduleEntity, NewTaskEntity, NewTrackEntity, NewTrackRefEntity, PlaylistEntity, SyncScheduleEntity, TaskEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
 
 // ================================================================================================
 // Track
@@ -340,6 +340,38 @@ impl NewTaskEntity {
             label: task.label.clone(),
             progress: task.progress,
             total: task.total,
+        }
+    }
+}
+
+// ================================================================================================
+// SyncSchedule
+// ================================================================================================
+
+impl SyncScheduleEntity {
+    pub fn convert_to_domain(entity: SyncScheduleEntity) -> shared::models::SyncSchedule {
+        shared::models::SyncSchedule {
+            id: Some(entity.id),
+            playlist_url: entity.playlist_url,
+            label: entity.label,
+            interval_seconds: entity.interval_seconds,
+            enabled: entity.enabled != 0,
+            last_run: entity.last_run,
+            next_run: entity.next_run,
+            created_at: Some(entity.created_at),
+        }
+    }
+}
+
+impl NewSyncScheduleEntity {
+    pub fn convert_from_domain(schedule: &shared::models::SyncSchedule) -> NewSyncScheduleEntity {
+        NewSyncScheduleEntity {
+            playlist_url: schedule.playlist_url.clone(),
+            label: schedule.label.clone(),
+            interval_seconds: schedule.interval_seconds,
+            enabled: if schedule.enabled { 1 } else { 0 },
+            last_run: schedule.last_run,
+            next_run: schedule.next_run,
         }
     }
 }

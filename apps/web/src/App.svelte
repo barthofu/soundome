@@ -5,8 +5,9 @@
   import Validations from './pages/Validations.svelte';
   import Tasks from './pages/Tasks.svelte';
   import Library from './pages/Library.svelte';
+  import SyncSchedules from './pages/SyncSchedules.svelte';
 
-  type Page = 'home' | 'validations' | 'tasks' | 'library';
+  type Page = 'home' | 'validations' | 'tasks' | 'library' | 'sync';
 
   let page: Page = $state('home');
   let pendingCount = $state(0);
@@ -78,6 +79,13 @@
         <span class="badge">{activeTasksCount}</span>
       {/if}
     </button>
+    <button
+      class="nav-link"
+      class:active={page === 'sync'}
+      onclick={() => navigate('sync')}
+    >
+      Sync
+    </button>
   </div>
 </nav>
 
@@ -88,6 +96,8 @@
     <Library />
   {:else if page === 'validations'}
     <Validations onDownloaded={refreshCounts} />
+  {:else if page === 'sync'}
+    <SyncSchedules />
   {:else}
     <Tasks />
   {/if}

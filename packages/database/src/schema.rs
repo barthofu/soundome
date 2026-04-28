@@ -83,6 +83,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    sync_schedule (id) {
+        id -> Integer,
+        playlist_url -> Text,
+        label -> Nullable<Text>,
+        interval_seconds -> Integer,
+        enabled -> Integer,
+        last_run -> Nullable<Timestamp>,
+        next_run -> Nullable<Timestamp>,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     task (id) {
         id -> Integer,
         task_type -> Text,
@@ -157,6 +170,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     genre,
     playlist,
     playlist_tracks,
+    sync_schedule,
     task,
     track,
     track_genres,

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use diesel::SqliteConnection;
-use shared::{models::{Album, Artist, Playlist, Task, Track}, types::SoundomeResult};
+use shared::{models::{Album, Artist, Playlist, SyncSchedule, Task, Track}, types::SoundomeResult};
 
 pub struct RepositoryLayer {
     pub track: Arc<dyn TrackRepository>,
@@ -9,6 +9,7 @@ pub struct RepositoryLayer {
     pub artist: Arc<dyn ArtistRepository>,
     pub playlist: Arc<dyn PlaylistRepository>,
     pub task: Arc<dyn TaskRepository>,
+    pub sync_schedule: Arc<dyn SyncScheduleRepository>,
 }
 
 // ================================================================================================
@@ -92,4 +93,18 @@ pub trait TaskRepository: Send + Sync {
     fn set_failed(&self, conn: &mut SqliteConnection, id: i32, error: &str) -> SoundomeResult<()>;
     fn get_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<Vec<Task>>;
     fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
+}
+
+// ================================================================================================
+
+pub trait SyncScheduleRepository: Send + Sync {
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<SyncSchedule>>;
+    fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<SyncSchedule>;
+    fn create(&self, conn: &mut SqliteConnection, schedule: &SyncSchedule) -> SoundomeResult<SyncSchedule>;
+    fn update(&self, conn: &mut SqliteConnection, id: i32, schedule: &SyncSchedule) -> SoundomeResult<SyncSchedule>;
+    fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
+    /// Returns all schedules that are enabled and whose next_run is in the past (or NULL).
+    fn get_due(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<SyncSchedule>>;
+    /// Record that a schedule ran now and compute the next_run time.
+    fn mark_ran(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
 }

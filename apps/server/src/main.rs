@@ -41,6 +41,7 @@ fn rocket() -> _ {
     let artist_repo = Arc::new(repositories::artist::DieselArtistRepository::new());
     let playlist_repo = Arc::new(repositories::playlist::DieselPlaylistRepository::new());
     let task_repo = Arc::new(repositories::task::DieselTaskRepository::new());
+    let sync_schedule_repo = Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),
@@ -48,6 +49,7 @@ fn rocket() -> _ {
         artist: artist_repo.clone(),
         playlist: playlist_repo.clone(),
         task: task_repo.clone(),
+        sync_schedule: sync_schedule_repo.clone(),
     });
 
     let services = Arc::new(ServiceLayer::new(repositories));
@@ -93,6 +95,55 @@ fn rocket() -> _ {
         }
     }
 
+    // Spawn the background sync scheduler (checks every 60 seconds)
+    {
+        let db_url = Config::get().database.url.clone();
+        let services_for_scheduler = services.clone();
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+
+                let conn = &mut database::init_connection(&db_url);
+                let due = match services_for_scheduler.sync_schedule_service.get_due(conn) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        tracing::error!("Scheduler: failed to query due schedules: {}", e);
+                        continue;
+                    }
+                };
+                for schedule in due {
+                    let schedule_id = match schedule.id {
+                        Some(id) => id,
+                        None => continue,
+                    };
+                    let url = schedule.playlist_url.clone();
+                    let label = schedule.label.clone();
+                    if let Err(e) = services_for_scheduler.sync_schedule_service.mark_ran(conn, schedule_id) {
+                        tracing::error!("Scheduler: failed to mark schedule {} as ran: {}", schedule_id, e);
+                        continue;
+                    }
+                    let task = match services_for_scheduler.task_service.create_playlist_sync(conn, &url, label) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            tracing::error!("Scheduler: failed to create task for schedule {}: {}", schedule_id, e);
+                            continue;
+                        }
+                    };
+                    let task_id = match task.id {
+                        Some(id) => id,
+                        None => continue,
+                    };
+                    tracing::info!("Scheduler: triggering sync for schedule {} (url={})", schedule_id, url);
+                    soundome_server::routes::download::spawn_playlist_sync_task(
+                        services_for_scheduler.clone(),
+                        task_id,
+                        url,
+                    );
+                }
+            }
+        });
+    }
+
     // let artist_service = Arc::new(ArtistService::new(artist_repo.clone()));
 
     rocket::build()
@@ -114,6 +165,12 @@ fn rocket() -> _ {
                 routes::tasks::get_all,
                 routes::tasks::get_by_id,
                 routes::tasks::retry,
+                routes::sync_schedules::get_all,
+                routes::sync_schedules::get_by_id,
+                routes::sync_schedules::create,
+                routes::sync_schedules::update,
+                routes::sync_schedules::delete,
+                routes::sync_schedules::trigger,
                 routes::tracks::get_all,
                 routes::tracks::get,
                 routes::tracks::update,

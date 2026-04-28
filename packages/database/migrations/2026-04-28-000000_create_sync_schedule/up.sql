@@ -1,0 +1,10 @@
+CREATE TABLE sync_schedule (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    playlist_url TEXT NOT NULL,
+    label TEXT,
+    interval_seconds INTEGER NOT NULL DEFAULT 3600,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_run TIMESTAMP,
+    next_run TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
