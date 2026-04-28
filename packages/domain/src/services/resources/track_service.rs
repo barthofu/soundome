@@ -175,7 +175,7 @@ impl TrackService {
                     let saved_artist = if let Some(id) = artist.id {
                         self.artist_repo.update(tx, id, artist)?
                     } else {
-                        self.artist_repo.create(tx, artist)?
+                        self.artist_repo.create_or_ignore(tx, artist)?
                     };
                     let artist_id = saved_artist.id.ok_or_else(|| Error::Internal("missing artist id after create/update".into()))?;
                     // album/artist refs are stored as metadata only
@@ -231,7 +231,7 @@ impl TrackService {
                 let saved_artist = if let Some(id) = artist.id {
                     self.artist_repo.update(tx, id, artist)?
                 } else {
-                    self.artist_repo.create(tx, artist)?
+                    self.artist_repo.create_or_ignore(tx, artist)?
                 };
                 let artist_id = saved_artist.id.ok_or_else(|| Error::Internal("missing artist id after create/update".into()))?;
                 // artist refs are stored as metadata only
