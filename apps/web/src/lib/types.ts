@@ -45,6 +45,22 @@ export interface PatchValidationBody {
   label?: string;
 }
 
+export interface MatchCandidateDto {
+  title: string;
+  artists: ArtistDto[];
+  album: AlbumDto | null;
+  date: string | null;
+  genre: string | null;
+  cover: string | null;
+  duration: number | null;
+  track_number: number | null;
+  disc_number: number | null;
+  label: string | null;
+  score: number;
+  provider: string;
+  references: ReferenceDto[];
+}
+
 export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
 export type TaskType = 'SyncPlaylist' | 'DownloadTrack';
 

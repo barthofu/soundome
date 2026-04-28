@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain::services::{track_service::ValidationPatch, ServiceLayer};
+use domain::services::{download_service::MatchCandidate, track_service::ValidationPatch, ServiceLayer};
 use rocket::{delete, get, http::Status, patch, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
@@ -211,6 +211,79 @@ pub async fn reject_validation(
                 message: err.to_string(),
             })
         })
+}
+
+// ================================================================================================
+// Match candidates
+// ================================================================================================
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MatchCandidateDto {
+    pub title: String,
+    pub artists: Vec<ArtistDto>,
+    pub album: Option<AlbumDto>,
+    pub date: Option<String>,
+    pub genre: Option<String>,
+    pub cover: Option<String>,
+    pub duration: Option<i32>,
+    pub track_number: Option<i32>,
+    pub disc_number: Option<i32>,
+    pub label: Option<String>,
+    pub score: f64,
+    pub provider: String,
+    pub references: Vec<ReferenceDto>,
+}
+
+impl MatchCandidateDto {
+    fn from_candidate(c: MatchCandidate) -> Self {
+        Self {
+            title: c.track.title,
+            artists: c.track.artists.into_iter().map(|a| ArtistDto { id: a.id, name: a.name }).collect(),
+            album: c.track.album.map(|a| AlbumDto {
+                id: a.id,
+                title: a.title,
+                artists: a.artists.into_iter().map(|a| ArtistDto { id: a.id, name: a.name }).collect(),
+            }),
+            date: c.track.date,
+            genre: c.track.genre,
+            cover: c.track.cover,
+            duration: c.track.duration,
+            track_number: c.track.track_number,
+            disc_number: c.track.disc_number,
+            label: c.track.label,
+            score: c.score,
+            provider: c.provider,
+            references: c.track.references.into_iter().map(reference_to_dto).collect(),
+        }
+    }
+}
+
+#[openapi]
+#[get("/validations/<id>/matches")]
+pub async fn get_match_candidates(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<MatchCandidateDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    db.run(move |conn| {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(services.download_service.get_match_candidates(conn, id))
+        })
+    })
+    .await
+    .map(|candidates| {
+        Json(candidates.into_iter().map(MatchCandidateDto::from_candidate).collect())
+    })
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
 }
 
 #[openapi]

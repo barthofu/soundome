@@ -1,16 +1,24 @@
 <script lang="ts">
-  import type { PendingValidationDto, PatchValidationBody } from './types';
+  import { getMatchCandidates } from './api';
+  import type { PendingValidationDto, PatchValidationBody, MatchCandidateDto } from './types';
 
   interface Props {
     track: PendingValidationDto;
+    focused?: boolean;
     onApprove?: (id: number, patch: PatchValidationBody) => Promise<void>;
     onReject?: (id: number) => Promise<void>;
   }
 
-  let { track, onApprove, onReject }: Props = $props();
+  let { track, focused = false, onApprove, onReject }: Props = $props();
 
   let editing = $state(false);
   let busy = $state(false);
+
+  // Match candidates state
+  let showMatches = $state(false);
+  let matchesLoading = $state(false);
+  let matchCandidates: MatchCandidateDto[] = $state([]);
+  let matchesError: string | null = $state(null);
 
   // editable copies — reset whenever we open the form
   let editTitle = $state(track.title);
@@ -21,6 +29,35 @@
   let editTrackNumber = $state(track.track_number?.toString() ?? '');
   let editDiscNumber = $state(track.disc_number?.toString() ?? '');
   let editLabel = $state(track.label ?? '');
+
+  let cardEl: HTMLElement | undefined = $state();
+
+  // Scroll into view when focused
+  $effect(() => {
+    if (focused && cardEl) {
+      cardEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  });
+
+  // Listen for keyboard shortcut events from parent
+  $effect(() => {
+    if (!cardEl) return;
+    function onEdit(e: Event) { e.stopPropagation(); startEdit(); }
+    function onApproveShortcut(e: Event) { e.stopPropagation(); handleApprove(); }
+    function onRejectShortcut(e: Event) { e.stopPropagation(); handleReject(); }
+    function onMatchesShortcut(e: Event) { e.stopPropagation(); toggleMatches(); }
+
+    cardEl.addEventListener('shortcut-edit', onEdit);
+    cardEl.addEventListener('shortcut-approve', onApproveShortcut);
+    cardEl.addEventListener('shortcut-reject', onRejectShortcut);
+    cardEl.addEventListener('shortcut-matches', onMatchesShortcut);
+    return () => {
+      cardEl!.removeEventListener('shortcut-edit', onEdit);
+      cardEl!.removeEventListener('shortcut-approve', onApproveShortcut);
+      cardEl!.removeEventListener('shortcut-reject', onRejectShortcut);
+      cardEl!.removeEventListener('shortcut-matches', onMatchesShortcut);
+    };
+  });
 
   function startEdit() {
     editTitle = track.title;
@@ -85,6 +122,44 @@
     }
   }
 
+  async function toggleMatches() {
+    if (showMatches) {
+      showMatches = false;
+      return;
+    }
+    showMatches = true;
+    if (matchCandidates.length > 0) return; // already loaded
+    matchesLoading = true;
+    matchesError = null;
+    try {
+      matchCandidates = await getMatchCandidates(track.id);
+    } catch (e: unknown) {
+      matchesError = e instanceof Error ? e.message : String(e);
+    } finally {
+      matchesLoading = false;
+    }
+  }
+
+  async function selectCandidate(candidate: MatchCandidateDto) {
+    if (!onApprove) return;
+    busy = true;
+    try {
+      const patch: PatchValidationBody = {
+        title: candidate.title,
+        artists: candidate.artists.map((a) => a.name),
+        album_title: candidate.album?.title ?? undefined,
+        genre: candidate.genre ?? undefined,
+        date: candidate.date ?? undefined,
+        track_number: candidate.track_number ?? undefined,
+        disc_number: candidate.disc_number ?? undefined,
+        label: candidate.label ?? undefined,
+      };
+      await onApprove(track.id, patch);
+    } finally {
+      busy = false;
+    }
+  }
+
   function formatDuration(seconds: number | null): string {
     if (!seconds) return '—';
     const m = Math.floor(seconds / 60);
@@ -96,12 +171,18 @@
     return track.artists.map((a) => a.name).join(', ') || '—';
   }
 
+  function formatScore(score: number): string {
+    return `${Math.round(score * 100)}%`;
+  }
+
   let sourceUrl = $derived(
     track.references.find((r) => r.ref_type === 'Source' && r.external_url)?.external_url ?? null
   );
+
+  let isPartialMatch = $derived(track.validation_reason === 'metadata_partial_match');
 </script>
 
-<article class="track-card" class:editing>
+<article class="track-card" class:editing class:focused bind:this={cardEl}>
   <div class="cover">
     {#if track.cover}
       <img src={track.cover} alt="cover" />
@@ -199,6 +280,11 @@
             <button class="btn-ghost btn-edit" onclick={startEdit} disabled={busy}>
               Edit
             </button>
+            {#if isPartialMatch}
+              <button class="btn-ghost btn-matches" onclick={toggleMatches} disabled={busy}>
+                {showMatches ? 'Hide matches' : 'Show matches'}
+              </button>
+            {/if}
           {/if}
         </div>
         <div class="actions-right">
@@ -213,6 +299,48 @@
             </button>
           {/if}
         </div>
+      </div>
+    {/if}
+
+    {#if showMatches}
+      <div class="matches-panel">
+        {#if matchesLoading}
+          <p class="matches-status">Searching metadata providers…</p>
+        {:else if matchesError}
+          <p class="matches-status matches-error">{matchesError}</p>
+        {:else if matchCandidates.length === 0}
+          <p class="matches-status">No candidates found</p>
+        {:else}
+          <p class="matches-count">{matchCandidates.length} candidate{matchCandidates.length > 1 ? 's' : ''} found</p>
+          <ul class="matches-list">
+            {#each matchCandidates as candidate, i}
+              <li class="match-item">
+                <div class="match-info">
+                  <div class="match-main">
+                    <span class="match-title">{candidate.title}</span>
+                    <span class="match-artists">{candidate.artists.map(a => a.name).join(', ')}</span>
+                  </div>
+                  <div class="match-meta">
+                    {#if candidate.album}
+                      <span class="chip">💿 {candidate.album.title}</span>
+                    {/if}
+                    {#if candidate.date}
+                      <span class="chip">📅 {candidate.date}</span>
+                    {/if}
+                    {#if candidate.duration}
+                      <span class="chip">⏱ {formatDuration(candidate.duration)}</span>
+                    {/if}
+                    <span class="chip match-score">{formatScore(candidate.score)}</span>
+                    <span class="chip match-provider">{candidate.provider}</span>
+                  </div>
+                </div>
+                <button class="btn-select" onclick={() => selectCandidate(candidate)} disabled={busy}>
+                  Select
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </div>
     {/if}
   </div>
@@ -231,6 +359,11 @@
 
   .track-card.editing {
     border-color: var(--accent);
+  }
+
+  .track-card.focused {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
   }
 
   .cover {
@@ -433,5 +566,121 @@
   .btn-reject:hover:not(:disabled) {
     background: #dc2626;
     color: #fff;
+  }
+
+  .btn-matches {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-matches:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ---- matches panel ---- */
+
+  .matches-panel {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: var(--surface-2);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .matches-status {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+    margin: 0;
+    padding: 0.5rem 0;
+  }
+
+  .matches-error {
+    color: var(--error);
+  }
+
+  .matches-count {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .matches-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .match-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    transition: border-color 0.15s;
+  }
+
+  .match-item:hover {
+    border-color: var(--accent);
+  }
+
+  .match-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .match-main {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+
+  .match-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .match-artists {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .match-meta {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+
+  .match-score {
+    background: #16a34a22;
+    color: #16a34a;
+    font-weight: 600;
+  }
+
+  .match-provider {
+    background: var(--accent-muted, rgba(99, 102, 241, 0.15));
+    color: var(--accent);
+  }
+
+  .btn-select {
+    flex-shrink: 0;
+    background: #16a34a;
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+  }
+
+  .btn-select:hover:not(:disabled) {
+    opacity: 0.85;
   }
 </style>

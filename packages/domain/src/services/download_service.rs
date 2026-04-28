@@ -7,6 +7,8 @@ use shared::{errors::Error, models::{Album, AlbumType, Artist, Track}, types::So
 use shared::models::ReferenceType;
 use tagger::TagProvider;
 
+pub use tagger::enricher::MatchCandidate;
+
 use super::{album_service::AlbumService, artist_service::ArtistService, playlist_service::PlaylistService, task_service::TaskService, track_service::{TrackService, ValidationPatch}};
 
 pub struct DownloadService {
@@ -26,7 +28,7 @@ impl DownloadService {
         playlist_service: Arc<PlaylistService>,
         task_service: Arc<TaskService>,
     ) -> Self {
-        Self { 
+        Self {
             track_service,
             album_service,
             artist_service,
@@ -50,11 +52,11 @@ impl DownloadService {
         let mut track = fetcher.get_track_from_url(url).await?;
         fetcher.clean_track_metadata(&mut track).await?;
         tracing::info!("Fetched track info from {}: {}", track.get_source_platform().as_ref(), track.display());
-    
+
         // Orchestrator workflow
         let final_track = self.orchestrator_workflow(conn, track).await?;
         Ok(final_track)
-    } 
+    }
 
     /// Main entry point for downloading a playlist from a given URL (from any supported platform).
     /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
@@ -158,6 +160,18 @@ impl DownloadService {
     // == Sub private and utils methods
     // ============================================================================================
 
+    /// Re-query metadata providers for a pending track and return scored candidates.
+    /// Used by the validation UI to show potential matches.
+    pub async fn get_match_candidates(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> SoundomeResult<Vec<tagger::enricher::MatchCandidate>> {
+        let track = self.track_service.get_by_id(conn, id)?;
+        let candidates = tagger::enricher::get_candidates_for_track(&track).await;
+        Ok(candidates)
+    }
+
     /// Called after a user approves a pending validation through the web UI.
     ///
     /// The track already has an audio file in the staging folder (downloaded at fetch time).
@@ -250,7 +264,7 @@ impl DownloadService {
         match existing_track {
             Some(existing_track) => {
                 tracing::info!("Existing track found in DB: {}, will compare quality", existing_track.display());
-                
+
                 let mut existing_track = existing_track;
                 let new_track_is_better_quality = self.track_service.is_better_quality(&existing_track, &track);
 
@@ -291,7 +305,7 @@ impl DownloadService {
     }
 
     /// Enrich metadata using metadata providers, and deduplicate entities in DB
-    /// 
+    ///
     /// Returns:
     /// - boolean indicating if the track should be marked as "to validate"
     /// - boolean indicating if the track should be compared in quality (already exists in DB)
@@ -328,7 +342,7 @@ impl DownloadService {
         if let Match::Exact(matched_track) = best_match {
             // TODO: Check if ref already exists in DB, if yes then apply references recursively to track and unfound album/artists
             tracing::info!("Exact match found from metadata provider: {:?}", matched_track.get_metadata().and_then(|m| m.external_url));
-            // find for existing tracks in the database 
+            // find for existing tracks in the database
 
             if let Some(mb_ref) = matched_track.get_metadata().and_then(|s| s.external_url.clone()) {
                 if let Some(existing_track) = self.track_service.get_by_url(conn, &mb_ref) {
@@ -383,7 +397,7 @@ impl DownloadService {
     }
 
     /// Searches for the best download URL and downloads the track
-    /// 
+    ///
     /// Returns the downloaded track with updated references and file_path
     /// Searches for the best download URL and downloads the track to the staging folder.
     /// The staging path is stored in `track.file_path`.

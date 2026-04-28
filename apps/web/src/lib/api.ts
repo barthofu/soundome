@@ -1,6 +1,7 @@
 import type {
   PendingValidationDto,
   PatchValidationBody,
+  MatchCandidateDto,
   TaskDto,
   LibraryTrackDto,
   UpdateTrackBody,
@@ -45,6 +46,15 @@ export async function rejectValidation(id: number): Promise<void> {
     const body = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(body.message ?? res.statusText);
   }
+}
+
+export async function getMatchCandidates(id: number): Promise<MatchCandidateDto[]> {
+  const res = await fetch(`${BASE}/validations/${id}/matches`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(body.message ?? res.statusText);
+  }
+  return res.json();
 }
 
 export type DownloadResultTrack = {

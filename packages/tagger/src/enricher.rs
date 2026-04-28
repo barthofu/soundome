@@ -3,6 +3,14 @@ use shared::{models::Track, utils::enums::Match};
 
 use crate::{TagProvider, providers};
 
+/// A scored candidate returned by metadata providers.
+#[derive(Debug, Clone)]
+pub struct MatchCandidate {
+    pub track: Track,
+    pub score: f64,
+    pub provider: String,
+}
+
 /// A single metadata provider variant, dispatched dynamically based on config.
 enum MetadataProvider {
     MusicBrainz(providers::musicbrainz::MusicBrainz),
@@ -16,6 +24,22 @@ impl MetadataProvider {
             Self::MusicBrainz(p) => p.get_best_match_from_track(track).await,
             Self::Bandcamp(p) => p.get_best_match_from_track(track).await,
             Self::Spotify(p) => p.get_best_match_from_track(track).await,
+        }
+    }
+
+    async fn get_matches_from_query(&self, query: &str) -> Vec<Track> {
+        match self {
+            Self::MusicBrainz(p) => p.get_matches_from_query(query).await,
+            Self::Bandcamp(p) => p.get_matches_from_query(query).await,
+            Self::Spotify(p) => p.get_matches_from_query(query).await,
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Self::MusicBrainz(_) => "musicbrainz",
+            Self::Bandcamp(_) => "bandcamp",
+            Self::Spotify(_) => "spotify",
         }
     }
 }
@@ -68,4 +92,39 @@ pub async fn get_best_match_from_track(track: &Track) -> Match<Track> {
         Some(t) => Match::Partial(t),
         None => Match::None,
     }
+}
+
+/// Query all enabled metadata providers and return all candidates with their scores.
+/// Used by the validation UI to let the user pick the correct match.
+pub async fn get_candidates_for_track(track: &Track) -> Vec<MatchCandidate> {
+    let providers = build_providers();
+
+    if providers.is_empty() {
+        tracing::warn!("No tagger metadata providers enabled in config");
+        return Vec::new();
+    }
+
+    let query = format!(
+        "{} {}",
+        track.artists.first().map(|a| a.name.as_str()).unwrap_or(""),
+        track.title,
+    );
+
+    let mut candidates: Vec<MatchCandidate> = Vec::new();
+
+    for provider in &providers {
+        let provider_name = provider.name();
+        let results = provider.get_matches_from_query(&query).await;
+
+        for candidate in results {
+            let score = track.compare(&candidate);
+            if score > 0.0 {
+                candidates.push(MatchCandidate { track: candidate, score, provider: provider_name.to_string() });
+            }
+        }
+    }
+
+    // Sort by score descending
+    candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    candidates
 }
