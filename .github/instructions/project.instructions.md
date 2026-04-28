@@ -1,142 +1,62 @@
-# Soundome - Contexte pour IA
+---
+description: "Use when: starting work in the Soundome repository, needing project context, identifying major architecture boundaries, or understanding global product and repository expectations before choosing a narrower instruction or skill."
+---
 
-## Vue d'ensemble
+# Soundome project context
 
-Soundome est une application de gestion de bibliothèque musicale personnelle qui unifie différentes sources musicales (services de streaming, fichiers locaux) dans une bibliothèque bien organisée, enrichie et de haute qualité. L'application met l'accent sur l'organisation intelligente, la déduplication, l'enrichissement des métadonnées et la préservation de la meilleure qualité audio disponible.
+## Overview
 
-## Objectifs du projet
+Soundome is a personal music-library management project. It pulls data from streaming sources and local files, enriches metadata, downloads or ingests audio, tags files, organizes them on disk, and persists enough context to keep the library clean over time.
 
-- Créer une bibliothèque musicale unifiée à partir de sources diverses
-- Minimiser l'intervention manuelle dans la gestion de la bibliothèque
-- Maintenir une organisation cohérente et une qualité optimale
-- Enrichir automatiquement les métadonnées des pistes
-- Préserver les structures de playlists tout en évitant la duplication
+The repository is still evolving, so prefer the current code paths over older notes when the documentation and the implementation diverge.
 
-## Architecture logicielle
+## Product goals
 
-### Composants principaux
+- Build a unified library from multiple music sources.
+- Minimize manual intervention.
+- Keep the filesystem layout predictable and library quality high.
+- Enrich metadata automatically when confidence is acceptable.
+- Preserve playlist and source provenance without reintroducing duplicates.
 
-1. **Système d'importation**
-   - Gestion des imports depuis URLs (Spotify, YouTube, SoundCloud)
-   - Gestion des imports de fichiers locaux
-   - Validation et déduplication
+## Main architecture
 
-2. **Système de métadonnées**
-   - Extraction des métadonnées des sources
-   - Enrichissement via MusicBrainz
-   - Scoring de correspondance
-   - Mise à jour des tags audio
+### Import pipeline
 
-3. **Système de stockage**
-   - Base de données relationnelle pour métadonnées et références
-   - Organisation du système de fichiers (Artiste/Album/Piste)
-   - Gestion de cache et d'ingest
+- Accept a track or playlist URL.
+- Fetch source metadata.
+- Clean noisy metadata.
+- Enrich through metadata providers.
+- Download to staging.
+- Deduplicate and compare quality.
+- Tag, organize, and persist.
 
-4. **Interface de validation**
-   - Panel web pour validation manuelle des cas ambigus
-   - Interface de résolution des conflits
+### Persistence layer
 
-5. **Gestionnaire de qualité**
-   - Comparaison de qualité entre versions d'une même piste
-   - Algorithmes de décision pour remplacement/conservation
+- SQLite for entities and references.
+- Filesystem library for the finalized audio files.
+- Temporary staging area for downloaded files waiting to be finalized.
 
-### Flux de données
+### Manual validation layer
 
-URLs/Fichiers → Extraction de métadonnées → Déduplication → Enrichissement → Organisation → Téléchargement/Déplacement → Tagging → Sauvegarde BD
+- A web admin UI exists for ambiguous metadata matches.
+- Tracks can remain staged until a user approves the final metadata.
 
-### Structure du système de fichiers
+## Important data-model ideas
 
-/
-├── cache/               # Cache temporaire de téléchargement
-├── ingest/              # Dossier d'import pour fichiers locaux
-└── library/             # Bibliothèque organisée
-    ├── Artiste1/
-    │   └── Album1/
-    │       └── Piste1.mp3
-    └── Artiste2/
-        └── Album2/
-            └── Piste2.mp3
+- `Track`, `Album`, `Artist`, and `Playlist` live in `packages/shared/src/models`.
+- `ReferenceType::Source` and `ReferenceType::Provider` describe the effective audio path.
+- `ReferenceType::Metadata` preserves durable identifiers even when the source or provider changes.
 
-## Flux de travail principaux
+## Important code entry points
 
-### Import depuis URL (ex: Spotify)
+- `apps/server/src/main.rs`
+- `packages/domain/src/services/download_service.rs`
+- `packages/shared/src/libs/http.rs`
+- `packages/database/src/repositories/*`
 
-1. **Récupération des infos de la source**
-   - Extraction d'URL et métadonnées
-   - Conservation des références de playlist
+## Working expectations
 
-2. **Déduplication niveau URL**
-   - Vérification si l'URL existe déjà en base
-
-3. **Identification des entités**
-   - Album, artistes principaux, featuring
-
-4. **Enrichissement des métadonnées**
-   - Via MusicBrainz avec scoring de fiabilité
-
-5. **Téléchargement**
-   - Acquisition depuis le fournisseur approprié
-
-6. **Déduplication niveau contenu**
-   - Comparaison avec pistes existantes
-   - Décision basée sur la qualité
-
-7. **Organisation**
-   - Placement dans la structure de bibliothèque
-   - Création de liens symboliques pour playlists
-
-8. **Sauvegarde et gestion d'erreurs**
-   - Persistance en base de données
-   - Rollback en cas d'échec
-
-### Import de fichier local
-
-1. **Analyse des métadonnées du fichier**
-   - Extraction des tags existants
-
-2. **Enrichissement si nécessaire**
-   - Recherche MusicBrainz si métadonnées insuffisantes
-
-3. **Déduplication**
-   - Vérification de l'existence en bibliothèque
-
-4. **Gestion des conflits**
-   - Si meilleure qualité: remplacement
-   - Si qualité égale: validation manuelle
-   - Si qualité inférieure: archivage/suppression
-
-5. **Organisation et indexation**
-   - Placement dans la structure de bibliothèque
-   - Mise à jour de la base de données
-
-## Modèles de données clés
-
-- **Track**: Représentation d'une piste musicale
-- **Track_ref**: Référence externe vers une piste (URL Spotify, etc.)
-- **Album**: Collection de pistes
-- **Artist**: Créateur/interprète de musique
-- **Playlist**: Collection ordonnée de pistes
-
-## Défis techniques
-
-- Détection précise des doublons avec variations de métadonnées
-- Scoring fiable de la qualité audio
-- Réconciliation d'identités d'artistes similaires
-- Gestion des cas particuliers (compilations, remixes, versions)
-- Balance entre automatisation et validation manuelle
-
-## Technologies et dépendances
-
-- Base de données relationnelle
-- APIs externes (MusicBrainz, services de streaming)
-- Système de tagging audio
-- Interface web pour validation manuelle
-- Algorithmes de comparaison audio et métadonnées
-
-## Glossaire
-
-- **Ingest**: Processus d'importation de fichiers dans le système
-- **Track_ref**: Référence externe vers une piste musicale
-- **Featuring**: Artistes additionnels participant à une piste
-- **Score de correspondance**: Indice de fiabilité entre métadonnées et référence MusicBrainz
-- **Déduplication**: Processus d'identification et gestion des doublons
+- Prefer small, reversible changes.
+- Keep behavior explicit when a feature is still partial.
+- Avoid adding parallel abstractions when an existing service or repository already owns the workflow.
+- Use the docs under `docs/` as the first stop, but verify behavior in code before changing architecture-sensitive areas.

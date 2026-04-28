@@ -1,94 +1,95 @@
-# Soundome — Copilot instructions (global)
+# Soundome - global Copilot instructions
 
-Ce dépôt est un monorepo Rust pour un programme qui a pour but de **centraliser, télécharger, enrichir (metadata), tagger et organiser** une bibliothèque musicale personnelle à partir de sources comme **Spotify / SoundCloud / YouTube / YouTube Music**.
+This repository is a Rust monorepo for an application that centralizes, downloads, enriches, tags, and organizes a personal music library from sources such as Spotify, SoundCloud, YouTube, and YouTube Music.
 
-Objectif d’assistance : produire des changements **petits, sûrs et cohérents** avec l’architecture existante, en gardant en tête que le projet est **WIP** (certaines docs sont partielles/dépréciées).
+Your goal is to make small, safe, architecture-aligned changes while keeping in mind that the project is still work in progress and some surfaces are intentionally partial.
 
-## Objectifs du projet
+## Project goals
 
-- Créer une bibliothèque musicale unifiée à partir de sources diverses
-- Minimiser l'intervention manuelle dans la gestion de la bibliothèque
-- Maintenir une organisation cohérente et une qualité optimale
-- Enrichir automatiquement les métadonnées des pistes
-- Interface web de validation manuelle pour les cas ambigus
+- Build a unified music library from heterogeneous sources.
+- Minimize manual library management.
+- Keep organization and audio quality consistent over time.
+- Enrich track metadata automatically when confidence is high enough.
+- Expose a manual validation UI for ambiguous cases.
 
-## Ce que fait Soundome plus ou moins actuellement (fonctionnel)
+## What currently works in practice
 
-- Entrée : URL de track / playlist, ou fichiers locaux (ingest à venir)
-- Étapes typiques :
-  - **Fetch** des métadonnées source (titre, artistes, album, refs)
-  - **Nettoyage** (notamment SoundCloud)
-  - **Enrichissement metadata** via MusicBrainz (matching + score)
-  - **Download** via un provider (souvent YouTube/YT Music en “provider” même si la source est Spotify)
-  - **Déduplication** (URL, puis similarité, puis qualité)
-  - **Tagging** du fichier audio
-  - **Organisation filesystem** `Artist/Album/Track` + persistance DB
+- Inputs: track URLs, playlist URLs, and some groundwork for future local ingest.
+- Typical flow:
+  - fetch source metadata such as title, artists, album, and references
+  - clean noisy metadata, especially for SoundCloud-like sources
+  - enrich metadata through MusicBrainz
+  - download audio from a provider, often YouTube or YouTube Music even when the source is Spotify
+  - deduplicate by URL, then similarity, then quality
+  - tag the audio file
+  - move the file into the `Artist/Album/Track` library layout and persist the result
 
-Réfs de workflow :
-- docs/workflows/download.scenarios.md
-- docs/workflow.d2 (diagramme)
-- docs/specs.md (objectifs/contraintes)
+Useful workflow references:
+- `docs/README.md`
+- `docs/workflows/download.md`
+- `docs/architecture/design.md`
 
-## Architecture (technique)
+## Technical architecture
 
-Workspace Rust (Cargo workspace) :
-- apps/server : API Rocket + OpenAPI/Swagger (WIP)
-- apps/cli : CLI (actuellement minimal/WIP)
-- packages/domain : services + orchestrateur (DownloadService)
-- packages/fetcher : “sources” (Spotify/YT Music/SoundCloud)
-- packages/downloader : “providers” (YouTube/YT Music/SoundCloud)
-- packages/tagger : tagging / metadata providers (MusicBrainz)
-- packages/organizer : organisation filesystem
-- packages/database : Diesel + SQLite, repositories
-- packages/config : config TOML + env overlay + singleton global
-- packages/shared : types, erreurs, modèles, utils (HTTP proxy rotator, logging…)
-- packages/ai : client IA (OpenRouter) + prompts (principalement nettoyage metadata SoundCloud)
+Cargo workspace overview:
+- `apps/server`: Rocket API, OpenAPI, static file serving
+- `apps/cli`: CLI entry point, still minimal
+- `packages/domain`: services and orchestration, especially `DownloadService`
+- `packages/fetcher`: source adapters
+- `packages/downloader`: audio providers
+- `packages/tagger`: metadata providers and file tagging
+- `packages/organizer`: filesystem placement
+- `packages/database`: Diesel repositories backed by SQLite
+- `packages/config`: TOML config with environment overrides and singleton access
+- `packages/shared`: models, typed errors, HTTP helpers, logging, utilities
+- `packages/ai`: OpenRouter client and prompt helpers for metadata cleanup
 
-Points d’entrée code utiles :
-- apps/server/src/main.rs : bootstrap Rocket, init globals, injection services/repositories
-- packages/domain/src/services/download_service.rs : workflow principal (download/sync playlist)
-- packages/shared/src/models/* : Track/Album/Artist/Reference + logique compare/transpose
-- packages/shared/src/libs/http.rs : ProxyRotator + HttpClientBuilder
-- packages/database/src/repositories/* : sémantique “set_references” et transactions
+Useful code entry points:
+- `apps/server/src/main.rs`: bootstraps Rocket, globals, repositories, and services
+- `packages/domain/src/services/download_service.rs`: main download and playlist workflow
+- `packages/shared/src/models/*`: core models and reference merge logic
+- `packages/shared/src/libs/http.rs`: `ProxyRotator` and `HttpClientBuilder`
+- `packages/database/src/repositories/*`: repository semantics such as `set_references`
 
-## Données & références
+## References and data model
 
-- Le modèle `Reference` (shared) utilise `ReferenceType` : `Source`, `Provider`, `Metadata`, `Reference`.
-- Pattern important :
-  - `Source/Provider` représentent l’audio réellement utilisé (souvent **remplacés**)
-  - `Metadata` conserve des identifiants/URLs utiles (MusicBrainz, Spotify…) (souvent **merge**)
-- La logique DB correspondante existe côté repos Diesel (ex: track `set_references`).
+- `shared::models::Reference` uses `ReferenceType`: `Source`, `Provider`, `Metadata`, and `Reference`.
+- Important rule:
+  - `Source` and `Provider` describe the actual audio path in use and are often replaced
+  - `Metadata` keeps durable identifiers and URLs such as MusicBrainz or Spotify and is often merged
+- Repository code already encodes this behavior, especially around `set_references`.
 
-## Config / runtime
+## Config and runtime
 
-- Config : `packages/config` charge `config.toml` (par défaut `./config.toml`) et peut être surchargé via env `SOUNDOME_CONFIG_PATH` + `SOUNDOME__...`.
-- Initialisation globale attendue au démarrage : `shared::init_globals()` (Config + ProxyRotator).
-- Server/CLI utilisent `dotenvy` avec `required = true` → prévoir un `.env` local si nécessaire.
-- Rocket DB : voir `Rocket.toml` (SQLite `data/soundome.db`).
-- Diesel : `diesel.toml` pointe vers `packages/database/migrations` et `packages/database/src/schema.rs`.
+- `packages/config` loads `config.toml` by default and supports `SOUNDOME_CONFIG_PATH` and `SOUNDOME__...` overrides.
+- Global initialization should happen through `shared::init_globals()`.
+- Server and CLI boot paths use `dotenvy` with `required = true`, so a local `.env` file is expected.
+- Rocket database configuration lives in `Rocket.toml`.
+- Diesel uses `diesel.toml`, `packages/database/migrations`, and `packages/database/src/schema.rs`.
 
-## Proxy réseau
+## Networking and proxy rules
 
-- Support proxy : `Config.proxy` + `ProxyRotator` global.
-- Utiliser préférentiellement `shared::libs::http::HttpClientBuilder` (plutôt que créer un `reqwest::Client` ad hoc).
-- Docs : docs/proxy-configuration.md et docs/proxy-usage-example.md.
-- Limitation : certaines libs tierces n’acceptent pas nativement la config proxy (voir doc proxy).
+- Proxy support is configured through `Config.proxy` and the global `ProxyRotator`.
+- Prefer `shared::libs::http::HttpClientBuilder` over ad hoc `reqwest::Client` construction.
+- See `docs/operations/proxy-configuration.md` and `docs/operations/proxy-usage-example.md`.
+- Some third-party libraries still cannot honor the shared proxy configuration directly.
 
-## WIP / attentes
+## WIP expectations
 
-- Beaucoup de features sont incomplètes (routes server commentées, CLI vide, fetchers/downloaders partiels).
-- Ne pas “inventer” des comportements : si une partie manque, proposer un scaffold minimal cohérent avec l’existant.
-- Préférer des PRs petites et testables (migrations Diesel, routes Rocket, services domain).
+- Several features remain incomplete, including parts of the CLI and some provider integrations.
+- Do not invent behavior that is not already implied by the codebase.
+- When a surface is missing, prefer a minimal scaffold that fits the current architecture and makes the limitation explicit.
+- Favor small, testable changes over broad rewrites.
 
-## Conventions de code (résumé)
+## Code conventions
 
-- Langue utilisée : anglais pour le code, les commentaires et la documentation.
-- Erreurs : utiliser `shared::types::SoundomeResult<T>` et `shared::errors::Error`.
-- Logs : `tracing` (pas `println!` sauf boot fatal).
-- Éviter les `unwrap()`/`expect()` hors init/boot ; préférer propagation d’erreur.
-- Réutiliser la structure “ports/repositories” (traits) + “database/repositories” (Diesel impl).
+- Use English for code, comments, and documentation.
+- Use `shared::types::SoundomeResult<T>` and `shared::errors::Error` for errors.
+- Use `tracing` for logs.
+- Avoid `unwrap()` and `expect()` outside boot or initialization code.
+- Reuse the `ports/repositories` and `database/repositories` split.
 
-## Commandes utiles (dev)
+## Useful development commands
 
-- Workspace : `cargo test -q` ; `cargo clippy --workspace --all-targets` ; `cargo fmt`.
-- Diesel (SQLite) : `cargo install diesel_cli --no-default-features --features sqlite` puis `diesel migration run`.
+- Workspace: `cargo test -q`, `cargo clippy --workspace --all-targets`, `cargo fmt`
+- SQLite migrations: `cargo install diesel_cli --no-default-features --features sqlite`, then `diesel migration run`

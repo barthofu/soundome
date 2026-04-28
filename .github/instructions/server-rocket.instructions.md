@@ -1,4 +1,5 @@
 ---
+description: "Use when: editing Rocket routes, request or response DTOs, OpenAPI wiring, HTTP error mapping, or server-layer code in apps/server."
 applyTo: "apps/server/src/**/*.rs"
 ---
 
@@ -6,17 +7,17 @@ applyTo: "apps/server/src/**/*.rs"
 
 ## Architecture
 
-- Le server monte des routes Rocket + OpenAPI via `rocket_okapi`.
-- Injecter les services via `rocket::State<Arc<ServiceLayer>>`.
-- DB pool via `Db` (`apps/server/src/utils/database.rs`) avec `rocket_sync_db_pools`.
+- The server mounts Rocket routes and OpenAPI through `rocket_okapi`.
+- Inject services through `rocket::State<Arc<ServiceLayer>>`.
+- Use the `Db` pool from `apps/server/src/utils/database.rs` with `rocket_sync_db_pools`.
 
-## Recommandations
+## Recommendations
 
-- Préférer des handlers fins : appeler `domain::services` plutôt que coder de la logique métier dans les routes.
-- Les erreurs HTTP doivent être mappées proprement (ne pas exposer de secrets).
-- Ajouter les routes dans `apps/server/src/routes/mod.rs` puis dans le `mount` de `main.rs`.
+- Prefer thin handlers: call `domain::services` instead of putting business logic in the routes.
+- Map HTTP errors cleanly and do not expose secrets.
+- Add new routes in `apps/server/src/routes/mod.rs` and in the `mount` list in `main.rs`.
 
 ## OpenAPI
 
-- Annoter les routes avec `#[openapi]`.
-- Utiliser des types sérialisables (shared models) et éviter les types Diesel dans la couche HTTP.
+- Annotate routes with `#[openapi]`.
+- Use serializable types, preferably shared models or dedicated DTOs, and avoid Diesel types in the HTTP layer.

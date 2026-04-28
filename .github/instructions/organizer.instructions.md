@@ -1,14 +1,15 @@
 ---
+description: "Use when: editing filesystem placement, file renaming, library layout rules, or organizer behavior in packages/organizer."
 applyTo: "packages/organizer/src/**/*.rs"
 ---
 
 # Organizer — organisation filesystem
 
-## Rôle
+## Role
 
-- Déplacer/renommer les fichiers vers `Artist/Album/Track`.
+- Move and rename files into the `Artist/Album/Track` layout.
 
 ## Conventions
 
-- Toujours retourner des erreurs typées (`shared::errors::Error`) plutôt que `unwrap()`.
-- Normaliser les noms de dossiers/fichiers (éviter caractères interdits Windows si c’est un objectif futur).
+- Always return typed errors from `shared::errors::Error` instead of using `unwrap()`.
+- Normalize directory and file names, especially if future Windows compatibility matters.

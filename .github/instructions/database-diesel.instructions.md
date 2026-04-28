@@ -1,23 +1,24 @@
 ---
+description: "Use when: editing Diesel repositories, SQLite persistence, schema.rs, database transactions, or migration-adjacent Rust code in packages/database."
 applyTo: "packages/database/src/**/*.rs"
 ---
 
 # Database (Diesel + SQLite)
 
-## Sources de vérité
+## Sources of truth
 
-- Migrations : `packages/database/migrations/`
-- Schema généré : `packages/database/src/schema.rs` (voir diesel.toml)
+- Migrations: `packages/database/migrations/`
+- Generated schema: `packages/database/src/schema.rs` as configured by `diesel.toml`
 
 ## Repositories
 
-- Les repos implémentent les traits dans `packages/domain/src/ports/repositories`.
-- Conserver la sémantique existante : ex `set_references` remplace `source/provider` et merge le reste.
+- Repositories implement the traits defined in `packages/domain/src/ports/repositories`.
+- Preserve the existing semantics: for example, `set_references` replaces `source/provider` and merges the rest.
 
 ## Transactions
 
-- Pour les opérations composées (track + album + artists + refs), utiliser `conn.transaction(|tx| { ... })`.
+- For composed operations such as track, album, artist, and reference updates, use `conn.transaction(|tx| { ... })`.
 
 ## Tips
 
-- Ne pas faire remonter des erreurs Diesel brutes : mapper vers `shared::errors::Error::Database`.
+- Do not bubble up raw Diesel errors. Map them to `shared::errors::Error::Database`.

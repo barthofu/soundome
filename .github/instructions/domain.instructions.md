@@ -1,26 +1,27 @@
 ---
+description: "Use when: editing domain services, orchestration logic, DownloadService flows, transaction boundaries, or ReferenceType-aware business logic in packages/domain."
 applyTo: "packages/domain/src/**/*.rs"
 ---
 
 # Domain — services & orchestration
 
-## Rôle
+## Role
 
-- La crate `domain` orchestre les workflows (ex: `DownloadService`).
-- Les services doivent rester indépendants de Rocket.
+- The `domain` crate owns business workflows such as `DownloadService`.
+- Services should stay independent from Rocket.
 
 ## DB
 
-- Les méthodes publiques de service acceptent en général `&mut diesel::SqliteConnection`.
-- Encapsuler les écritures multi-étapes dans une transaction (voir `TrackService::create_or_update`).
+- Public service methods usually accept `&mut diesel::SqliteConnection`.
+- Wrap multi-step writes in a transaction, for example as done in `TrackService::create_or_update`.
 
-## Références
+## References
 
-- Respecter la sémantique `ReferenceType` :
-  - `Source`/`Provider` = audio effectif, souvent “replace”
-  - `Metadata` = conserver des IDs/URLs (MusicBrainz/Spotify/etc), souvent “merge”
-- Quand on dédupe par qualité, fusionner proprement les refs au lieu d’écraser.
+- Respect the `ReferenceType` semantics:
+  - `Source` and `Provider` represent the effective audio path and are often replaced
+  - `Metadata` keeps durable IDs and URLs such as MusicBrainz or Spotify and is often merged
+- When deduplicating by quality, merge references carefully instead of overwriting them.
 
 ## WIP
 
-- Quand une étape est TODO (validation manuelle, playlist sync complet), garder le comportement actuel et ajouter du code derrière un flag / endpoint explicite si besoin.
+- When a step is still TODO, such as fuller manual validation or broader playlist sync, preserve the current behavior and add new code behind an explicit flag or endpoint when needed.

@@ -1,16 +1,17 @@
 ---
+description: "Use when: editing OpenRouter integration, AI prompt generation, metadata-cleanup prompts, or structured AI output handling in packages/ai."
 applyTo: "packages/ai/src/**/*.rs"
 ---
 
 # AI — OpenRouter / prompts
 
-## Rôle
+## Role
 
-- `AIClient::new()` lit `Config.ai` et instancie un backend (OpenRouter).
-- Les prompts vivent dans `packages/ai/src/prompts.rs` et servent surtout au nettoyage/standardisation de metadata.
+- `AIClient::new()` reads `Config.ai` and instantiates the configured backend, currently OpenRouter.
+- Prompts live in `packages/ai/src/prompts.rs` and mainly support metadata cleanup and standardization.
 
 ## Conventions
 
-- Ne jamais logger de secrets (API keys).
-- Les prompts doivent être déterministes : format d’entrée/sortie strict, et données JSON validables.
-- Préférer `generate_with_data` quand on attend un JSON structuré.
+- Never log secrets such as API keys.
+- Keep prompts deterministic: strict input and output shape, with JSON that can be validated.
+- Prefer `generate_with_data` when structured JSON output is expected.

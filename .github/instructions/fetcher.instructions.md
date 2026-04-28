@@ -1,16 +1,17 @@
 ---
+description: "Use when: editing source adapters, source URL validation, source metadata extraction, or metadata cleanup logic in packages/fetcher."
 applyTo: "packages/fetcher/src/**/*.rs"
 ---
 
 # Fetcher — sources (Spotify/YT Music/SoundCloud)
 
-## Rôle
+## Role
 
-- Convertir une URL source en `shared::models::*` + `ReferenceType::Source`.
-- Fournir des helpers de “clean” metadata (ex SoundCloud : titre/artistes).
+- Convert a source URL into `shared::models::*` values plus `ReferenceType::Source` references.
+- Provide metadata-cleaning helpers, for example for SoundCloud titles and artist names.
 
 ## Conventions
 
-- Si un provider n’est pas initialisable (credentials manquants, etc.), retourner `Error::ProviderUnavailable(Platform)`.
-- Garder `is_valid_*_url` strict (ne pas accepter de faux positifs).
-- Pour tout HTTP direct, utiliser le client proxy-aware (shared http builder) si possible.
+- If a provider cannot be initialized, for example because credentials are missing, return `Error::ProviderUnavailable(Platform)`.
+- Keep `is_valid_*_url` strict and avoid false positives.
+- For direct HTTP calls, use the proxy-aware shared HTTP builder when possible.

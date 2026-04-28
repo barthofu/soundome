@@ -1,14 +1,15 @@
 ---
+description: "Use when: editing metadata enrichment providers, audio tagging behavior, or file-tag writing logic in packages/tagger."
 applyTo: "packages/tagger/src/**/*.rs"
 ---
 
-# Tagger — metadata & fichiers audio
+# Tagger — metadata and audio files
 
-## Rôle
+## Role
 
-- Providers metadata (MusicBrainz) et tagging des fichiers audio via `tagger::file`.
+- Provide metadata enrichment, mainly through MusicBrainz, and tag audio files through `tagger::file`.
 
 ## Conventions
 
-- Le tagging doit être idempotent autant que possible.
-- En cas de match partiel / douteux, remonter une structure exploitable (pour une future validation web).
+- Keep tagging as idempotent as possible.
+- When a match is partial or uncertain, return a structure that can feed the web validation flow.

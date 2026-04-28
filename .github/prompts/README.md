@@ -1,5 +1,5 @@
-# Copilot prompt files (Soundome)
+# Copilot prompt files
 
-Ces fichiers sont des “skills”/prompts réutilisables pour Copilot Chat dans ce repo.
+This directory is reserved for one-off prompt templates.
 
-Utilisation : ouvrir un prompt depuis l’UI Copilot (Prompt files) puis fournir les paramètres demandés.
+Repository-specific reusable workflows now live under `.github/skills/` as first-class Copilot skills.
