@@ -54,4 +54,16 @@ impl TaskService {
     pub fn set_failed(&self, conn: &mut SqliteConnection, id: i32, error: &str) -> shared::types::SoundomeResult<()> {
         self.task_repo.set_failed(conn, id, error)
     }
+
+    /// Return all tasks currently stuck in `Running` status (e.g. after a crash).
+    pub fn get_stale_running(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<Vec<Task>> {
+        self.task_repo.get_by_status(conn, TaskStatus::Running.as_ref())
+    }
+
+    /// Reset a task (Running or Failed) back to Pending so it can be re-executed.
+    /// Progress is zeroed — already-processed tracks will be skipped automatically.
+    pub fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<Task> {
+        self.task_repo.reset_for_retry(conn, id)?;
+        self.task_repo.get_by_id(conn, id)
+    }
 }

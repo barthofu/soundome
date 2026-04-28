@@ -99,4 +99,26 @@ impl TaskRepository for DieselTaskRepository {
             .map_err(map_error)?;
         Ok(())
     }
+
+    fn get_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<Vec<Task>> {
+        let entities = schema::task::table
+            .filter(schema::task::status.eq(status))
+            .order(schema::task::id.asc())
+            .load::<TaskEntity>(conn)
+            .map_err(map_error)?;
+        Ok(entities.into_iter().map(TaskEntity::convert_to_domain).collect())
+    }
+
+    fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
+        diesel::update(schema::task::table.filter(schema::task::id.eq(id)))
+            .set((
+                schema::task::status.eq("Pending"),
+                schema::task::progress.eq(0),
+                schema::task::error.eq(None::<String>),
+                schema::task::updated_at.eq(chrono::Utc::now().naive_utc()),
+            ))
+            .execute(conn)
+            .map_err(map_error)?;
+        Ok(())
+    }
 }

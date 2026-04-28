@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use domain::services::ServiceLayer;
-use rocket::{get, http::Status, serde::json::Json};
+use rocket::{get, post, http::Status, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::Serialize;
-use shared::models::Task;
+use shared::models::{Task, TaskStatus, TaskType};
 
 use crate::utils::{database::Db, error::CustomError};
 
@@ -89,4 +89,80 @@ pub async fn get_by_id(
                 message: err.to_string(),
             })
         })
+}
+
+/// Retry a failed or interrupted task. Resets progress to 0 and re-spawns the background job.
+/// Already-downloaded tracks will be skipped automatically.
+#[openapi]
+#[post("/tasks/<id>/retry")]
+pub async fn retry(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<TaskDto>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let services_for_spawn = services.clone();
+
+    let task = db
+        .run(move |conn| {
+            let task = services.task_service.get_by_id(conn, id)?;
+
+            // Only allow retry for Failed or Running (stale) tasks
+            if task.status != TaskStatus::Failed && task.status != TaskStatus::Running {
+                return Err(shared::errors::Error::Custom(format!(
+                    "Task {} is in status {:?} and cannot be retried",
+                    id, task.status
+                )));
+            }
+
+            services.task_service.reset_for_retry(conn, id)
+        })
+        .await
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::BadRequest,
+                code: "RetryFailed".to_string(),
+                message: err.to_string(),
+            })
+        })?;
+
+    let task_id = task.id.expect("persisted task must have an id");
+
+    // Extract URL from the task payload
+    let url = extract_url_from_payload(&task.payload).ok_or_else(|| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "InvalidPayload".to_string(),
+            message: format!("Task {} has no url in payload", task_id),
+        })
+    })?;
+
+    match task.task_type {
+        TaskType::SyncPlaylist => {
+            super::download::spawn_playlist_sync_task(services_for_spawn, task_id, url);
+        }
+        _ => {
+            return Err(crate::utils::error::Error::Custom(CustomError {
+                status: Status::BadRequest,
+                code: "UnsupportedTaskType".to_string(),
+                message: format!("Retry is not supported for task type {:?}", task.task_type),
+            }));
+        }
+    }
+
+    TaskDto::from_task(task)
+        .ok_or_else(|| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: "Task has no id".to_string(),
+            })
+        })
+        .map(Json)
+}
+
+fn extract_url_from_payload(payload: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(payload)
+        .ok()
+        .and_then(|v| v.get("url")?.as_str().map(String::from))
 }

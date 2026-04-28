@@ -44,6 +44,53 @@ fn is_playlist_url(url: &str) -> bool {
         || url.contains("/album/")
 }
 
+/// Spawn a background OS thread that runs `sync_playlist_from_url` for the given task.
+///
+/// The task must already exist in the DB. The thread creates its own SQLite connection
+/// and single-threaded Tokio runtime.
+pub fn spawn_playlist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: String) {
+    let db_url = Config::get().database.url.clone();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to build background tokio runtime");
+
+        rt.block_on(async move {
+            let conn = &mut database::init_connection(&db_url);
+
+            if let Err(e) = services.task_service.set_running(conn, task_id) {
+                tracing::error!("Failed to set task {} as running: {}", task_id, e);
+            }
+
+            match services
+                .download_service
+                .sync_playlist_from_url(&url, conn, Some(task_id))
+                .await
+            {
+                Ok(_) => {
+                    if let Err(e) = services.task_service.set_completed(conn, task_id) {
+                        tracing::error!("Failed to mark task {} as completed: {}", task_id, e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Playlist sync task {} failed: {}", task_id, e);
+                    if let Err(e2) =
+                        services.task_service.set_failed(conn, task_id, &e.to_string())
+                    {
+                        tracing::error!(
+                            "Failed to mark task {} as failed: {}",
+                            task_id,
+                            e2
+                        );
+                    }
+                }
+            }
+        });
+    });
+}
+
 // ================================================================================================
 // Routes
 // ================================================================================================
@@ -78,48 +125,8 @@ pub async fn download(
             })?;
 
         let task_id = task.id.expect("created task must have an id");
-        let db_url = Config::get().database.url.clone();
 
-        // Spawn a dedicated OS thread with its own single-threaded Tokio runtime.
-        // This avoids `Send` constraints on `&mut SqliteConnection` across `.await` points.
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("failed to build background tokio runtime");
-
-            rt.block_on(async move {
-                let conn = &mut database::init_connection(&db_url);
-
-                if let Err(e) = services.task_service.set_running(conn, task_id) {
-                    tracing::error!("Failed to set task {} as running: {}", task_id, e);
-                }
-
-                match services
-                    .download_service
-                    .sync_playlist_from_url(&url, conn, Some(task_id))
-                    .await
-                {
-                    Ok(_) => {
-                        if let Err(e) = services.task_service.set_completed(conn, task_id) {
-                            tracing::error!("Failed to mark task {} as completed: {}", task_id, e);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Playlist sync task {} failed: {}", task_id, e);
-                        if let Err(e2) =
-                            services.task_service.set_failed(conn, task_id, &e.to_string())
-                        {
-                            tracing::error!(
-                                "Failed to mark task {} as failed: {}",
-                                task_id,
-                                e2
-                            );
-                        }
-                    }
-                }
-            });
-        });
+        spawn_playlist_sync_task(services, task_id, url);
 
         Ok(Json(serde_json::json!({
             "type": "playlist",

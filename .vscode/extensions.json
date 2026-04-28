@@ -5,6 +5,7 @@
         "mkhl.direnv",
         "Terrastruct.d2",
         "BarbossHack.crates-io",
-        "svelte.svelte-vscode"
+        "svelte.svelte-vscode",
+        "qwtel.sqlite-viewer"
     ]
 }
