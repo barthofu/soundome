@@ -107,8 +107,11 @@ pub async fn retry(
         .run(move |conn| {
             let task = services.task_service.get_by_id(conn, id)?;
 
-            // Only allow retry for Failed or Running (stale) tasks
-            if task.status != TaskStatus::Failed && task.status != TaskStatus::Running {
+            // Allow retry for Failed, Running (stale), or Pending (stuck) tasks
+            if task.status != TaskStatus::Failed
+                && task.status != TaskStatus::Running
+                && task.status != TaskStatus::Pending
+            {
                 return Err(shared::errors::Error::Custom(format!(
                     "Task {} is in status {:?} and cannot be retried",
                     id, task.status

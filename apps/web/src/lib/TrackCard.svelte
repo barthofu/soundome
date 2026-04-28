@@ -4,12 +4,11 @@
 
   interface Props {
     track: PendingValidationDto;
-    focused?: boolean;
     onApprove?: (id: number, patch: PatchValidationBody) => Promise<void>;
     onReject?: (id: number) => Promise<void>;
   }
 
-  let { track, focused = false, onApprove, onReject }: Props = $props();
+  let { track, onApprove, onReject }: Props = $props();
 
   let editing = $state(false);
   let busy = $state(false);
@@ -31,32 +30,27 @@
   let editLabel = $state(track.label ?? '');
 
   let cardEl: HTMLElement | undefined = $state();
+  let hovered = $state(false);
 
-  // Scroll into view when focused
+  // 'e' to open edit when hovered, Escape to close it
   $effect(() => {
-    if (focused && cardEl) {
-      cardEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!hovered || editing) return;
+    function onKeydown(e: KeyboardEvent) {
+      const tgt = e.target as HTMLElement;
+      if (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.tagName === 'SELECT') return;
+      if (e.key === 'e') { e.preventDefault(); startEdit(); }
     }
+    document.addEventListener('keydown', onKeydown);
+    return () => document.removeEventListener('keydown', onKeydown);
   });
 
-  // Listen for keyboard shortcut events from parent
   $effect(() => {
-    if (!cardEl) return;
-    function onEdit(e: Event) { e.stopPropagation(); startEdit(); }
-    function onApproveShortcut(e: Event) { e.stopPropagation(); handleApprove(); }
-    function onRejectShortcut(e: Event) { e.stopPropagation(); handleReject(); }
-    function onMatchesShortcut(e: Event) { e.stopPropagation(); toggleMatches(); }
-
-    cardEl.addEventListener('shortcut-edit', onEdit);
-    cardEl.addEventListener('shortcut-approve', onApproveShortcut);
-    cardEl.addEventListener('shortcut-reject', onRejectShortcut);
-    cardEl.addEventListener('shortcut-matches', onMatchesShortcut);
-    return () => {
-      cardEl!.removeEventListener('shortcut-edit', onEdit);
-      cardEl!.removeEventListener('shortcut-approve', onApproveShortcut);
-      cardEl!.removeEventListener('shortcut-reject', onRejectShortcut);
-      cardEl!.removeEventListener('shortcut-matches', onMatchesShortcut);
-    };
+    if (!editing) return;
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key === 'Escape') { e.preventDefault(); editing = false; }
+    }
+    document.addEventListener('keydown', onKeydown);
+    return () => document.removeEventListener('keydown', onKeydown);
   });
 
   function startEdit() {
@@ -182,7 +176,9 @@
   let isPartialMatch = $derived(track.validation_reason === 'metadata_partial_match');
 </script>
 
-<article class="track-card" class:editing class:focused bind:this={cardEl}>
+<article class="track-card" class:editing bind:this={cardEl}
+  onmouseenter={() => hovered = true}
+  onmouseleave={() => hovered = false}>
   <div class="cover">
     {#if track.cover}
       <img src={track.cover} alt="cover" />
@@ -359,11 +355,6 @@
 
   .track-card.editing {
     border-color: var(--accent);
-  }
-
-  .track-card.focused {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
   }
 
   .cover {

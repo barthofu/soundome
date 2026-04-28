@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { getTasks } from '../lib/api';
+  import { getTasks, retryTask } from '../lib/api';
   import type { TaskDto } from '../lib/types';
 
   let tasks: TaskDto[] = $state([]);
   let loading = $state(true);
+  let retrying: Set<number> = $state(new Set());
   let interval: ReturnType<typeof setInterval>;
 
   async function refresh() {
@@ -14,6 +15,18 @@
       // silent
     } finally {
       loading = false;
+    }
+  }
+
+  async function handleRetry(task: TaskDto) {
+    retrying = new Set([...retrying, task.id]);
+    try {
+      await retryTask(task.id);
+      await refresh();
+    } catch (e) {
+      alert(`Échec du retry : ${e instanceof Error ? e.message : e}`);
+    } finally {
+      retrying = new Set([...retrying].filter((id) => id !== task.id));
     }
   }
 
@@ -42,6 +55,10 @@
     if (task.task_type === 'SyncPlaylist') return 'Synchronisation de playlist';
     return 'Téléchargement';
   }
+
+  function canRetry(status: TaskDto['status']) {
+    return status === 'Pending' || status === 'Failed' || status === 'Running';
+  }
 </script>
 
 <div class="tasks-page">
@@ -57,7 +74,18 @@
         <li class="task-card">
           <div class="task-header">
             <span class="task-label">{taskLabel(task)}</span>
-            <span class="status-badge {statusClass(task.status)}">{statusLabel(task.status)}</span>
+            <div class="task-header-right">
+              {#if canRetry(task.status)}
+                <button
+                  class="retry-btn"
+                  disabled={retrying.has(task.id)}
+                  onclick={() => handleRetry(task)}
+                >
+                  {retrying.has(task.id) ? '…' : 'Relancer'}
+                </button>
+              {/if}
+              <span class="status-badge {statusClass(task.status)}">{statusLabel(task.status)}</span>
+            </div>
           </div>
 
           {#if task.status === 'Running' || task.status === 'Completed'}
@@ -130,6 +158,32 @@
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .task-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .retry-btn {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+    border: 1px solid #555;
+    background: transparent;
+    color: #aaa;
+    cursor: pointer;
+  }
+  .retry-btn:hover:not(:disabled) {
+    background: #2a2a2a;
+    color: #fff;
+  }
+  .retry-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .task-label {
