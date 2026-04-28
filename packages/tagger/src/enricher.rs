@@ -7,6 +7,7 @@ use crate::{TagProvider, providers};
 enum MetadataProvider {
     MusicBrainz(providers::musicbrainz::MusicBrainz),
     Bandcamp(providers::bandcamp::Bandcamp),
+    Spotify(providers::spotify::Spotify),
 }
 
 impl MetadataProvider {
@@ -14,6 +15,7 @@ impl MetadataProvider {
         match self {
             Self::MusicBrainz(p) => p.get_best_match_from_track(track).await,
             Self::Bandcamp(p) => p.get_best_match_from_track(track).await,
+            Self::Spotify(p) => p.get_best_match_from_track(track).await,
         }
     }
 }
@@ -26,6 +28,7 @@ fn build_providers() -> Vec<MetadataProvider> {
         .iter()
         .filter_map(|name| match name.as_str() {
             "musicbrainz" => Some(MetadataProvider::MusicBrainz(providers::musicbrainz::MusicBrainz::new())),
+            "spotify" => providers::spotify::Spotify::new().map(MetadataProvider::Spotify),
             "bandcamp" => Some(MetadataProvider::Bandcamp(providers::bandcamp::Bandcamp::new())),
             other => {
                 tracing::warn!("Unknown tagger metadata provider in config: {:?}, skipping", other);

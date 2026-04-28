@@ -14,3 +14,8 @@ id3 = "1.16.2"
 chrono = "0.4.39"
 musicbrainz_rs = "0.9.0"
 bandcamp = "0.3.4"
+rspotify = { version = "0.16.0", default-features = false, features = [
+  "env-file",
+  "client-ureq",
+  "ureq-rustls-tls",
+] }

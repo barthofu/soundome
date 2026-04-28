@@ -100,7 +100,7 @@ pub struct OpenRouterConfig {
 #[allow(unused)]
 pub struct TaggerConfig {
     /// List of enabled metadata provider names, in priority order.
-    /// Supported values: "musicbrainz", "bandcamp"
+    /// Supported values: "musicbrainz", "bandcamp", "spotify"
     #[serde(default = "TaggerConfig::default_providers")]
     pub metadata_providers: Vec<String>,
 }

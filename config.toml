@@ -5,7 +5,7 @@ temp_download_dir = "./temp"
 [tagger]
 # Metadata providers to use, in priority order.
 # Supported values: "musicbrainz", "bandcamp"
-metadata_providers = ["musicbrainz", "bandcamp"]
+metadata_providers = ["musicbrainz", "bandcamp", "spotify"]
 
 [logs]
 level = "info" # Options: "error", "warn", "info", "debug", "trace"

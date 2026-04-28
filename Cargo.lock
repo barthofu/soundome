@@ -4423,6 +4423,7 @@ dependencies = [
  "config 0.1.0",
  "id3",
  "musicbrainz_rs",
+ "rspotify",
  "shared",
  "tracing",
 ]
