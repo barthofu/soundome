@@ -117,7 +117,7 @@ impl DownloadService {
         // Clean metadata for all new tracks
         let mut new_track_values: Vec<Track> = new_tracks.iter().map(|(_, t)| t.clone()).collect();
         if let Err(e) = fetcher.clean_tracks_metadata(&mut new_track_values.iter_mut().collect::<Vec<_>>()).await {
-            tracing::info!("Failed to clean tracks title and artist name: {}", e);
+            tracing::warn!("Failed to clean tracks title and artist name: {}", e);
         }
 
         // Process each new track and link it to the playlist

@@ -31,11 +31,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=server",
-                    "--package=server"
+                    "--bin=soundome-server",
+                    "--package=soundome-server"
                 ],
                 "filter": {
-                    "name": "server",
+                    "name": "soundome-server",
                     "kind": "bin"
                 }
             },

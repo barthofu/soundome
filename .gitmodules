@@ -1,0 +1,3 @@
+[submodule "libs/openrouter_api"]
+	path = libs/openrouter_api
+	url = https://github.com/barthofu/openrouter_api

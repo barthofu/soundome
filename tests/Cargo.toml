@@ -24,7 +24,7 @@ diesel = { version = "2.2.7", features = ["sqlite", "r2d2"] }
 rsoundcloud = "0.2.3"
 # rsoundcloud = { path = "../../rsoundcloud" } # for local testing purposes
 fancy-regex = "0.14.0"
-openrouter_api = { path = "../../openrouter_api" }
+openrouter_api = { path = "../libs/openrouter_api" }
 openrouter = "0.1.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"

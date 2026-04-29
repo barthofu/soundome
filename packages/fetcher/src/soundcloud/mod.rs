@@ -162,7 +162,7 @@ impl Source for Soundcloud {
             .client
             .get_playlist_tracks(ResourceId::Url(url.to_string()))
             .await
-            .map_err(mappers::convert_error)?;
+            .map_err(|_| Error::NotFound(format!("SoundCloud playlist tracks from {}", url)))?;
 
         Ok(
             join_all(tracks.into_iter().map(|track| self.get_complete_track_from_music_track(track)))

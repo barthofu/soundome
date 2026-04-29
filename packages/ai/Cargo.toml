@@ -7,7 +7,8 @@ edition = "2021"
 shared = { path = "../shared" }
 config = { path = "../config" }
 
-openrouter_api = { path = "../../../openrouter_api" }
+openrouter_api = { path = "../../libs/openrouter_api" }
+# openrouter_api = "0.6.0"
 
 tracing = { workspace = true }
 

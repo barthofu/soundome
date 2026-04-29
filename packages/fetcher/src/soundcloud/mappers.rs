@@ -6,13 +6,13 @@ use shared::{
     },
 };
 
-/// Converts an rspotify ClientError into a shared Error.
+/// Converts an rsoundcloud ClientError into a shared Error.
 pub fn convert_error(err: rsoundcloud::ClientError) -> Error {
     match err {
         rsoundcloud::ClientError::Http(ref http_error) => match http_error.as_ref() {
             rsoundcloud::http::HttpError::Client(err) => Error::Custom(err.to_string()),
             rsoundcloud::http::HttpError::StatusCode(response) => match response.status() {
-                StatusCode::NOT_FOUND => Error::NotFound("Resource not found".to_string()),
+                StatusCode::NOT_FOUND => Error::NotFound("SoundCloud resource. Are you sure it exists and is public?".to_string()),
                 _ => Error::Http(response.status().to_string(), "".to_string()),
             },
         },
