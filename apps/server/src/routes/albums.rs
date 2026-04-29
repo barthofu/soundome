@@ -50,6 +50,7 @@ impl AlbumDto {
 pub struct UpdateAlbumBody {
     pub title: Option<String>,
     pub date: Option<String>,
+    pub cover: Option<String>,
 }
 
 // ================================================================================================
@@ -110,6 +111,7 @@ pub async fn update(
         let mut album = services.album_service.get_by_id(conn, id)?;
         if let Some(title) = body.title { album.title = title; }
         if let Some(date) = body.date { album.date = Some(date); }
+        if let Some(cover) = body.cover { album.cover = Some(cover); }
         services.album_service.update(conn, id, &album)
     })
     .await

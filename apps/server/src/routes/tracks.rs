@@ -76,6 +76,7 @@ pub struct UpdateTrackBody {
     pub track_number: Option<i32>,
     pub disc_number: Option<i32>,
     pub label: Option<String>,
+    pub cover: Option<String>,
 }
 
 // ================================================================================================
@@ -141,6 +142,7 @@ pub async fn update(
         if let Some(tn) = body.track_number { track.track_number = Some(tn); }
         if let Some(dn) = body.disc_number { track.disc_number = Some(dn); }
         if let Some(label) = body.label { track.label = Some(label); }
+        if let Some(cover) = body.cover { track.cover = Some(cover); }
 
         if let Some(names) = body.artists {
             track.artists = names.into_iter().map(|name| Artist {

@@ -33,6 +33,7 @@ impl ArtistDto {
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateArtistBody {
     pub name: Option<String>,
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -100,6 +101,7 @@ pub async fn update(
     db.run(move |conn| {
         let mut artist = services.artist_service.get_by_id(conn, id)?;
         if let Some(name) = body.name { artist.name = name; }
+        if let Some(icon) = body.icon { artist.icon = Some(icon); }
         services.artist_service.update(conn, id, &artist)
     })
     .await

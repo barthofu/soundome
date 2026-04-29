@@ -105,6 +105,7 @@ export interface UpdateTrackBody {
   track_number?: number;
   disc_number?: number;
   label?: string;
+  cover?: string;
 }
 
 export interface LibraryAlbumDto {
@@ -119,6 +120,7 @@ export interface LibraryAlbumDto {
 export interface UpdateAlbumBody {
   title?: string;
   date?: string;
+  cover?: string;
 }
 
 export interface LibraryArtistDto {
@@ -129,4 +131,5 @@ export interface LibraryArtistDto {
 
 export interface UpdateArtistBody {
   name?: string;
+  icon?: string;
 }

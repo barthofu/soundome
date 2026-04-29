@@ -2,6 +2,10 @@
 address = "0.0.0.0"
 port = 8000
 
+[default.limits]
+file = "10 MiB"
+form = "10 MiB"
+
 [global.databases.sqlite]
 url = "data/soundome.db"
 pool_size = 10

@@ -231,6 +231,37 @@ export async function mergeArtists(
 }
 
 // ================================================================================================
+// Image uploads
+// ================================================================================================
+
+export interface ImageResponse {
+  url: string;
+}
+
+async function uploadImage(endpoint: string, file: File): Promise<ImageResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(endpoint, { method: 'POST', body: form });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function uploadArtistImage(id: number, file: File): Promise<ImageResponse> {
+  return uploadImage(`${BASE}/artists/${id}/image`, file);
+}
+
+export async function uploadAlbumImage(id: number, file: File): Promise<ImageResponse> {
+  return uploadImage(`${BASE}/albums/${id}/image`, file);
+}
+
+export async function uploadTrackImage(id: number, file: File): Promise<ImageResponse> {
+  return uploadImage(`${BASE}/tracks/${id}/image`, file);
+}
+
+// ================================================================================================
 // Sync Schedules
 // ================================================================================================
 
