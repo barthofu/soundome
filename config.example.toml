@@ -1,0 +1,214 @@
+# =============================================================================
+# Soundome — example configuration
+# =============================================================================
+#
+# Copy this file to config.toml and fill in your values.
+# Any key can be overridden at runtime with an environment variable using the
+# prefix SOUNDOME__ and double-underscore as the section separator.
+# Examples:
+#   SOUNDOME__GENERAL__BASE_LIBRARY_DIR=/mnt/music
+#   SOUNDOME__PROVIDERS__SPOTIFY__CLIENT_SECRET=secret
+#
+# The path to this file itself can be changed via:
+#   SOUNDOME_CONFIG_PATH=/path/to/custom-config.toml
+#
+# =============================================================================
+
+
+# =============================================================================
+# [server]  (optional)
+# =============================================================================
+# Overrides for the Rocket HTTP server binding.
+# When omitted, the values from Rocket.toml are used unchanged.
+# These keys take priority over Rocket.toml but are still overridden by
+# Rocket's own native env vars (ROCKET_ADDRESS, ROCKET_PORT).
+#
+# ENV: SOUNDOME__SERVER__HOST
+#      SOUNDOME__SERVER__PORT
+# =============================================================================
+# [server]
+
+# IP address or hostname to bind. Use "0.0.0.0" to listen on all interfaces.
+# ENV: SOUNDOME__SERVER__HOST
+# host = "0.0.0.0"
+
+# TCP port the server listens on.
+# ENV: SOUNDOME__SERVER__PORT
+# port = 8000
+
+
+# =============================================================================
+# [general]
+# =============================================================================
+# Core filesystem paths used throughout the application.
+# =============================================================================
+[general]
+
+# Root directory of the organized music library.
+# Finalized tracks are placed under <base_library_dir>/<Artist>/<Album>/<Track>.
+# ENV: SOUNDOME__GENERAL__BASE_LIBRARY_DIR
+base_library_dir = "./library"
+
+# Temporary staging directory for files being downloaded or processed.
+# Files are moved out of here once finalization succeeds.
+# ENV: SOUNDOME__GENERAL__TEMP_DOWNLOAD_DIR
+temp_download_dir = "./temp"
+
+
+# =============================================================================
+# [logs]
+# =============================================================================
+# Logging and tracing configuration.
+# =============================================================================
+[logs]
+
+# Minimum tracing level emitted to stdout.
+# Options: "error", "warn", "info", "debug", "trace"
+# ENV: SOUNDOME__LOGS__LEVEL
+level = "info"
+
+# When true, enables verbose HTTP request/response logging from reqwest.
+# Useful for debugging provider calls. Requires level = "debug" or lower.
+# ENV: SOUNDOME__LOGS__ENABLE_REQWEST_LOGGING
+enable_reqwest_logging = false
+
+
+# =============================================================================
+# [database]
+# =============================================================================
+# SQLite database connection used by packages/database.
+# The Rocket.toml file defines a separate database path for the server pool;
+# keep both values aligned.
+# =============================================================================
+[database]
+
+# SQLite connection URL.
+# ENV: SOUNDOME__DATABASE__URL
+url = "./data/soundome.db"
+
+# Optional connection pool size. Omit to use the default.
+# ENV: SOUNDOME__DATABASE__POOL_SIZE
+# pool_size = 5
+
+
+# =============================================================================
+# [providers]
+# =============================================================================
+# Credentials and settings for external provider integrations.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Spotify
+# Required. Used for metadata fetching and source resolution.
+# Obtain credentials at https://developer.spotify.com/dashboard
+# -----------------------------------------------------------------------------
+[providers.spotify]
+
+# Spotify OAuth client ID.
+# ENV: SOUNDOME__PROVIDERS__SPOTIFY__CLIENT_ID
+client_id = "your_spotify_client_id"
+
+# Spotify OAuth client secret.
+# ENV: SOUNDOME__PROVIDERS__SPOTIFY__CLIENT_SECRET
+client_secret = "your_spotify_client_secret"
+
+# -----------------------------------------------------------------------------
+# YouTube (optional)
+# When omitted, the default YouTube / YouTube Music integration is used.
+# -----------------------------------------------------------------------------
+# [providers.youtube]
+
+# Base URL of an Invidious instance to use instead of direct YouTube access.
+# ENV: SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE
+# invidious_instance = "https://invidious.example.com"
+
+
+# =============================================================================
+# [ai]
+# =============================================================================
+# AI-assisted metadata cleanup via OpenRouter.
+# Set enabled = false to skip all AI enrichment steps.
+# =============================================================================
+[ai]
+
+# Master switch for AI-powered metadata enrichment.
+# ENV: SOUNDOME__AI__ENABLED
+enabled = false
+
+# OpenRouter API credentials and model selection (required when enabled = true).
+# Obtain an API key at https://openrouter.ai
+[ai.openrouter]
+
+# OpenRouter API key.
+# ENV: SOUNDOME__AI__OPENROUTER__API_KEY
+api_key = "your_openrouter_api_key"
+
+# Model identifier to use for completions, e.g. "openai/gpt-4o-mini".
+# Omit to use the application default.
+# ENV: SOUNDOME__AI__OPENROUTER__MODEL
+# model = "openai/gpt-4o-mini"
+
+# Preferred inference provider within OpenRouter, e.g. "openai".
+# Omit to let OpenRouter choose.
+# ENV: SOUNDOME__AI__OPENROUTER__PROVIDER
+# provider = "openai"
+
+# Override the OpenRouter API base URL. Useful for local proxies or testing.
+# ENV: SOUNDOME__AI__OPENROUTER__BASE_URL
+# base_url = "https://openrouter.ai/api/v1"
+
+# HTTP request timeout in seconds for OpenRouter calls.
+# ENV: SOUNDOME__AI__OPENROUTER__TIMEOUT
+# timeout = 30
+
+
+# =============================================================================
+# [tagger]
+# =============================================================================
+# Metadata enrichment providers used when tagging audio files.
+# =============================================================================
+[tagger]
+
+# Ordered list of metadata providers. Providers are tried in the given order
+# and the first successful result is used.
+# Supported values: "musicbrainz", "bandcamp", "spotify"
+# ENV: SOUNDOME__TAGGER__METADATA_PROVIDERS
+metadata_providers = ["musicbrainz", "bandcamp", "spotify"]
+
+
+# =============================================================================
+# [proxy]  (optional)
+# =============================================================================
+# Outbound HTTP proxy configuration shared across the application.
+# Omit this section entirely to disable proxy support.
+#
+# Proxy URLs are passed to reqwest and support HTTP, HTTPS, and SOCKS5.
+# Credentials can be embedded in the URL or provided in colon-separated form:
+#   Standard:          "socks5://user:pass@host:port"
+#   Colon-separated:   "host:port:user:pass"
+#
+# See docs/operations/proxy-configuration.md for details.
+# =============================================================================
+# [proxy]
+
+# Enable or disable the proxy. Set to false to bypass without removing the section.
+# ENV: SOUNDOME__PROXY__ENABLED
+# enabled = true
+
+# List of proxy URLs. When multiple URLs are given, the rotation strategy applies.
+# ENV: SOUNDOME__PROXY__URLS
+# urls = [
+#     "socks5://localhost:1080",
+#     "http://user:pass@proxy.example.com:8080",
+#     "64.137.96.74:6641:username:password",    # colon-separated format
+# ]
+
+# Proxy rotation strategy.
+# Options: "round_robin", "random", "sticky_per_hour", "first_available"
+# Default: "round_robin"
+# ENV: SOUNDOME__PROXY__STRATEGY
+# strategy = "round_robin"
+
+# Hosts and domains that bypass the proxy.
+# ENV: SOUNDOME__PROXY__NO_PROXY
+# no_proxy = ["localhost", "127.0.0.1", "*.local"]

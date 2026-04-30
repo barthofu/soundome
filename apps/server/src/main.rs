@@ -146,7 +146,21 @@ fn rocket() -> _ {
 
     // let artist_service = Arc::new(ArtistService::new(artist_repo.clone()));
 
-    rocket::build()
+    // Rocket — build a figment from the standard Rocket.toml / ROCKET_* sources,
+    // then layer any SOUNDOME__SERVER__* overrides on top.
+    let figment = {
+        let soundome_cfg = Config::get();
+        let mut f = rocket::Config::figment();
+        if let Some(host) = &soundome_cfg.server.host {
+            f = f.merge(("address", host.as_str()));
+        }
+        if let Some(port) = soundome_cfg.server.port {
+            f = f.merge(("port", port));
+        }
+        f
+    };
+
+    rocket::custom(figment)
         .attach(Cors)
         .attach(Db::fairing())
         .manage(services)

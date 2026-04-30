@@ -11,6 +11,8 @@ pub struct Config {
     pub proxy: Option<ProxyConfig>,
     #[serde(default)]
     pub tagger: TaggerConfig,
+    #[serde(default)]
+    pub server: ServerConfig,
 }
 
 // ===============================================================================
@@ -143,4 +145,20 @@ pub enum ProxyStrategy {
     StickyPerHour,
     #[serde(rename = "first_available")]
     FirstAvailable,
+}
+
+// ===============================================================================
+// Server
+// ===============================================================================
+
+/// Optional server binding overrides. When omitted, Rocket.toml values apply.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(unused)]
+pub struct ServerConfig {
+    /// IP address or hostname to bind. E.g. "0.0.0.0" or "127.0.0.1".
+    /// ENV: SOUNDOME__SERVER__HOST
+    pub host: Option<String>,
+    /// TCP port to listen on.
+    /// ENV: SOUNDOME__SERVER__PORT
+    pub port: Option<u16>,
 }

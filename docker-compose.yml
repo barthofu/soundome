@@ -1,0 +1,16 @@
+services:
+
+  soundome:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.all-in-one
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./library:/app/library
+      - ./temp:/app/temp
+      - ./config.toml:/app/config.toml:ro
+    restart: unless-stopped

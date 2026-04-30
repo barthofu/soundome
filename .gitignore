@@ -1,5 +1,6 @@
 # env
 .direnv
+.env
 
 # build
 target/
@@ -8,8 +9,8 @@ target/
 node_modules/
 dist/
 
-# secrets
-.env
+# config
+config.toml
 
 # ide
 .idea/

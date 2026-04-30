@@ -1,0 +1,72 @@
+FROM lukemathwalker/cargo-chef:0.1.77-rust-alpine AS cargo-chef
+FROM alpine:3.23 AS base
+
+# ==================
+# ===== libs =======
+# ==================
+FROM base AS libs
+    RUN apk add --no-cache curl tar xz openssl
+
+    RUN curl -L -o /yt-dlp "https://github.com/yt-dlp/yt-dlp/releases/2026.03.17/download/yt-dlp" \
+        && chmod +x /yt-dlp
+
+    RUN curl -L -o /tmp/ffmpeg.tar.xz "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" \
+        && tar -xf /tmp/ffmpeg.tar.xz -C /tmp --strip-components=1 \
+        && mv /tmp/ffmpeg /ffmpeg \
+        && chmod +x /ffmpeg \
+        && rm /tmp/ffmpeg.tar.xz
+
+# ==================
+# == dependencies ==
+# ==================
+FROM cargo-chef AS dependencies
+    WORKDIR /app
+
+    COPY . .
+
+    # use chef to prepare the dependency tree json
+    RUN cargo chef prepare --recipe-path recipe.json
+
+# ==================
+# ==== builder =====
+# ==================
+FROM cargo-chef AS builder
+    WORKDIR /app
+
+    RUN apk add --no-cache pkgconfig openssl-dev openssl-libs-static musl-dev
+
+    # first, build the dependencies in a separate layer, in order to cache 
+    # them and avoid rebuilding them every time the source code changes
+    COPY --from=dependencies /app/recipe.json .
+    RUN cargo chef cook --release --recipe-path recipe.json
+
+    # copy all the source code
+    COPY . .
+
+    # build the application
+    RUN cargo build --release --bin soundome-server
+
+# ==================
+# ==== runner ======
+# ==================
+FROM base AS runner
+    WORKDIR /app
+
+    # create a user and a group to run the app more securely and properly
+    RUN addgroup --system --gid 1000 soundome \
+        && adduser --system --uid 1000 soundome
+
+    # embed Rocket config so users don't need to set ROCKET_* env vars
+    COPY Rocket.toml .
+
+    # copy the binary from the previous stage
+    COPY --from=builder /app/target/release/soundome-server .
+
+    # copy external tools from the libs stage (cached independently from the Rust build)
+    COPY --from=libs /yt-dlp /usr/local/bin/yt-dlp
+    COPY --from=libs /ffmpeg /usr/local/bin/ffmpeg
+
+    USER soundome
+
+    # start the app
+    CMD ["./soundome-server"]
