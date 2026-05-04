@@ -3,7 +3,7 @@ services:
   soundome:
     build:
       context: .
-      dockerfile: infra/docker/Dockerfile.all-in-one
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:

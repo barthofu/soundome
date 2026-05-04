@@ -3,10 +3,15 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct Config {
+    #[serde(default)]
     pub general: GeneralConfig,
+    #[serde(default)]
     pub logs: LogsConfig,
+    #[serde(default)]
     pub database: DatabaseConfig,
+    #[serde(default)]
     pub providers: ProvidersConfig,
+    #[serde(default)]
     pub ai: AiConfig,
     pub proxy: Option<ProxyConfig>,
     #[serde(default)]
@@ -22,8 +27,24 @@ pub struct Config {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct GeneralConfig {
+    #[serde(default = "GeneralConfig::default_base_library_dir")]
     pub base_library_dir: String,
+    #[serde(default = "GeneralConfig::default_temp_download_dir")]
     pub temp_download_dir: String,
+}
+
+impl Default for GeneralConfig {
+    fn default() -> Self {
+        Self {
+            base_library_dir: Self::default_base_library_dir(),
+            temp_download_dir: Self::default_temp_download_dir(),
+        }
+    }
+}
+
+impl GeneralConfig {
+    fn default_base_library_dir() -> String { "./library".to_string() }
+    fn default_temp_download_dir() -> String { "./temp".to_string() }
 }
 
 // ===============================================================================
@@ -33,8 +54,23 @@ pub struct GeneralConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct LogsConfig {
+    #[serde(default = "LogsConfig::default_level")]
     pub level: String,
+    #[serde(default)]
     pub enable_reqwest_logging: bool,
+}
+
+impl Default for LogsConfig {
+    fn default() -> Self {
+        Self {
+            level: Self::default_level(),
+            enable_reqwest_logging: false,
+        }
+    }
+}
+
+impl LogsConfig {
+    fn default_level() -> String { "info".to_string() }
 }
 
 // ===============================================================================
@@ -44,18 +80,32 @@ pub struct LogsConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct DatabaseConfig {
+    #[serde(default = "DatabaseConfig::default_url")]
     pub url: String,
     pub pool_size: Option<u32>,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            url: Self::default_url(),
+            pool_size: None,
+        }
+    }
+}
+
+impl DatabaseConfig {
+    fn default_url() -> String { "./data/soundome.db".to_string() }
 }
 
 // ===============================================================================
 // Providers
 // ===============================================================================
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[allow(unused)]
 pub struct ProvidersConfig {
-    pub spotify: SpotifyConfig,
+    pub spotify: Option<SpotifyConfig>,
     pub youtube: Option<YoutubeConfig>,
 }
 
@@ -79,8 +129,18 @@ pub struct YoutubeConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct AiConfig {
+    #[serde(default)]
     pub enabled: bool,
     pub openrouter: Option<OpenRouterConfig>,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            openrouter: None,
+        }
+    }
 }
 
 
@@ -117,7 +177,7 @@ impl Default for TaggerConfig {
 
 impl TaggerConfig {
     fn default_providers() -> Vec<String> {
-        vec!["musicbrainz".to_string()]
+        vec!["musicbrainz".to_string(), "bandcamp".to_string(), "spotify".to_string()]
     }
 }
 

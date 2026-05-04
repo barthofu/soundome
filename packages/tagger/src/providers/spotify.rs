@@ -25,8 +25,15 @@ impl Spotify {
 
     pub fn new() -> Option<Self> {
         let config = Config::get();
-        let client_id = &config.providers.spotify.client_id;
-        let client_secret = &config.providers.spotify.client_secret;
+        let spotify_cfg = match config.providers.spotify.as_ref() {
+            Some(c) => c,
+            None => {
+                tracing::debug!("Spotify metadata provider: no credentials in config, skipping");
+                return None;
+            }
+        };
+        let client_id = &spotify_cfg.client_id;
+        let client_secret = &spotify_cfg.client_secret;
 
         if client_id.is_empty() || client_secret.is_empty() {
             tracing::warn!("Spotify metadata provider: missing credentials, skipping");

@@ -42,15 +42,18 @@ pub struct Fetcher {
 impl Fetcher {
     pub async fn new() -> Self {
         Self {
-            spotify: Spotify::new(
-                &Config::get().providers.spotify.client_id,
-                &Config::get().providers.spotify.client_secret,
-            )
-                .map_err(|e| {
-                    tracing::error!("Failed to initialize Spotify source: {:?}", e);
-                    e
-                })
-                .ok(),
+            spotify: Config::get()
+                .providers
+                .spotify
+                .as_ref()
+                .and_then(|cfg| {
+                    Spotify::new(&cfg.client_id, &cfg.client_secret)
+                        .map_err(|e| {
+                            tracing::error!("Failed to initialize Spotify source: {:?}", e);
+                            e
+                        })
+                        .ok()
+                }),
             youtube_music: YoutubeMusic::new()
                 .map_err(|e| {
                     tracing::error!("Failed to initialize YouTube Music source: {:?}", e);
