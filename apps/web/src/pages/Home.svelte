@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { downloadUrl, getRecentTracks } from '../lib/api';
+  import { downloadUrl, getRecentTracks, getProviders } from '../lib/api';
   import type { DownloadResult, RecentTrack } from '../lib/api';
 
   let { onNavigateTasks = undefined }: { onNavigateTasks?: () => void } = $props();
@@ -12,6 +12,7 @@
 
   let recentTracks: RecentTrack[] = $state([]);
   let recentLoading = $state(true);
+  let providers: string[] = $state([]);
 
   async function loadRecent() {
     try {
@@ -23,7 +24,10 @@
     }
   }
 
-  onMount(loadRecent);
+  onMount(() => {
+    loadRecent();
+    getProviders().then((p) => { providers = p; });
+  });
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
@@ -98,13 +102,14 @@
     {/if}
   {/if}
 
-  <div class="supported">
-    <span>Supported:</span>
-    <span class="platform">Spotify</span>
-    <span class="platform">SoundCloud</span>
-    <span class="platform">YouTube</span>
-    <span class="platform">YouTube Music</span>
-  </div>
+  {#if providers.length > 0}
+    <div class="supported">
+      <span>Supported:</span>
+      {#each providers as platform}
+        <span class="platform">{platform}</span>
+      {/each}
+    </div>
+  {/if}
 
   <section class="recent">
     <h2>Recent downloads</h2>

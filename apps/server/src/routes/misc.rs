@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
+use config::Config;
 use domain::services::ServiceLayer;
 use rocket::{get, http::Status, serde::json::Json};
 use rocket_okapi::openapi;
+use schemars::JsonSchema;
+use serde::Serialize;
 use shared::models::Artist;
 
 use crate::utils::{database::Db, error::CustomError};
@@ -31,4 +34,32 @@ pub async fn get_all(
                 message: err.to_string(),
             })
         )
+}
+
+#[derive(Serialize, JsonSchema)]
+pub struct ProvidersResponse {
+    /// Source providers that are enabled and fully configured.
+    pub providers: Vec<String>,
+}
+
+/// Returns the list of source providers that are available (enabled + configured).
+#[openapi]
+#[get("/providers")]
+pub fn get_providers() -> Json<ProvidersResponse> {
+    let config = Config::get();
+    let mut providers = Vec::new();
+
+    // Spotify requires non-empty credentials
+    if let Some(spotify) = config.providers.spotify.as_ref() {
+        if !spotify.client_id.is_empty() && !spotify.client_secret.is_empty() {
+            providers.push("Spotify".to_string());
+        }
+    }
+
+    // SoundCloud and YouTube don't require credentials
+    providers.push("SoundCloud".to_string());
+    providers.push("YouTube".to_string());
+    providers.push("YouTube Music".to_string());
+
+    Json(ProvidersResponse { providers })
 }

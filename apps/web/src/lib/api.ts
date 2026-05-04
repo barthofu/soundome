@@ -95,6 +95,13 @@ export type RecentTrack = {
   validation_reason: string | null;
 };
 
+export async function getProviders(): Promise<string[]> {
+  const res = await fetch(`${BASE}/providers`);
+  if (!res.ok) return [];
+  const data: { providers: string[] } = await res.json();
+  return data.providers;
+}
+
 export async function getRecentTracks(limit = 20): Promise<RecentTrack[]> {
   const res = await fetch(`${BASE}/tracks/recent?limit=${limit}`);
   if (!res.ok) throw new Error(`Failed to fetch recent tracks: ${res.statusText}`);

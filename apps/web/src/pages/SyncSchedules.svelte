@@ -16,7 +16,7 @@
   // Create form
   let newUrl = $state('');
   let newLabel = $state('');
-  let newInterval = $state(3600);
+  let newIntervalMinutes = $state(60);
   let creating = $state(false);
   let createError: string | null = $state(null);
 
@@ -44,10 +44,10 @@
     creating = true;
     createError = null;
     try {
-      await createSyncSchedule(newUrl.trim(), newLabel.trim() || null, newInterval);
+      await createSyncSchedule(newUrl.trim(), newLabel.trim() || null, newIntervalMinutes * 60);
       newUrl = '';
       newLabel = '';
-      newInterval = 3600;
+      newIntervalMinutes = 60;
       await load();
     } catch (e: unknown) {
       createError = e instanceof Error ? e.message : String(e);
@@ -131,12 +131,12 @@
         <div class="interval-group">
           <input
             type="number"
-            min="60"
-            step="60"
-            bind:value={newInterval}
+            min="1"
+            step="1"
+            bind:value={newIntervalMinutes}
             disabled={creating}
           />
-          <span class="interval-hint">seconds ({formatInterval(newInterval)})</span>
+          <span class="interval-hint">min ({formatInterval(newIntervalMinutes * 60)})</span>
         </div>
         <button type="submit" disabled={creating || !newUrl.trim()}>
           {#if creating}<span class="spinner"></span> Adding…{:else}Add{/if}
@@ -255,11 +255,23 @@
   .form-row input[type="text"] {
     flex: 1;
     padding: 0.55rem 0.75rem;
-    border: 1px solid var(--color-border, #333);
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--color-surface, #1a1a1a);
-    color: inherit;
+    background: var(--surface);
+    color: var(--text);
     font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .form-row input[type="url"]:focus,
+  .form-row input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  .form-row input:disabled {
+    opacity: 0.5;
   }
 
   .interval-group {
@@ -269,13 +281,24 @@
   }
 
   .interval-group input[type="number"] {
-    width: 90px;
+    width: 80px;
     padding: 0.55rem 0.5rem;
-    border: 1px solid var(--color-border, #333);
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--color-surface, #1a1a1a);
-    color: inherit;
+    background: var(--surface);
+    color: var(--text);
     font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .interval-group input[type="number"]:focus {
+    border-color: var(--accent);
+  }
+
+  .interval-group input[type="number"]:disabled {
+    opacity: 0.5;
   }
 
   .interval-hint {
