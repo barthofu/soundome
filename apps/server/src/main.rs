@@ -239,6 +239,7 @@ fn rocket() -> _ {
             routes::images::upload_album_image,
             routes::images::upload_track_image,
         ])
+        .mount("/", routes![routes::metrics::metrics])
         .mount("/swagger", make_swagger_ui(&get_docs()))
         .mount("/", FileServer::from("data/web"))
 }

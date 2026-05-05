@@ -64,4 +64,11 @@ impl PlaylistRepository for DieselPlaylistRepository {
             .map_err(map_error)?;
         Ok(())
     }
+
+    fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
+        schema::playlist::table
+            .count()
+            .get_result(conn)
+            .map_err(map_error)
+    }
 }

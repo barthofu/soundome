@@ -12,7 +12,7 @@ impl ArtistService {
     pub fn new(
         artist_repo: Arc<dyn ArtistRepository + Send + Sync>,
     ) -> Self {
-        Self { 
+        Self {
             artist_repo,
         }
     }
@@ -48,5 +48,9 @@ impl ArtistService {
     pub fn merge_into(&self, conn: &mut SqliteConnection, source_ids: &[i32], target_id: i32) -> shared::types::SoundomeResult<shared::models::Artist> {
         self.artist_repo.merge_into(conn, source_ids, target_id)?;
         self.artist_repo.get_by_id(conn, target_id)
+    }
+
+    pub fn count(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<i64> {
+        self.artist_repo.count(conn)
     }
 }

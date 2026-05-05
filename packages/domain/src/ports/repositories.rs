@@ -24,6 +24,8 @@ pub trait TrackRepository: Send + Sync {
     fn get_recent(&self, conn: &mut SqliteConnection, limit: i64) -> SoundomeResult<Vec<Track>>;
     fn get_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>>;
     fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Track>;
+    fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
+    fn count_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
     fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
     /// Replace all references for a track (delete existing, then insert provided ones)
     fn set_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
@@ -41,6 +43,7 @@ pub trait AlbumRepository: Send + Sync {
     fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Album>;
     fn create_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
     fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Album>;
+    fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
     /// Replace all references for an album (delete existing, then insert provided ones)
     fn set_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[shared::models::Reference]) -> SoundomeResult<()>;
     // /// Find an album by unique fields (e.g. title + artists + date)
@@ -67,6 +70,7 @@ pub trait ArtistRepository: Send + Sync {
     fn set_album_artists(&self, conn: &mut SqliteConnection, album_id: i32, artist_ids: &[i32]) -> SoundomeResult<()>;
     /// Merge all source artists into `target_id`: re-point tracks, albums, and references, then delete sources.
     fn merge_into(&self, conn: &mut SqliteConnection, source_ids: &[i32], target_id: i32) -> SoundomeResult<()>;
+    fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
     // /// Find an artist by unique fields (e.g. name)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Option<Artist>>;
 }
@@ -81,6 +85,7 @@ pub trait PlaylistRepository: Send + Sync {
     fn update_last_sync(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     /// Link a track to a playlist. Silently ignores duplicate entries.
     fn add_track(&self, conn: &mut SqliteConnection, playlist_id: i32, track_id: i32, position: Option<i32>) -> SoundomeResult<()>;
+    fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
 }
 
 // ================================================================================================
@@ -96,6 +101,7 @@ pub trait TaskRepository: Send + Sync {
     fn set_cancelled(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     fn get_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<Vec<Task>>;
     fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
+    fn count_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<i64>;
 }
 
 // ================================================================================================

@@ -11,6 +11,7 @@ You are the maintainer agent for the Soundome project.
 ## Constraints
 
 - Start by identifying the relevant crate or crates, such as `apps/server`, `packages/domain`, or `packages/database`.
+- You should first read the relevant documentation in order to understand the intended behavior, architecture, and ownership before making code changes.
 - Prefer modifying the existing implementation over adding new abstractions.
 - Treat the `DownloadService` workflow as the main source of truth: dedup, enrich, download, tag, move, persist.
 - When you hit a WIP or deprecated area, prefer a minimal implementation plus an explicit TODO.
@@ -18,10 +19,12 @@ You are the maintainer agent for the Soundome project.
 
 ## Approach
 
-1. Route the task to the owning crate and abstraction.
-2. Use the narrowest relevant instruction or skill rather than widening scope immediately.
-3. Make the smallest architecture-aligned change.
-4. Validate with the narrowest useful command.
+1. Read the relevant documentation to understand the intended behavior and architecture.
+2. Route the task to the owning crate and abstraction.
+3. Use the narrowest relevant instruction or skill rather than widening scope immediately.
+4. Make the smallest architecture-aligned change.
+5. Validate with the narrowest useful command.
+6. Update documentation if the change affects intended behavior or ownership.
 
 ## Output expectations
 

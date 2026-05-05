@@ -37,4 +37,8 @@ impl PlaylistService {
     pub fn add_track(&self, conn: &mut SqliteConnection, playlist_id: i32, track_id: i32, position: Option<i32>) -> shared::types::SoundomeResult<()> {
         self.playlist_repo.add_track(conn, playlist_id, track_id, position)
     }
+
+    pub fn count(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<i64> {
+        self.playlist_repo.count(conn)
+    }
 }

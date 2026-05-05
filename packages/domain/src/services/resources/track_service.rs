@@ -78,6 +78,14 @@ impl TrackService {
         self.track_repo.get_pending_validations(conn)
     }
 
+    pub fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
+        self.track_repo.count(conn)
+    }
+
+    pub fn count_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
+        self.track_repo.count_pending_validations(conn)
+    }
+
     /// Applies `patch` to an existing track, clears its validation flag, and persists.
     pub fn validate_track(&self, conn: &mut SqliteConnection, id: i32, patch: ValidationPatch) -> SoundomeResult<Track> {
         conn.transaction(|tx| {
@@ -255,7 +263,7 @@ impl TrackService {
 
     /// Compares file quality of two tracks.
     /// Currently, this is a simple comparison based on bitrate.
-    /// 
+    ///
     /// Returns true if the new track has better quality.
     pub fn is_better_quality(&self, existing_track: &Track, new_track: &Track) -> bool {
 
@@ -276,8 +284,8 @@ impl TrackService {
         } else {
             false
         };
-        
+
         Ok(file_deleted)
     }
-    
+
 }

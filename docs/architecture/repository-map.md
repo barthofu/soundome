@@ -76,6 +76,7 @@ Primary entry point: `apps/server/src/main.rs`
 
 - `apps/server/src/main.rs`: repository and service wiring
 - `apps/server/src/routes/`: HTTP layer
+- `apps/server/src/routes/metrics.rs`: Prometheus metrics handler (`GET /metrics`)
 - `packages/domain/src/services/download_service.rs`: main business workflow
 - `packages/shared/src/models/`: track, album, artist, playlist, and reference models
 - `packages/shared/src/libs/http.rs`: proxy rotation and proxy-aware HTTP client builder

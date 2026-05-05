@@ -49,24 +49,28 @@ impl AlbumService {
         self.album_repo.get_by_url(conn, url).ok()
     }
 
+    pub fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
+        self.album_repo.count(conn)
+    }
+
     // Custom
 
-    fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {        
+    fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {
         // Step 1: Use create_or_ignore for the album
         let created_album = self.album_repo.create_or_ignore(conn, album)?;
         let album_id = created_album.id.unwrap();
-        
+
         // Step 2: Handle album artists using create_or_ignore
         for artist in &album.artists {
             let created_artist = self.artist_repo.create_or_ignore(conn, artist)?;
             let artist_id = created_artist.id.unwrap();
-            
+
             // Create artist-album relationship
             self.artist_repo.create_album_relationship(conn, artist_id, album_id)?;
         }
-        
+
         // Step 3: Load the complete album with all relationships for return
         self.album_repo.get_by_id(conn, album_id)
     }
-    
+
 }

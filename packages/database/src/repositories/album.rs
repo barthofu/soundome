@@ -44,7 +44,7 @@ impl AlbumRepository for DieselAlbumRepository {
     fn create_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[Reference]) -> SoundomeResult<()> {
         for reference in references {
             let new_album_ref = NewAlbumRefEntity::convert_from_domain(reference, album_id);
-            
+
             diesel::insert_into(schema::album_ref::table)
                 .values(&new_album_ref)
                 .execute(conn)
@@ -296,7 +296,7 @@ impl AlbumRepository for DieselAlbumRepository {
     }
 
     fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
-        
+
         delete_with_relations!(
             conn,
             id,
@@ -308,5 +308,12 @@ impl AlbumRepository for DieselAlbumRepository {
         )?;
         Ok(())
 
+    }
+
+    fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
+        schema::album::table
+            .count()
+            .get_result(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to count albums: {}", err)))
     }
 }

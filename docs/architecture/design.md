@@ -40,6 +40,8 @@ This distinction matters during deduplication. When a better audio source replac
 
 The Rocket server currently mounts API routes under `/api`, Swagger under `/swagger`, and serves the built SPA at `/`.
 
+A Prometheus-compatible metrics endpoint is available at `GET /metrics`. It is not registered with OpenAPI and is intended for scraping only. It returns library statistics in the standard Prometheus text format (`text/plain; version=0.0.4`) via `apps/server/src/routes/metrics.rs`.
+
 The web app covers:
 
 - track or playlist submission

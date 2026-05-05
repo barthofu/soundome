@@ -60,6 +60,7 @@ All routes are documented through Swagger at `/swagger`.
 | `DELETE` | `/api/validations/:id` | Reject and delete a pending track |
 | `GET` | `/api/tracks/recent?limit=N` | List the most recent tracks |
 | `POST` | `/api/download` | Submit a track or playlist URL |
+| `GET` | `/metrics` | Prometheus metrics (tracks, albums, artists, playlists, tasks by status) |
 
 ## Validation workflow
 

@@ -132,4 +132,12 @@ impl TaskRepository for DieselTaskRepository {
             .map_err(map_error)?;
         Ok(())
     }
+
+    fn count_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<i64> {
+        schema::task::table
+            .filter(schema::task::status.eq(status))
+            .count()
+            .get_result(conn)
+            .map_err(map_error)
+    }
 }

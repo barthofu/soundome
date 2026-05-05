@@ -104,4 +104,8 @@ impl TaskService {
         self.task_repo.reset_for_retry(conn, id)?;
         self.task_repo.get_by_id(conn, id)
     }
+
+    pub fn count_by_status(&self, conn: &mut SqliteConnection, status: &str) -> shared::types::SoundomeResult<i64> {
+        self.task_repo.count_by_status(conn, status)
+    }
 }

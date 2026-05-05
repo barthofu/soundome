@@ -141,7 +141,7 @@ impl TrackRepository for DieselTrackRepository {
     fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[Reference]) -> SoundomeResult<()> {
         for reference in references {
             let new_track_ref = NewTrackRefEntity::convert_from_domain(reference, track_id);
-            
+
             diesel::insert_into(schema::track_ref::table)
                 .values(&new_track_ref)
                 .execute(conn)
@@ -308,7 +308,7 @@ impl TrackRepository for DieselTrackRepository {
                     err
                 ))
             })?;
-        
+
         Ok(TrackEntity::convert_to_domain(
             track,
             album,
@@ -336,7 +336,7 @@ impl TrackRepository for DieselTrackRepository {
                     .ok()
             } else {
                 None
-            }; 
+            };
 
             let artists: Vec<ArtistEntity> = schema::artist_tracks::table
                 .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
@@ -433,6 +433,21 @@ impl TrackRepository for DieselTrackRepository {
             ]
         )?;
         Ok(())
+    }
+
+    fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
+        schema::track::table
+            .count()
+            .get_result(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to count tracks: {}", err)))
+    }
+
+    fn count_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
+        schema::track::table
+            .filter(schema::track::needs_validation.eq(true))
+            .count()
+            .get_result(conn)
+            .map_err(|err| shared::errors::Error::Database(format!("Failed to count pending validations: {}", err)))
     }
 }
 
