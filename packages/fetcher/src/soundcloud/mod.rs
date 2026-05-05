@@ -10,6 +10,7 @@ use rsoundcloud::{
     ClientError, CollectionParams, PlaylistsApi, ResourceId, SearchApi, SoundCloudClient,
     TracksApi, UsersApi,
 };
+use rsoundcloud::models::track::BasicTrack;
 use shared::{
     errors::Error, http::HttpClientBuilder, models::{Album, Artist, Platform, Playlist, PlaylistTrack, SimplifiedTrack, Track}, types::SoundomeResult
 };
@@ -48,6 +49,130 @@ impl Soundcloud {
     // =================
     // Utils
     // =================
+
+    /// Fetch all tracks for a user with pagination (the default API only returns one page).
+    /// Also fetches tracks from the user's albums since those are not included in `/tracks`.
+    async fn get_all_user_tracks(&self, url: &str) -> Result<Vec<BasicTrack>, Error> {
+        // Resolve user to get their ID
+        let user = self
+            .client
+            .get_user(ResourceId::Url(url.to_string()))
+            .await
+            .map_err(|_| Error::NotFound(format!("Soundcloud artist from {}", url)))?;
+
+        let user_id = user.user.id;
+        let mut all_tracks: Vec<BasicTrack> = Vec::new();
+        let mut seen_ids: std::collections::HashSet<u64> = std::collections::HashSet::new();
+
+        // 1. Fetch direct uploads (singles) with pagination
+        let limit = 50u32;
+        let mut offset = 0u32;
+
+        loop {
+            let uri = format!("/users/{}/tracks", user_id);
+            let mut query = std::collections::HashMap::new();
+            query.insert("limit".to_string(), limit.to_string());
+            query.insert("offset".to_string(), offset.to_string());
+            query.insert("linked_partitioning".to_string(), "1".to_string());
+
+            let result = self.client.api_get(&uri, query).await.map_err(|e| {
+                Error::Network(format!("Failed to fetch user tracks page at offset {}: {}", offset, e))
+            })?;
+
+            let json: serde_json::Value = serde_json::from_str(&result).map_err(|e| {
+                Error::Internal(format!("Failed to parse tracks response: {}", e))
+            })?;
+
+            let collection = json.get("collection").and_then(|c| c.as_array());
+            let page_tracks: Vec<BasicTrack> = match collection {
+                Some(items) if !items.is_empty() => {
+                    serde_json::from_value(serde_json::Value::Array(items.clone())).map_err(|e| {
+                        Error::Internal(format!("Failed to deserialize tracks: {}", e))
+                    })?
+                }
+                _ => break,
+            };
+
+            let page_len = page_tracks.len();
+            for track in page_tracks {
+                if seen_ids.insert(track.track.id) {
+                    all_tracks.push(track);
+                }
+            }
+
+            if page_len < limit as usize {
+                break;
+            }
+
+            let has_next = json.get("next_href").and_then(|v| v.as_str()).is_some();
+            if !has_next {
+                break;
+            }
+
+            offset += limit;
+        }
+
+        tracing::info!("Fetched {} direct tracks for SoundCloud user", all_tracks.len());
+
+        // 2. Fetch tracks from the user's albums (these are not included in /tracks)
+        let mut album_offset = 0u32;
+
+        loop {
+            let uri = format!("/users/{}/albums", user_id);
+            let mut query = std::collections::HashMap::new();
+            query.insert("limit".to_string(), limit.to_string());
+            query.insert("offset".to_string(), album_offset.to_string());
+            query.insert("linked_partitioning".to_string(), "1".to_string());
+
+            let result = self.client.api_get(&uri, query).await.map_err(|e| {
+                Error::Network(format!("Failed to fetch user albums at offset {}: {}", album_offset, e))
+            })?;
+
+            let json: serde_json::Value = serde_json::from_str(&result).map_err(|e| {
+                Error::Internal(format!("Failed to parse albums response: {}", e))
+            })?;
+
+            let collection = json.get("collection").and_then(|c| c.as_array());
+            let albums = match collection {
+                Some(items) if !items.is_empty() => items.clone(),
+                _ => break,
+            };
+
+            let page_len = albums.len();
+
+            for album_value in &albums {
+                // Each album has a "tracks" array with track objects
+                let tracks_arr = album_value.get("tracks").and_then(|t| t.as_array());
+                if let Some(tracks) = tracks_arr {
+                    for track_value in tracks {
+                        // Album tracks can be BasicTrack or MiniTrack (incomplete).
+                        // Only include those with full info (have "title" and "permalink_url").
+                        if track_value.get("title").is_some() && track_value.get("media").is_some() {
+                            if let Ok(track) = serde_json::from_value::<BasicTrack>(track_value.clone()) {
+                                if seen_ids.insert(track.track.id) {
+                                    all_tracks.push(track);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if page_len < limit as usize {
+                break;
+            }
+
+            let has_next = json.get("next_href").and_then(|v| v.as_str()).is_some();
+            if !has_next {
+                break;
+            }
+
+            album_offset += limit;
+        }
+
+        tracing::info!("Fetched {} total tracks for SoundCloud user (including albums)", all_tracks.len());
+        Ok(all_tracks)
+    }
 
     async fn get_complete_track_from_music_track(
         &self,
@@ -190,11 +315,7 @@ impl Source for Soundcloud {
     }
 
     async fn get_artist_tracks_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {
-        let tracks = self
-            .client
-            .get_user_tracks(ResourceId::Url(url.to_string()))
-            .await
-            .map_err(|_| Error::NotFound(format!("Soundcloud artist tracks from {}", url)))?;
+        let tracks = self.get_all_user_tracks(url).await?;
 
         Ok(tracks
             .into_iter()

@@ -7,3 +7,10 @@
   - full-scan sync that compares the library with the database and identifies missing files, duplicates, and orphaned metadata. This can be a separate CLI command that runs on demand.
     - it should use the most recent and rich metadata (either db, filesystem, or both)
 - [ ] add support for custom prometheus metrics
+- [ ] régler ce bug :
+```
+[1] 2026-05-05T11:55:48.584805Z  INFO domain::services::download_service: Existing track found in DB: Crescelia by Sköne, Le Wanski (2025-12-05), will compare quality
+[1] 2026-05-05T11:55:48.658932Z ERROR symphonia_core::probe: reached probe limit of 1048576 bytes.
+[1] 2026-05-05T11:55:48.732323Z ERROR symphonia_core::probe: reached probe limit of 1048576 bytes.
+```
+- [ ] mettre un loading icon quand on clique sur "annuler" sur une task jusqu'à ce que le status passe à "cancelled"

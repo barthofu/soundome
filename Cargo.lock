@@ -1120,6 +1120,7 @@ dependencies = [
  "rsoundcloud",
  "rspotify",
  "rustypipe",
+ "serde_json",
  "shared",
  "tracing",
 ]

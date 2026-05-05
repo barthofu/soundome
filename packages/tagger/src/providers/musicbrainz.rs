@@ -39,12 +39,18 @@ impl MusicBrainz {
 
 impl TagProvider for MusicBrainz {
     async fn get_best_match_from_track(&self, track: &Track) -> Match<Track> {
+        // Need at least one artist to build a meaningful query
+        let first_artist = match track.artists.first() {
+            Some(artist) => &artist.name,
+            None => return Match::None,
+        };
+
         // Build the query based on the track information
         let mut query_builder = RecordingSearchQuery::query_builder();
         query_builder
             .recording(&track.title)
             .and()
-            .artist(&track.artists.get(0).unwrap().name); // TODO: Handle error
+            .artist(first_artist);
 
         if let Some(album) = &track.album {
             query_builder.and().release(&album.title);

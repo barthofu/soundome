@@ -25,3 +25,4 @@ temp/
 tmp/
 /core
 rustypipe_cache.json
+rustypipe_reports/
