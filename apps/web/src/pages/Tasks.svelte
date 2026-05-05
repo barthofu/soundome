@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { getTasks, retryTask } from '../lib/api';
+  import { getTasks, retryTask, cancelTask } from '../lib/api';
   import type { TaskDto } from '../lib/types';
 
   let tasks: TaskDto[] = $state([]);
   let loading = $state(true);
   let retrying: Set<number> = $state(new Set());
+  let cancelling: Set<number> = $state(new Set());
   let interval: ReturnType<typeof setInterval>;
 
   async function refresh() {
@@ -30,6 +31,18 @@
     }
   }
 
+  async function handleCancel(task: TaskDto) {
+    cancelling = new Set([...cancelling, task.id]);
+    try {
+      await cancelTask(task.id);
+      await refresh();
+    } catch (e) {
+      alert(`Échec de l'annulation : ${e instanceof Error ? e.message : e}`);
+    } finally {
+      cancelling = new Set([...cancelling].filter((id) => id !== task.id));
+    }
+  }
+
   onMount(() => {
     refresh();
     interval = setInterval(refresh, 3_000);
@@ -38,11 +51,11 @@
   onDestroy(() => clearInterval(interval));
 
   function statusLabel(status: TaskDto['status']) {
-    return { Pending: 'En attente', Running: 'En cours', Completed: 'Terminé', Failed: 'Échec' }[status] ?? status;
+    return { Pending: 'En attente', Running: 'En cours', Completed: 'Terminé', Failed: 'Échec', Cancelled: 'Annulé', Cancelling: 'Annulation…' }[status] ?? status;
   }
 
   function statusClass(status: TaskDto['status']) {
-    return { Pending: 'pending', Running: 'running', Completed: 'completed', Failed: 'failed' }[status] ?? '';
+    return { Pending: 'pending', Running: 'running', Completed: 'completed', Failed: 'failed', Cancelled: 'cancelled', Cancelling: 'cancelling' }[status] ?? '';
   }
 
   function progressPercent(task: TaskDto) {
@@ -53,11 +66,17 @@
   function taskLabel(task: TaskDto) {
     if (task.label) return task.label;
     if (task.task_type === 'SyncPlaylist') return 'Synchronisation de playlist';
+    if (task.task_type === 'SyncArtist') return 'Synchronisation d\'artiste';
+    if (task.task_type === 'SyncAlbum') return 'Synchronisation d\'album';
     return 'Téléchargement';
   }
 
   function canRetry(status: TaskDto['status']) {
-    return status === 'Pending' || status === 'Failed' || status === 'Running';
+    return status === 'Pending' || status === 'Failed' || status === 'Running' || status === 'Cancelled';
+  }
+
+  function canCancel(status: TaskDto['status']) {
+    return status === 'Running' || status === 'Pending';
   }
 </script>
 
@@ -75,6 +94,15 @@
           <div class="task-header">
             <span class="task-label">{taskLabel(task)}</span>
             <div class="task-header-right">
+              {#if canCancel(task.status)}
+                <button
+                  class="cancel-btn"
+                  disabled={cancelling.has(task.id)}
+                  onclick={() => handleCancel(task)}
+                >
+                  {cancelling.has(task.id) ? '…' : 'Annuler'}
+                </button>
+              {/if}
               {#if canRetry(task.status)}
                 <button
                   class="retry-btn"
@@ -186,6 +214,25 @@
     cursor: not-allowed;
   }
 
+  .cancel-btn {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+    border: 1px solid #b91c1c;
+    background: transparent;
+    color: #f87171;
+    cursor: pointer;
+  }
+  .cancel-btn:hover:not(:disabled) {
+    background: #3b1a1a;
+    color: #fca5a5;
+  }
+  .cancel-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .task-label {
     font-size: 0.9rem;
     font-weight: 500;
@@ -206,6 +253,8 @@
   .status-badge.running  { background: #1e3a5f; color: #60a5fa; }
   .status-badge.completed { background: #1a3326; color: #4ade80; }
   .status-badge.failed   { background: #3b1a1a; color: #f87171; }
+  .status-badge.cancelled { background: #3b2a1a; color: #fb923c; }
+  .status-badge.cancelling { background: #3b2a1a; color: #fbbf24; }
 
   .progress-row {
     display: flex;

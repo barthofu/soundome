@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    
+
     // ============================================================================================
     // Generic errors
     // ============================================================================================
@@ -41,7 +41,7 @@ pub enum Error {
     TrackProcessingFailed(String),
     #[error("track metadata error: {0}")]
     TrackMetadataError(String),
-    
+
     #[error("{0} provider is not available")]
     ProviderUnavailable(String),
 
@@ -86,6 +86,8 @@ pub enum Error {
     InvalidArg,
     #[error("process timeout")]
     ProcessTimeout,
+    #[error("task cancelled")]
+    Cancelled,
     #[error("process error")]
     ExitCode { code: i32, stderr: String },
 }

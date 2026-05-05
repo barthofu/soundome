@@ -10,7 +10,7 @@ use rocket_okapi::{
 };
 
 use shared::{init_globals, utils::logs::init_logger};
-use soundome_server::utils::database::Db;
+use soundome_server::utils::{cancellation::CancellationRegistry, database::Db};
 use soundome_server::{
     middlewares::cors::Cors,
     routes::{self, errors},
@@ -53,6 +53,7 @@ fn rocket() -> _ {
     });
 
     let services = Arc::new(ServiceLayer::new(repositories));
+    let cancellation_registry = Arc::new(CancellationRegistry::new());
 
     // Recover tasks that were Running when the server stopped (crash / restart).
     // Reset them to Pending and re-spawn the background jobs.
@@ -82,6 +83,7 @@ fn rocket() -> _ {
                         continue;
                     }
 
+                    let cancel_flag = cancellation_registry.register(task_id);
                     tracing::info!("Re-launching stale task {} for URL {}", task_id, url);
                     match task.task_type {
                         shared::models::TaskType::SyncArtist => {
@@ -89,6 +91,8 @@ fn rocket() -> _ {
                                 services.clone(),
                                 task_id,
                                 url,
+                                cancel_flag,
+                                cancellation_registry.clone(),
                             );
                         }
                         shared::models::TaskType::SyncAlbum => {
@@ -96,6 +100,8 @@ fn rocket() -> _ {
                                 services.clone(),
                                 task_id,
                                 url,
+                                cancel_flag,
+                                cancellation_registry.clone(),
                             );
                         }
                         _ => {
@@ -103,6 +109,8 @@ fn rocket() -> _ {
                                 services.clone(),
                                 task_id,
                                 url,
+                                cancel_flag,
+                                cancellation_registry.clone(),
                             );
                         }
                     }
@@ -117,6 +125,7 @@ fn rocket() -> _ {
     {
         let db_url = Config::get().database.url.clone();
         let services_for_scheduler = services.clone();
+        let registry_for_scheduler = cancellation_registry.clone();
         std::thread::spawn(move || {
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(60));
@@ -151,11 +160,14 @@ fn rocket() -> _ {
                         Some(id) => id,
                         None => continue,
                     };
+                    let cancel_flag = registry_for_scheduler.register(task_id);
                     tracing::info!("Scheduler: triggering sync for schedule {} (url={})", schedule_id, url);
                     soundome_server::routes::download::spawn_playlist_sync_task(
                         services_for_scheduler.clone(),
                         task_id,
                         url,
+                        cancel_flag,
+                        registry_for_scheduler.clone(),
                     );
                 }
             }
@@ -182,6 +194,7 @@ fn rocket() -> _ {
         .attach(Cors)
         .attach(Db::fairing())
         .manage(services)
+        .manage(cancellation_registry)
         .register("/", catchers![errors::default])
         .mount(
             "/api",
@@ -198,6 +211,7 @@ fn rocket() -> _ {
                 routes::tasks::get_all,
                 routes::tasks::get_by_id,
                 routes::tasks::retry,
+                routes::tasks::cancel,
                 routes::sync_schedules::get_all,
                 routes::sync_schedules::get_by_id,
                 routes::sync_schedules::create,

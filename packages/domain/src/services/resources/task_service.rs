@@ -89,6 +89,10 @@ impl TaskService {
         self.task_repo.set_failed(conn, id, error)
     }
 
+    pub fn set_cancelled(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
+        self.task_repo.set_cancelled(conn, id)
+    }
+
     /// Return all tasks currently stuck in `Running` status (e.g. after a crash).
     pub fn get_stale_running(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<Vec<Task>> {
         self.task_repo.get_by_status(conn, TaskStatus::Running.as_ref())

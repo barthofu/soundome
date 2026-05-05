@@ -100,6 +100,17 @@ impl TaskRepository for DieselTaskRepository {
         Ok(())
     }
 
+    fn set_cancelled(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
+        diesel::update(schema::task::table.filter(schema::task::id.eq(id)))
+            .set((
+                schema::task::status.eq("Cancelled"),
+                schema::task::updated_at.eq(chrono::Utc::now().naive_utc()),
+            ))
+            .execute(conn)
+            .map_err(map_error)?;
+        Ok(())
+    }
+
     fn get_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<Vec<Task>> {
         let entities = schema::task::table
             .filter(schema::task::status.eq(status))

@@ -123,6 +123,15 @@ export async function retryTask(id: number): Promise<TaskDto> {
   return res.json();
 }
 
+export async function cancelTask(id: number): Promise<TaskDto> {
+  const res = await fetch(`${BASE}/tasks/${id}/cancel`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
 export async function getActiveTasksCount(): Promise<number> {
   const tasks = await getTasks();
   return tasks.filter((t) => t.status === 'Pending' || t.status === 'Running').length;

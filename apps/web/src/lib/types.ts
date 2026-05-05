@@ -61,8 +61,8 @@ export interface MatchCandidateDto {
   references: ReferenceDto[];
 }
 
-export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
-export type TaskType = 'SyncPlaylist' | 'DownloadTrack';
+export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Cancelled' | 'Cancelling';
+export type TaskType = 'SyncPlaylist' | 'SyncArtist' | 'SyncAlbum' | 'DownloadTrack';
 
 export interface TaskDto {
   id: number;

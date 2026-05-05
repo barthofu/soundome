@@ -45,6 +45,7 @@ pub enum TaskStatus {
     Running,
     Completed,
     Failed,
+    Cancelled,
 }
 
 impl TaskStatus {
@@ -54,6 +55,7 @@ impl TaskStatus {
             "Running" => TaskStatus::Running,
             "Completed" => TaskStatus::Completed,
             "Failed" => TaskStatus::Failed,
+            "Cancelled" => TaskStatus::Cancelled,
             _ => TaskStatus::Pending,
         }
     }

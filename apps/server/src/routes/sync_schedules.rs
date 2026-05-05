@@ -6,7 +6,7 @@ use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{database::Db, error::CustomError, response::Success};
+use crate::utils::{cancellation::CancellationRegistry, database::Db, error::CustomError, response::Success};
 
 // ================================================================================================
 // DTOs
@@ -200,9 +200,12 @@ pub async fn trigger(
     id: i32,
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
+    registry: &rocket::State<Arc<CancellationRegistry>>,
 ) -> Result<Json<serde_json::Value>, crate::utils::error::Error> {
     let services_for_db = Arc::clone(services);
+    let services_for_task = Arc::clone(services);
     let services_for_spawn = Arc::clone(services);
+    let registry = Arc::clone(registry);
 
     // Fetch the schedule and mark it as ran immediately
     let schedule = db
@@ -223,7 +226,7 @@ pub async fn trigger(
 
     let task = db
         .run(move |conn| {
-            services_for_spawn.task_service.create_playlist_sync(conn, &url, label)
+            services_for_task.task_service.create_playlist_sync(conn, &url, label)
         })
         .await
         .map_err(|e| crate::utils::error::Error::Custom(CustomError {
@@ -234,7 +237,8 @@ pub async fn trigger(
 
     let task_id = task.id.unwrap();
     let url = schedule.playlist_url.clone();
-    crate::routes::download::spawn_playlist_sync_task(Arc::clone(services), task_id, url);
+    let cancel_flag = registry.register(task_id);
+    crate::routes::download::spawn_playlist_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
 
     Ok(Json(serde_json::json!({ "task_id": task_id })))
 }

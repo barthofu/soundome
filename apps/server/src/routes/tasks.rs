@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use shared::models::{Task, TaskStatus, TaskType};
 
-use crate::utils::{database::Db, error::CustomError};
+use crate::utils::{cancellation::CancellationRegistry, database::Db, error::CustomError};
 
 // ================================================================================================
 // DTOs
@@ -99,18 +99,21 @@ pub async fn retry(
     id: i32,
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
+    registry: &rocket::State<Arc<CancellationRegistry>>,
 ) -> Result<Json<TaskDto>, crate::utils::error::Error> {
     let services = Arc::clone(services);
     let services_for_spawn = services.clone();
+    let registry = Arc::clone(registry);
 
     let task = db
         .run(move |conn| {
             let task = services.task_service.get_by_id(conn, id)?;
 
-            // Allow retry for Failed, Running (stale), or Pending (stuck) tasks
+            // Allow retry for Failed, Running (stale), Pending (stuck), or Cancelled tasks
             if task.status != TaskStatus::Failed
                 && task.status != TaskStatus::Running
                 && task.status != TaskStatus::Pending
+                && task.status != TaskStatus::Cancelled
             {
                 return Err(shared::errors::Error::Custom(format!(
                     "Task {} is in status {:?} and cannot be retried",
@@ -140,9 +143,16 @@ pub async fn retry(
         })
     })?;
 
+    let cancel_flag = registry.register(task_id);
     match task.task_type {
         TaskType::SyncPlaylist => {
-            super::download::spawn_playlist_sync_task(services_for_spawn, task_id, url);
+            super::download::spawn_playlist_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
+        }
+        TaskType::SyncArtist => {
+            super::download::spawn_artist_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
+        }
+        TaskType::SyncAlbum => {
+            super::download::spawn_album_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
         }
         _ => {
             return Err(crate::utils::error::Error::Custom(CustomError {
@@ -168,4 +178,64 @@ fn extract_url_from_payload(payload: &str) -> Option<String> {
     serde_json::from_str::<serde_json::Value>(payload)
         .ok()
         .and_then(|v| v.get("url")?.as_str().map(String::from))
+}
+
+/// Cancel a running task gracefully. The task will stop at the next track boundary.
+#[openapi]
+#[post("/tasks/<id>/cancel")]
+pub async fn cancel(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+    registry: &rocket::State<Arc<CancellationRegistry>>,
+) -> Result<Json<TaskDto>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let registry = Arc::clone(registry);
+
+    // Verify the task exists and is running
+    let services_for_get = services.clone();
+    let task = db
+        .run(move |conn| services_for_get.task_service.get_by_id(conn, id))
+        .await
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::NotFound,
+                code: "NotFound".to_string(),
+                message: err.to_string(),
+            })
+        })?;
+
+    if task.status != TaskStatus::Running && task.status != TaskStatus::Pending {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "InvalidState".to_string(),
+            message: format!("Task {} is in status {:?} and cannot be cancelled", id, task.status),
+        }));
+    }
+
+    // Signal cancellation
+    if !registry.cancel(id) {
+        // Task not in registry (already finished between check and signal), update DB directly
+        db.run(move |conn| services.task_service.set_cancelled(conn, id))
+            .await
+            .map_err(|err| {
+                crate::utils::error::Error::Custom(CustomError {
+                    status: Status::InternalServerError,
+                    code: "Internal".to_string(),
+                    message: err.to_string(),
+                })
+            })?;
+    }
+
+    // Return updated task state (may still show Running until the worker picks up the signal)
+    let mut dto = TaskDto::from_task(task).ok_or_else(|| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: "Task has no id".to_string(),
+        })
+    })?;
+    dto.status = "Cancelling".to_string();
+
+    Ok(Json(dto))
 }

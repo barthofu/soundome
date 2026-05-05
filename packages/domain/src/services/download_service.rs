@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, sync::atomic::{AtomicBool, Ordering}};
 
 use config::Config;
 use diesel::SqliteConnection;
@@ -60,7 +60,7 @@ impl DownloadService {
 
     /// Main entry point for downloading a playlist from a given URL (from any supported platform).
     /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
-    pub async fn sync_playlist_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>) -> SoundomeResult<Vec<Track>> {
+    pub async fn sync_playlist_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>, cancel_flag: Option<Arc<AtomicBool>>) -> SoundomeResult<Vec<Track>> {
         tracing::info!("====================\nDownloading playlist from {:?}\n---------", url);
 
         let fetcher = Fetcher::new().await;
@@ -123,6 +123,12 @@ impl DownloadService {
         // Process each new track and link it to the playlist
         let mut new_processed_tracks = Vec::new();
         for (i, (position, _)) in new_tracks.iter().enumerate() {
+            // Check for cancellation before processing next track
+            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
+                tracing::info!("Playlist sync cancelled after processing {}/{} new tracks", i, new_tracks.len());
+                return Err(Error::Cancelled);
+            }
+
             let track = &new_track_values[i];
             tracing::info!("Processing track: {}", track.display());
             match self.orchestrator_workflow(conn, track.clone()).await {
@@ -158,7 +164,7 @@ impl DownloadService {
 
     /// Main entry point for downloading/syncing all tracks from an artist URL.
     /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
-    pub async fn sync_artist_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>) -> SoundomeResult<Vec<Track>> {
+    pub async fn sync_artist_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>, cancel_flag: Option<Arc<AtomicBool>>) -> SoundomeResult<Vec<Track>> {
         tracing::info!("====================\nSyncing artist from {:?}\n---------", url);
 
         let fetcher = Fetcher::new().await;
@@ -205,6 +211,12 @@ impl DownloadService {
         // Process each new track
         let mut new_processed_tracks = Vec::new();
         for (i, track) in new_tracks.iter().enumerate() {
+            // Check for cancellation before processing next track
+            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
+                tracing::info!("Artist sync cancelled after processing {}/{} new tracks", i, new_tracks.len());
+                return Err(Error::Cancelled);
+            }
+
             tracing::info!("Processing track: {}", track.display());
             match self.orchestrator_workflow(conn, track.clone()).await {
                 Ok(t) => {
@@ -234,7 +246,7 @@ impl DownloadService {
 
     /// Main entry point for downloading/syncing all tracks from an album URL.
     /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
-    pub async fn sync_album_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>) -> SoundomeResult<Vec<Track>> {
+    pub async fn sync_album_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>, cancel_flag: Option<Arc<AtomicBool>>) -> SoundomeResult<Vec<Track>> {
         tracing::info!("====================\nSyncing album from {:?}\n---------", url);
 
         let fetcher = Fetcher::new().await;
@@ -279,6 +291,12 @@ impl DownloadService {
         // Process each new track
         let mut new_processed_tracks = Vec::new();
         for (i, track) in new_tracks.iter().enumerate() {
+            // Check for cancellation before processing next track
+            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
+                tracing::info!("Album sync cancelled after processing {}/{} new tracks", i, new_tracks.len());
+                return Err(Error::Cancelled);
+            }
+
             tracing::info!("Processing track: {}", track.display());
             match self.orchestrator_workflow(conn, track.clone()).await {
                 Ok(t) => {

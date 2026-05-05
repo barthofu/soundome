@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use config::Config;
 use domain::services::ServiceLayer;
@@ -8,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 
-use crate::utils::{database::Db, error::CustomError};
+use crate::utils::{cancellation::CancellationRegistry, database::Db, error::CustomError};
 
 // ================================================================================================
 // DTOs
@@ -63,7 +64,13 @@ fn is_artist_url(url: &str) -> bool {
 ///
 /// The task must already exist in the DB. The thread creates its own SQLite connection
 /// and single-threaded Tokio runtime.
-pub fn spawn_playlist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: String) {
+pub fn spawn_playlist_sync_task(
+    services: Arc<ServiceLayer>,
+    task_id: i32,
+    url: String,
+    cancel_flag: Arc<AtomicBool>,
+    registry: Arc<CancellationRegistry>,
+) {
     let db_url = Config::get().database.url.clone();
 
     std::thread::spawn(move || {
@@ -81,12 +88,18 @@ pub fn spawn_playlist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: 
 
             match services
                 .download_service
-                .sync_playlist_from_url(&url, conn, Some(task_id))
+                .sync_playlist_from_url(&url, conn, Some(task_id), Some(cancel_flag))
                 .await
             {
                 Ok(_) => {
                     if let Err(e) = services.task_service.set_completed(conn, task_id) {
                         tracing::error!("Failed to mark task {} as completed: {}", task_id, e);
+                    }
+                }
+                Err(shared::errors::Error::Cancelled) => {
+                    tracing::info!("Task {} was cancelled", task_id);
+                    if let Err(e) = services.task_service.set_cancelled(conn, task_id) {
+                        tracing::error!("Failed to mark task {} as cancelled: {}", task_id, e);
                     }
                 }
                 Err(e) => {
@@ -102,6 +115,8 @@ pub fn spawn_playlist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: 
                     }
                 }
             }
+
+            registry.remove(task_id);
         });
     });
 }
@@ -110,7 +125,13 @@ pub fn spawn_playlist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: 
 ///
 /// The task must already exist in the DB. The thread creates its own SQLite connection
 /// and single-threaded Tokio runtime.
-pub fn spawn_artist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: String) {
+pub fn spawn_artist_sync_task(
+    services: Arc<ServiceLayer>,
+    task_id: i32,
+    url: String,
+    cancel_flag: Arc<AtomicBool>,
+    registry: Arc<CancellationRegistry>,
+) {
     let db_url = Config::get().database.url.clone();
 
     std::thread::spawn(move || {
@@ -128,12 +149,18 @@ pub fn spawn_artist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: St
 
             match services
                 .download_service
-                .sync_artist_from_url(&url, conn, Some(task_id))
+                .sync_artist_from_url(&url, conn, Some(task_id), Some(cancel_flag))
                 .await
             {
                 Ok(_) => {
                     if let Err(e) = services.task_service.set_completed(conn, task_id) {
                         tracing::error!("Failed to mark task {} as completed: {}", task_id, e);
+                    }
+                }
+                Err(shared::errors::Error::Cancelled) => {
+                    tracing::info!("Task {} was cancelled", task_id);
+                    if let Err(e) = services.task_service.set_cancelled(conn, task_id) {
+                        tracing::error!("Failed to mark task {} as cancelled: {}", task_id, e);
                     }
                 }
                 Err(e) => {
@@ -149,6 +176,8 @@ pub fn spawn_artist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: St
                     }
                 }
             }
+
+            registry.remove(task_id);
         });
     });
 }
@@ -157,7 +186,13 @@ pub fn spawn_artist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: St
 ///
 /// The task must already exist in the DB. The thread creates its own SQLite connection
 /// and single-threaded Tokio runtime.
-pub fn spawn_album_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: String) {
+pub fn spawn_album_sync_task(
+    services: Arc<ServiceLayer>,
+    task_id: i32,
+    url: String,
+    cancel_flag: Arc<AtomicBool>,
+    registry: Arc<CancellationRegistry>,
+) {
     let db_url = Config::get().database.url.clone();
 
     std::thread::spawn(move || {
@@ -175,12 +210,18 @@ pub fn spawn_album_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: Str
 
             match services
                 .download_service
-                .sync_album_from_url(&url, conn, Some(task_id))
+                .sync_album_from_url(&url, conn, Some(task_id), Some(cancel_flag))
                 .await
             {
                 Ok(_) => {
                     if let Err(e) = services.task_service.set_completed(conn, task_id) {
                         tracing::error!("Failed to mark task {} as completed: {}", task_id, e);
+                    }
+                }
+                Err(shared::errors::Error::Cancelled) => {
+                    tracing::info!("Task {} was cancelled", task_id);
+                    if let Err(e) = services.task_service.set_cancelled(conn, task_id) {
+                        tracing::error!("Failed to mark task {} as cancelled: {}", task_id, e);
                     }
                 }
                 Err(e) => {
@@ -196,6 +237,8 @@ pub fn spawn_album_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: Str
                     }
                 }
             }
+
+            registry.remove(task_id);
         });
     });
 }
@@ -211,9 +254,11 @@ pub async fn download(
     body: Json<DownloadRequest>,
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
+    registry: &rocket::State<Arc<CancellationRegistry>>,
 ) -> Result<Json<serde_json::Value>, crate::utils::error::Error> {
     let url = body.into_inner().url;
     let services = Arc::clone(services);
+    let registry = Arc::clone(registry);
 
     if is_playlist_url(&url) {
         // --- Async path: create task, spawn background thread, return task_id immediately ---
@@ -234,8 +279,9 @@ pub async fn download(
             })?;
 
         let task_id = task.id.expect("created task must have an id");
+        let cancel_flag = registry.register(task_id);
 
-        spawn_playlist_sync_task(services, task_id, url);
+        spawn_playlist_sync_task(services, task_id, url, cancel_flag, registry);
 
         Ok(Json(serde_json::json!({
             "type": "playlist",
@@ -260,8 +306,9 @@ pub async fn download(
             })?;
 
         let task_id = task.id.expect("created task must have an id");
+        let cancel_flag = registry.register(task_id);
 
-        spawn_artist_sync_task(services, task_id, url);
+        spawn_artist_sync_task(services, task_id, url, cancel_flag, registry);
 
         Ok(Json(serde_json::json!({
             "type": "artist",
@@ -286,8 +333,9 @@ pub async fn download(
             })?;
 
         let task_id = task.id.expect("created task must have an id");
+        let cancel_flag = registry.register(task_id);
 
-        spawn_album_sync_task(services, task_id, url);
+        spawn_album_sync_task(services, task_id, url, cancel_flag, registry);
 
         Ok(Json(serde_json::json!({
             "type": "album",

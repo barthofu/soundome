@@ -93,6 +93,7 @@ pub trait TaskRepository: Send + Sync {
     fn update_progress(&self, conn: &mut SqliteConnection, id: i32, progress: i32, total: i32) -> SoundomeResult<()>;
     fn set_completed(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     fn set_failed(&self, conn: &mut SqliteConnection, id: i32, error: &str) -> SoundomeResult<()>;
+    fn set_cancelled(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     fn get_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<Vec<Task>>;
     fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
 }
