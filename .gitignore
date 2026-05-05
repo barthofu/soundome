@@ -18,7 +18,7 @@ config.toml
 # data
 data/
 !data/.gitkeep
-library/
+/library/
 temp/
 
 # misc

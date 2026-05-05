@@ -1,3 +1,3 @@
-#[dotenvy::load(path = "./.env", required = true)]
+#[dotenvy::load(path = "./.env", required = false)]
 #[tokio::main]
 async fn main() {}

@@ -10,6 +10,11 @@ config = { path = "../config" }
 openrouter_api = { path = "../../libs/openrouter_api" }
 # openrouter_api = "0.6.0"
 
+ollama-rs = "0.3.4"
+# schemars 1.x is required by ollama-rs for JsonStructure::new_for_schema.
+# It coexists with schemars 0.8 which is used by the AIBackend trait signature.
+schemars-v1 = { package = "schemars", version = "1" }
+
 tracing = { workspace = true }
 
 async-trait = "0.1.88"

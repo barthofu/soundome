@@ -1,0 +1,454 @@
+import {
+  getTracks, updateTrack, deleteTrack,
+  getAlbums, updateAlbum, deleteAlbum,
+  getArtists, updateArtist, deleteArtist, mergeArtists,
+  uploadArtistImage, uploadAlbumImage, uploadTrackImage,
+} from '../api';
+import type {
+  LibraryTrackDto, UpdateTrackBody,
+  LibraryAlbumDto, UpdateAlbumBody,
+  LibraryArtistDto, UpdateArtistBody,
+} from '../types';
+
+export type Tab = 'artists' | 'albums' | 'tracks';
+export type ViewMode = 'list' | 'grid';
+export type TrackFilter = 'all' | 'ok' | 'pending';
+export type EditState =
+  | { type: 'track'; item: LibraryTrackDto }
+  | { type: 'album'; item: LibraryAlbumDto }
+  | { type: 'artist'; item: LibraryArtistDto }
+  | null;
+export type HoveredItem = { type: 'track' | 'album' | 'artist'; id: number } | null;
+
+// ── Artist name similarity helpers ────────────────────────────────────────────
+function _editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0]; dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[n];
+}
+
+export function areSimilarArtistNames(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const na = norm(a), nb = norm(b);
+  if (na === nb) return true;
+  if (na.length < 2 || nb.length < 2) return false;
+  const dist = _editDistance(na, nb);
+  const maxLen = Math.max(na.length, nb.length);
+  return dist <= 2 || (maxLen >= 8 && dist / maxLen <= 0.2);
+}
+
+function createLibraryStore() {
+  const _initHash = (() => {
+    const raw = location.hash.replace('#', '');
+    const p = raw.split('/');
+    const t = (['artists', 'albums', 'tracks'] as const).find(x => x === p[0]) ?? 'artists';
+    const aid = t === 'artists' && p[1] ? (parseInt(p[1]) || null) : null;
+    const bid =
+      t === 'albums' && p[1] ? (parseInt(p[1]) || null) :
+      t === 'artists' && p[2] === 'album' && p[3] ? (parseInt(p[3]) || null) : null;
+    return { tab: t, artistId: aid, albumId: bid };
+  })();
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let tab: Tab = $state(_initHash.tab);
+  let tracksView: ViewMode = $state('list');
+  let albumsView: ViewMode = $state('grid');
+  let artistsView: ViewMode = $state('grid');
+
+  let tracks: LibraryTrackDto[] = $state([]);
+  let tracksLoaded = $state(false);
+  let tracksLoading = $state(false);
+  let tracksError: string | null = $state(null);
+
+  let albums: LibraryAlbumDto[] = $state([]);
+  let albumsLoaded = $state(false);
+  let albumsLoading = $state(false);
+  let albumsError: string | null = $state(null);
+
+  let artists: LibraryArtistDto[] = $state([]);
+  let artistsLoaded = $state(false);
+  let artistsLoading = $state(false);
+  let artistsError: string | null = $state(null);
+
+  let trackSearch = $state('');
+  let albumSearch = $state('');
+  let artistSearch = $state('');
+  let trackFilter: TrackFilter = $state('ok');
+
+  let drillArtistId: number | null = $state(_initHash.artistId);
+  let drillAlbumId: number | null = $state(_initHash.albumId);
+
+  let editState: EditState = $state(null);
+  let editSaving = $state(false);
+  let imageUploading = $state(false);
+  let trackDraft: UpdateTrackBody = $state({});
+  let albumDraft: UpdateAlbumBody = $state({});
+  let artistDraft: UpdateArtistBody = $state({});
+
+  let hoveredItem: HoveredItem = $state(null);
+
+  // ── Artist selection / merge state ─────────────────────────────────────────
+  let selectedArtistIds: Set<number> = $state(new Set());
+  let mergePicking = $state(false);
+  let mergeSaving = $state(false);
+  let similarFilterActive = $state(false);
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  let drillArtist = $derived(
+    drillArtistId != null ? (artists.find(a => a.id === drillArtistId) ?? null) : null
+  );
+  let drillAlbum = $derived(
+    drillAlbumId != null ? (albums.find(a => a.id === drillAlbumId) ?? null) : null
+  );
+  let artistAlbums = $derived.by(() => {
+    const d = drillArtist; if (!d) return [];
+    return albums.filter(a => a.artists.some(ar => ar.id === d.id));
+  });
+  let artistTracks = $derived.by(() => {
+    const d = drillArtist; if (!d) return [];
+    return tracks.filter(t => t.artists.some(a => a.id === d.id));
+  });
+  let albumTracks = $derived.by(() => {
+    const d = drillAlbum; if (!d) return [];
+    return tracks.filter(t => t.album?.id === d.id);
+  });
+  let artistTracksByAlbum = $derived.by(() => {
+    if (!drillArtist) return [];
+    type Group = { albumId: number | null; albumTitle: string | null; albumCover: string | null; tracks: LibraryTrackDto[] };
+    const map = new Map<string, Group>();
+    for (const t of artistTracks) {
+      const key = t.album?.id != null ? String(t.album.id) : '__none__';
+      if (!map.has(key)) map.set(key, { albumId: t.album?.id ?? null, albumTitle: t.album?.title ?? null, albumCover: null, tracks: [] });
+      map.get(key)!.tracks.push(t);
+    }
+    const result: Group[] = [];
+    for (const [, grp] of map) {
+      const fullAlbum = grp.albumId != null ? albums.find(a => a.id === grp.albumId) : null;
+      result.push({ ...grp, albumCover: fullAlbum?.cover ?? null });
+    }
+    result.sort((a, b) => {
+      if (a.albumId === null) return 1;
+      if (b.albumId === null) return -1;
+      const aDate = albums.find(x => x.id === a.albumId)?.date ?? '';
+      const bDate = albums.find(x => x.id === b.albumId)?.date ?? '';
+      if (aDate !== bDate) return aDate < bDate ? -1 : 1;
+      return (a.albumTitle ?? '') < (b.albumTitle ?? '') ? -1 : 1;
+    });
+    return result;
+  });
+  let filteredTracks = $derived.by(() => {
+    let list = tracks;
+    const q = trackSearch.trim().toLowerCase();
+    if (q) list = list.filter(t => t.title.toLowerCase().includes(q) || t.artists.some(a => a.name.toLowerCase().includes(q)));
+    if (trackFilter === 'ok') list = list.filter(t => !t.needs_validation);
+    if (trackFilter === 'pending') list = list.filter(t => t.needs_validation);
+    return list;
+  });
+  let filteredAlbums = $derived.by(() => {
+    const q = albumSearch.trim().toLowerCase(); if (!q) return albums;
+    return albums.filter(a => a.title.toLowerCase().includes(q) || a.artists.some(ar => ar.name.toLowerCase().includes(q)));
+  });
+  let filteredArtists = $derived.by(() => {
+    const q = artistSearch.trim().toLowerCase(); if (!q) return artists;
+    return artists.filter(a => a.name.toLowerCase().includes(q));
+  });
+  let pendingCount = $derived(tracks.filter(t => t.needs_validation).length);
+  let similarArtistIds = $derived.by(() => {
+    const ids = new Set<number>();
+    for (let i = 0; i < artists.length; i++) {
+      for (let j = i + 1; j < artists.length; j++) {
+        if (areSimilarArtistNames(artists[i].name, artists[j].name)) {
+          ids.add(artists[i].id);
+          ids.add(artists[j].id);
+        }
+      }
+    }
+    return ids;
+  });
+
+  // ── URL navigation ─────────────────────────────────────────────────────────
+  function buildHash(t: Tab, artistId?: number, albumId?: number): string {
+    if (t === 'artists') {
+      if (artistId && albumId) return `#artists/${artistId}/album/${albumId}`;
+      if (artistId) return `#artists/${artistId}`;
+      return '#artists';
+    }
+    if (t === 'albums') { if (albumId) return `#albums/${albumId}`; return '#albums'; }
+    return '#tracks';
+  }
+  function navigate(t: Tab, artistId?: number, albumId?: number) {
+    const h = buildHash(t, artistId, albumId);
+    if (location.hash !== h) history.pushState(null, '', h);
+    tab = t; drillArtistId = artistId ?? null; drillAlbumId = albumId ?? null; editState = null;
+  }
+  function applyHash() {
+    editState = null;
+    const raw = location.hash.replace('#', '');
+    if (!raw) { tab = 'artists'; drillArtistId = null; drillAlbumId = null; return; }
+    const p = raw.split('/');
+    const t = (['artists', 'albums', 'tracks'] as const).find(x => x === p[0]) ?? 'artists';
+    if (t === 'tracks') { tab = 'tracks'; drillArtistId = null; drillAlbumId = null; return; }
+    if (t === 'albums') { tab = 'albums'; drillArtistId = null; drillAlbumId = p[1] ? (parseInt(p[1]) || null) : null; return; }
+    tab = 'artists';
+    drillArtistId = p[1] ? (parseInt(p[1]) || null) : null;
+    drillAlbumId = (p[2] === 'album' && p[3]) ? (parseInt(p[3]) || null) : null;
+  }
+  function switchTab(t: Tab) { navigate(t); clearArtistSelection(); }
+  function clearDrill() { navigate(tab); }
+  function handleRefresh() {
+    clearDrill();
+    if (tab === 'tracks') { tracksLoaded = false; tracks = []; loadTracks(); }
+    else if (tab === 'albums') { albumsLoaded = false; albums = []; loadAlbums(); }
+    else { artistsLoaded = false; artists = []; loadArtists(); }
+  }
+  function drillIntoArtist(a: LibraryArtistDto) { navigate('artists', a.id); }
+  function drillIntoAlbum(album: LibraryAlbumDto) {
+    if (tab === 'albums') navigate('albums', undefined, album.id);
+    else navigate('artists', drillArtistId ?? undefined, album.id);
+  }
+  function backToArtist() { if (drillArtistId) navigate('artists', drillArtistId); }
+  function backToRoot() { navigate(tab); }
+
+  // ── Data loading ───────────────────────────────────────────────────────────
+  async function loadTracks() {
+    tracksLoading = true; tracksError = null;
+    try { tracks = await getTracks(); tracksLoaded = true; }
+    catch (e) { tracksError = e instanceof Error ? e.message : String(e); tracksLoaded = true; }
+    finally { tracksLoading = false; }
+  }
+  async function loadAlbums() {
+    albumsLoading = true; albumsError = null;
+    try { albums = await getAlbums(); albumsLoaded = true; }
+    catch (e) { albumsError = e instanceof Error ? e.message : String(e); albumsLoaded = true; }
+    finally { albumsLoading = false; }
+  }
+  async function loadArtists() {
+    artistsLoading = true; artistsError = null;
+    try { artists = await getArtists(); artistsLoaded = true; }
+    catch (e) { artistsError = e instanceof Error ? e.message : String(e); artistsLoaded = true; }
+    finally { artistsLoading = false; }
+  }
+
+  // ── Edit helpers ───────────────────────────────────────────────────────────
+  function startEditTrack(t: LibraryTrackDto) {
+    trackDraft = {
+      title: t.title, artists: t.artists.map(a => a.name),
+      album_title: t.album?.title ?? undefined, genre: t.genre ?? undefined,
+      date: t.date ?? undefined, track_number: t.track_number ?? undefined,
+      disc_number: t.disc_number ?? undefined, label: t.label ?? undefined,
+      cover: t.cover ?? undefined,
+    };
+    editState = { type: 'track', item: t };
+  }
+  function startEditAlbum(a: LibraryAlbumDto) {
+    albumDraft = { title: a.title, date: a.date ?? undefined, cover: a.cover ?? undefined };
+    editState = { type: 'album', item: a };
+  }
+  function startEditArtist(a: LibraryArtistDto) {
+    artistDraft = { name: a.name, icon: a.icon ?? undefined };
+    editState = { type: 'artist', item: a };
+  }
+  function openEditForHovered() {
+    if (!hoveredItem) return;
+    if (hoveredItem.type === 'track') { const t = tracks.find(x => x.id === hoveredItem!.id); if (t) startEditTrack(t); }
+    else if (hoveredItem.type === 'album') { const a = albums.find(x => x.id === hoveredItem!.id); if (a) startEditAlbum(a); }
+    else { const a = artists.find(x => x.id === hoveredItem!.id); if (a) startEditArtist(a); }
+  }
+  async function saveEdit() {
+    if (!editState) return;
+    const state = editState;
+    editSaving = true;
+    try {
+      if (state.type === 'track') {
+        const updated = await updateTrack(state.item.id, trackDraft);
+        tracks = tracks.map(t => t.id === state.item.id ? updated : t);
+      } else if (state.type === 'album') {
+        const updated = await updateAlbum(state.item.id, albumDraft);
+        albums = albums.map(a => a.id === state.item.id ? updated : a);
+      } else {
+        const updated = await updateArtist(state.item.id, artistDraft);
+        artists = artists.map(a => a.id === state.item.id ? updated : a);
+      }
+      editState = null;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally { editSaving = false; }
+  }
+
+  // ── Image upload ──────────────────────────────────────────────────────────
+  async function uploadImage(file: File) {
+    if (!editState) return;
+    const state = editState;
+    imageUploading = true;
+    try {
+      if (state.type === 'artist') {
+        const { url } = await uploadArtistImage(state.item.id, file);
+        const updated = { ...state.item, icon: url };
+        artists = artists.map(a => a.id === state.item.id ? updated : a);
+        editState = { type: 'artist', item: updated };
+        artistDraft.icon = url;
+      } else if (state.type === 'album') {
+        const { url } = await uploadAlbumImage(state.item.id, file);
+        const updated = { ...state.item, cover: url };
+        albums = albums.map(a => a.id === state.item.id ? updated : a);
+        editState = { type: 'album', item: updated };
+        albumDraft.cover = url;
+      } else {
+        const { url } = await uploadTrackImage(state.item.id, file);
+        const updated = { ...state.item, cover: url };
+        tracks = tracks.map(t => t.id === state.item.id ? updated : t);
+        editState = { type: 'track', item: updated };
+        trackDraft.cover = url;
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      imageUploading = false;
+    }
+  }
+
+  // ── Delete handlers ────────────────────────────────────────────────────────
+  async function handleDeleteTrack(id: number) {
+    if (!confirm('Delete this track from the library?')) return;
+    try { await deleteTrack(id); tracks = tracks.filter(t => t.id !== id); }
+    catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  }
+  async function handleDeleteAlbum(id: number) {
+    if (!confirm('Delete this album? Tracks will remain but lose their album association.')) return;
+    try {
+      await deleteAlbum(id); albums = albums.filter(a => a.id !== id);
+      if (drillAlbumId === id) navigate(tab, drillArtistId ?? undefined);
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  }
+  async function handleDeleteArtist(id: number) {
+    if (!confirm('Delete this artist?')) return;
+    try {
+      await deleteArtist(id); artists = artists.filter(a => a.id !== id);
+      if (drillArtistId === id) navigate('artists');
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  }
+
+  // ── Artist selection helpers ───────────────────────────────────────────────
+  function toggleArtistSelection(id: number) {
+    const next = new Set(selectedArtistIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selectedArtistIds = next;
+    if (selectedArtistIds.size < 2) mergePicking = false;
+  }
+  function clearArtistSelection() {
+    selectedArtistIds = new Set();
+    mergePicking = false;
+  }
+  function startMergePicking() {
+    if (selectedArtistIds.size >= 2) mergePicking = true;
+  }
+  function cancelMergePicking() {
+    mergePicking = false;
+  }
+  async function pickMergeTarget(targetId: number) {
+    if (!mergePicking || !selectedArtistIds.has(targetId)) return;
+    const sourceIds = [...selectedArtistIds].filter(id => id !== targetId);
+    const targetName = artists.find(a => a.id === targetId)?.name ?? String(targetId);
+    const sourceNames = sourceIds.map(id => artists.find(a => a.id === id)?.name ?? String(id)).join(', ');
+    if (!confirm(`Merge "${sourceNames}" into "${targetName}"?\n\nThis cannot be undone.`)) return;
+    mergeSaving = true;
+    try {
+      const updated = await mergeArtists(sourceIds, targetId);
+      artists = artists
+        .filter(a => !sourceIds.includes(a.id))
+        .map(a => a.id === updated.id ? updated : a);
+      clearArtistSelection();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      mergeSaving = false;
+    }
+  }
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  function fmtDuration(secs: number | null): string {
+    if (secs == null) return '\u2014';
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+  function isRemote(url: string | null | undefined): boolean {
+    return url != null && (url.startsWith('http://') || url.startsWith('https://'));
+  }
+
+  // ── Public API ─────────────────────────────────────────────────────────────
+  return {
+    get tab() { return tab; },
+    get tracksView() { return tracksView; }, set tracksView(v: ViewMode) { tracksView = v; },
+    get albumsView() { return albumsView; }, set albumsView(v: ViewMode) { albumsView = v; },
+    get artistsView() { return artistsView; }, set artistsView(v: ViewMode) { artistsView = v; },
+
+    get tracks() { return tracks; }, set tracks(v: LibraryTrackDto[]) { tracks = v; },
+    get tracksLoaded() { return tracksLoaded; },
+    get tracksLoading() { return tracksLoading; },
+    get tracksError() { return tracksError; },
+
+    get albums() { return albums; }, set albums(v: LibraryAlbumDto[]) { albums = v; },
+    get albumsLoaded() { return albumsLoaded; },
+    get albumsLoading() { return albumsLoading; },
+    get albumsError() { return albumsError; },
+
+    get artists() { return artists; }, set artists(v: LibraryArtistDto[]) { artists = v; },
+    get artistsLoaded() { return artistsLoaded; },
+    get artistsLoading() { return artistsLoading; },
+    get artistsError() { return artistsError; },
+
+    get trackSearch() { return trackSearch; }, set trackSearch(v: string) { trackSearch = v; },
+    get albumSearch() { return albumSearch; }, set albumSearch(v: string) { albumSearch = v; },
+    get artistSearch() { return artistSearch; }, set artistSearch(v: string) { artistSearch = v; },
+    get trackFilter() { return trackFilter; }, set trackFilter(v: TrackFilter) { trackFilter = v; },
+
+    get drillArtistId() { return drillArtistId; },
+    get drillAlbumId() { return drillAlbumId; },
+    get drillArtist() { return drillArtist; },
+    get drillAlbum() { return drillAlbum; },
+    get artistAlbums() { return artistAlbums; },
+    get artistTracks() { return artistTracks; },
+    get albumTracks() { return albumTracks; },
+    get artistTracksByAlbum() { return artistTracksByAlbum; },
+    get filteredTracks() { return filteredTracks; },
+    get filteredAlbums() { return filteredAlbums; },
+    get filteredArtists() { return filteredArtists; },
+    get pendingCount() { return pendingCount; },
+
+    get editState() { return editState; }, set editState(v: EditState) { editState = v; },
+    get editSaving() { return editSaving; },
+    get imageUploading() { return imageUploading; },
+    get trackDraft() { return trackDraft; },
+    get albumDraft() { return albumDraft; },
+    get artistDraft() { return artistDraft; },
+
+    get hoveredItem() { return hoveredItem; }, set hoveredItem(v: HoveredItem) { hoveredItem = v; },
+
+    get selectedArtistIds() { return selectedArtistIds; },
+    get mergePicking() { return mergePicking; },
+    get mergeSaving() { return mergeSaving; },
+    get similarFilterActive() { return similarFilterActive; }, set similarFilterActive(v: boolean) { similarFilterActive = v; },
+    get similarArtistIds() { return similarArtistIds; },
+
+    navigate, applyHash, switchTab, clearDrill, handleRefresh,
+    drillIntoArtist, drillIntoAlbum, backToArtist, backToRoot,
+    loadTracks, loadAlbums, loadArtists,
+    startEditTrack, startEditAlbum, startEditArtist,
+    openEditForHovered, saveEdit, uploadImage,
+    handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist,
+    toggleArtistSelection, clearArtistSelection, startMergePicking, cancelMergePicking, pickMergeTarget,
+    fmtDuration, isRemote,
+  };
+}
+
+export const lib = createLibraryStore();

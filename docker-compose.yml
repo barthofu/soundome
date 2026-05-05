@@ -8,6 +8,10 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+        - SOUNDOME__GENERAL__BASE_LIBRARY_DIR=/app/library
+        - SOUNDOME__GENERAL__TEMP_DOWNLOAD_DIR=/app/temp
+        - SOUNDOME__DATABASE__URL=/app/data/soundome.db
     volumes:
       - ./data:/app/data
       - ./library:/app/library

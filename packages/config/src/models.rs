@@ -131,18 +131,30 @@ pub struct YoutubeConfig {
 pub struct AiConfig {
     #[serde(default)]
     pub enabled: bool,
+    /// Ordered list of AI provider names to try. The first available provider is used;
+    /// if it fails, the next one is attempted. Supported values: "ollama", "openrouter".
+    #[serde(default = "AiConfig::default_provider_order")]
+    pub provider_order: Vec<String>,
     pub openrouter: Option<OpenRouterConfig>,
+    pub ollama: Option<OllamaConfig>,
 }
 
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            provider_order: Self::default_provider_order(),
             openrouter: None,
+            ollama: None,
         }
     }
 }
 
+impl AiConfig {
+    fn default_provider_order() -> Vec<String> {
+        vec!["openrouter".to_string()]
+    }
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
@@ -151,6 +163,19 @@ pub struct OpenRouterConfig {
     pub model: Option<String>,
     pub provider: Option<String>,
     pub base_url: Option<String>,
+    pub timeout: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
+pub struct OllamaConfig {
+    /// Base URL of the Ollama instance, e.g. "http://192.168.1.10". Default: "http://localhost".
+    pub host: Option<String>,
+    /// Port of the Ollama instance. Default: 11434.
+    pub port: Option<u16>,
+    /// Model identifier, e.g. "llama3.2" or "qwen2.5:7b".
+    pub model: Option<String>,
+    /// HTTP request timeout in seconds.
     pub timeout: Option<u64>,
 }
 

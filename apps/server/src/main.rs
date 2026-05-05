@@ -23,7 +23,7 @@ fn get_docs() -> SwaggerUIConfig {
     }
 }
 
-#[dotenvy::load(path = "./.env", required = true)]
+#[dotenvy::load(path = "./.env", required = false)]
 #[launch]
 fn rocket() -> _ {
 
