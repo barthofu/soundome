@@ -34,6 +34,8 @@
 
             id3v2
             glibcLocales
+
+            git-cliff
           ];
 
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
