@@ -12,6 +12,15 @@
   async function refresh() {
     try {
       tasks = await getTasks();
+      // Clear cancelling state for tasks that have transitioned to Cancelled/Cancelling
+      if (cancelling.size > 0) {
+        const resolved = tasks
+          .filter((t) => cancelling.has(t.id) && (t.status === 'Cancelled' || t.status === 'Cancelling'))
+          .map((t) => t.id);
+        if (resolved.length > 0) {
+          cancelling = new Set([...cancelling].filter((id) => !resolved.includes(id)));
+        }
+      }
     } catch {
       // silent
     } finally {
@@ -38,9 +47,9 @@
       await refresh();
     } catch (e) {
       alert(`Échec de l'annulation : ${e instanceof Error ? e.message : e}`);
-    } finally {
       cancelling = new Set([...cancelling].filter((id) => id !== task.id));
     }
+    // Keep in cancelling state until task status reflects cancellation (handled in refresh)
   }
 
   onMount(() => {
@@ -100,7 +109,11 @@
                   disabled={cancelling.has(task.id)}
                   onclick={() => handleCancel(task)}
                 >
-                  {cancelling.has(task.id) ? '…' : 'Annuler'}
+                  {#if cancelling.has(task.id)}
+                    <span class="spinner"></span> Annulation…
+                  {:else}
+                    Annuler
+                  {/if}
                 </button>
               {/if}
               {#if canRetry(task.status)}
@@ -296,5 +309,20 @@
     font-size: 0.72rem;
     color: var(--muted);
     margin: 0;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid #f8717155;
+    border-top-color: #f87171;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 </style>
