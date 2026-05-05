@@ -232,6 +232,80 @@ impl DownloadService {
         Ok(new_processed_tracks)
     }
 
+    /// Main entry point for downloading/syncing all tracks from an album URL.
+    /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
+    pub async fn sync_album_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>) -> SoundomeResult<Vec<Track>> {
+        tracing::info!("====================\nSyncing album from {:?}\n---------", url);
+
+        let fetcher = Fetcher::new().await;
+
+        // Fetch album metadata
+        let album_meta = fetcher.get_album_from_url(url).await?;
+        tracing::info!("Album: \"{}\" by {}", album_meta.title, album_meta.artists.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "));
+
+        // Fetch all tracks from this album
+        let album_tracks = fetcher.get_album_tracks_from_url(url).await?;
+        let total_tracks = album_tracks.len();
+        tracing::info!("Found {} tracks in album", total_tracks);
+
+        // Filter out existing tracks and collect new ones
+        let mut new_tracks: Vec<Track> = Vec::new();
+        let mut existing_count = 0;
+        for track in &album_tracks {
+            let track_url = track.get_source()
+                .and_then(|s| s.external_url.clone())
+                .unwrap_or_else(|| "unknown".to_string());
+            if self.track_service.get_by_url(conn, &track_url).is_some() {
+                tracing::warn!("   -> Track already exists in DB: {}", track.display());
+                existing_count += 1;
+                if let Some(tid) = task_id {
+                    let current = existing_count as i32;
+                    if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                        tracing::warn!("Failed to update task progress: {}", e);
+                    }
+                }
+            } else {
+                new_tracks.push(track.clone());
+            }
+        }
+
+        tracing::info!("{} new tracks to download after filtering existing ones", new_tracks.len());
+
+        // Clean metadata for all new tracks
+        if let Err(e) = fetcher.clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>()).await {
+            tracing::warn!("Failed to clean tracks title and artist name: {}", e);
+        }
+
+        // Process each new track
+        let mut new_processed_tracks = Vec::new();
+        for (i, track) in new_tracks.iter().enumerate() {
+            tracing::info!("Processing track: {}", track.display());
+            match self.orchestrator_workflow(conn, track.clone()).await {
+                Ok(t) => {
+                    tracing::info!("Successfully processed track: {}", t.display());
+                    new_processed_tracks.push(t);
+                },
+                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e)
+            }
+            if let Some(tid) = task_id {
+                let current = (existing_count as i32) + (i as i32) + 1;
+                if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                    tracing::warn!("Failed to update task progress: {}", e);
+                }
+            }
+        }
+
+        tracing::info!(
+            "Downloaded {}/{} tracks from album, {} existing tracks and {} errors",
+            new_processed_tracks.len(),
+            total_tracks,
+            existing_count,
+            new_tracks.len() - new_processed_tracks.len(),
+        );
+
+        Ok(new_processed_tracks)
+    }
+
     // ============================================================================================
     // == Sub private and utils methods
     // ============================================================================================

@@ -23,6 +23,7 @@ pub struct Task {
 pub enum TaskType {
     SyncPlaylist,
     SyncArtist,
+    SyncAlbum,
     DownloadTrack,
 }
 
@@ -31,6 +32,7 @@ impl TaskType {
         match s {
             "SyncPlaylist" => TaskType::SyncPlaylist,
             "SyncArtist" => TaskType::SyncArtist,
+            "SyncAlbum" => TaskType::SyncAlbum,
             "DownloadTrack" => TaskType::DownloadTrack,
             _ => TaskType::DownloadTrack,
         }

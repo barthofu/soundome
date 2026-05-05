@@ -237,8 +237,18 @@ impl Source for Soundcloud {
             .collect())
     }
 
-    async fn get_album_tracks_from_url(&self, _: &str) -> Result<Vec<Track>, Error> {
-        todo!()
+    async fn get_album_tracks_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {
+        // SoundCloud albums are technically playlists, reuse playlist track fetching
+        let tracks = self
+            .client
+            .get_playlist_tracks(ResourceId::Url(url.to_string()))
+            .await
+            .map_err(|_| Error::NotFound(format!("SoundCloud album tracks from {}", url)))?;
+
+        Ok(
+            join_all(tracks.into_iter().map(|track| self.get_complete_track_from_music_track(track)))
+                .await
+        )
     }
 
     async fn clean_track_metadata(&self, track: &mut Track) -> SoundomeResult<()> {
@@ -267,5 +277,11 @@ impl Source for Soundcloud {
         }
         let re = Regex::new(Self::ARTIST_REGEX).unwrap(); // safe unwrap
         re.is_match(url).unwrap_or(false)
+    }
+
+    fn is_valid_album_url(_url: &str) -> bool {
+        // SoundCloud albums use the same /sets/ URL pattern as playlists,
+        // so album URLs are handled through the playlist path.
+        false
     }
 }

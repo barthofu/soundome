@@ -91,6 +91,13 @@ fn rocket() -> _ {
                                 url,
                             );
                         }
+                        shared::models::TaskType::SyncAlbum => {
+                            soundome_server::routes::download::spawn_album_sync_task(
+                                services.clone(),
+                                task_id,
+                                url,
+                            );
+                        }
                         _ => {
                             soundome_server::routes::download::spawn_playlist_sync_task(
                                 services.clone(),

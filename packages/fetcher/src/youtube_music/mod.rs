@@ -296,8 +296,27 @@ impl Source for YoutubeMusic {
             .collect())
     }
 
-    async fn get_album_tracks_from_url(&self, _: &str) -> SoundomeResult<Vec<Track>> {
-        todo!()
+    async fn get_album_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
+        let album_id = self
+            .get_album_id_from_url(url)
+            .ok_or(Error::InvalidUrl(url.to_string()))?;
+        let album = self
+            .client
+            .query()
+            .music_album(album_id)
+            .await
+            .map_err(|_| {
+                Error::NotFound(format!("Youtube Music album from {}", url))
+            })?;
+
+        let tracks = join_all(
+            album
+                .tracks
+                .into_iter()
+                .map(|track| self.get_complete_track_from_music_track(track)),
+        )
+        .await;
+        Ok(tracks)
     }
 
     async fn clean_track_metadata(&self, _track: &mut Track) -> SoundomeResult<()> {
@@ -321,5 +340,10 @@ impl Source for YoutubeMusic {
     fn is_valid_artist_url(url: &str) -> bool {
         let re = Regex::new(Self::ARTIST_REGEX).unwrap(); // safe unwrap
         re.is_match(url).unwrap_or(false)
+    }
+
+    fn is_valid_album_url(url: &str) -> bool {
+        // YouTube Music album URLs contain "list=OLAK5uy_" (album playlist IDs)
+        url.contains("music.youtube.com") && url.contains("list=OLAK5uy_")
     }
 }

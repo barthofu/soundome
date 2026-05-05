@@ -235,8 +235,55 @@ impl Source for Spotify {
         }
     }
 
-    async fn get_album_tracks_from_url(&self, _: &str) -> SoundomeResult<Vec<Track>> {
-        todo!()
+    async fn get_album_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
+        let id = AlbumId::from_id(self.url_to_id(url))
+            .map_err(|_| Error::InvalidUrl(url.to_string()))?;
+
+        let album = self
+            .client
+            .album(id.as_ref(), None)
+            .map_err(|_| Error::NotFound(format!("Spotify album from {}", url)))?;
+
+        let simplified_album = rspotify::model::SimplifiedAlbum {
+            album_group: None,
+            album_type: Some(<rspotify::model::AlbumType as Into<&'static str>>::into(album.album_type).to_lowercase()),
+            artists: album.artists.clone(),
+            available_markets: vec![],
+            external_urls: album.external_urls.clone(),
+            href: None,
+            id: Some(album.id.clone()),
+            images: album.images.clone(),
+            name: album.name.clone(),
+            release_date: Some(album.release_date.clone()),
+            release_date_precision: None,
+            restrictions: None,
+        };
+
+        let market = Some(Market::Country(Country::France));
+        let mut all_tracks: Vec<Track> = Vec::new();
+        let mut offset: u32 = 0;
+        let limit: u32 = 50;
+
+        loop {
+            let tracks_page = self
+                .client
+                .album_track_manual(id.as_ref(), market, Some(limit), Some(offset))
+                .map_err(|e| {
+                    error!("Spotify API error fetching album tracks for {}: {}", url, e);
+                    Error::NotFound(format!("Spotify album tracks from {}", url))
+                })?;
+
+            for track in &tracks_page.items {
+                all_tracks.push(mappers::convert_simplified_track(track, &simplified_album));
+            }
+
+            if tracks_page.offset + tracks_page.items.len() as u32 >= tracks_page.total {
+                break;
+            }
+            offset += limit;
+        }
+
+        Ok(all_tracks)
     }
 
     async fn clean_track_metadata(&self, _track: &mut Track) -> SoundomeResult<()> {
@@ -257,5 +304,9 @@ impl Source for Spotify {
 
     fn is_valid_artist_url(url: &str) -> bool {
         url.contains("open.spotify.com/artist/")
+    }
+
+    fn is_valid_album_url(url: &str) -> bool {
+        url.contains("open.spotify.com/album/")
     }
 }
