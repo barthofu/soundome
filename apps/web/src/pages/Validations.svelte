@@ -12,6 +12,21 @@
   let tracks: PendingValidationDto[] = $state([]);
   let loading = $state(true);
   let error: string | null = $state(null);
+  let search = $state('');
+
+  let filteredTracks = $derived(
+    search.trim() === ''
+      ? tracks
+      : tracks.filter((t) => {
+          const q = search.toLowerCase();
+          return (
+            t.title.toLowerCase().includes(q) ||
+            t.artists.some((a) => a.name.toLowerCase().includes(q)) ||
+            (t.album?.title.toLowerCase().includes(q) ?? false) ||
+            (t.validation_reason?.toLowerCase().includes(q) ?? false)
+          );
+        })
+  );
 
   async function load() {
     loading = true;
@@ -50,6 +65,16 @@
     </button>
   </header>
 
+  {#if tracks.length > 0}
+    <div class="search-bar">
+      <input
+        type="text"
+        placeholder="Filter by title, artist, album…"
+        bind:value={search}
+      />
+    </div>
+  {/if}
+
   {#if loading}
     <p class="status">Loading…</p>
   {:else if error}
@@ -57,9 +82,9 @@
   {:else if tracks.length === 0}
     <p class="status empty">No pending validations 🎉</p>
   {:else}
-    <p class="count">{tracks.length} track{tracks.length > 1 ? 's' : ''} awaiting review</p>
+    <p class="count">{filteredTracks.length} / {tracks.length} track{tracks.length > 1 ? 's' : ''} awaiting review</p>
     <ul class="track-list">
-      {#each tracks as track (track.id)}
+      {#each filteredTracks as track (track.id)}
         <li>
           <TrackCard {track} onApprove={handleApprove} onReject={handleReject} />
         </li>
@@ -104,6 +129,24 @@
   button:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  .search-bar {
+    margin-bottom: 1rem;
+  }
+
+  .search-bar input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    font-size: 0.875rem;
+    color: inherit;
+  }
+
+  .search-bar input::placeholder {
+    color: var(--muted);
   }
 
   .status {
