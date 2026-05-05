@@ -62,7 +62,7 @@
     <div class="input-row">
       <input
         type="url"
-        placeholder="https://open.spotify.com/track/… or SoundCloud, YouTube…"
+        placeholder="Paste a track, album, artists or playlist URL"
         bind:value={url}
         disabled={loading}
         autocomplete="off"
@@ -104,7 +104,7 @@
 
   {#if providers.length > 0}
     <div class="supported">
-      <span>Supported:</span>
+      <span>Supported platforms:</span>
       {#each providers as platform}
         <span class="platform">{platform}</span>
       {/each}

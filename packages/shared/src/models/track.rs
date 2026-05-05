@@ -177,12 +177,20 @@ impl Track {
 
         // Use symphonia for audio probing
         use symphonia::core::io::MediaSourceStream;
+        use symphonia::core::probe::Hint;
 
         let file = File::open(path).ok()?;
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
+        // Provide file extension hint so symphonia can select the correct reader
+        // without scanning through potentially large ID3 tags / metadata.
+        let mut hint = Hint::new();
+        if let Some(ext) = PathBuf::from(path).extension().and_then(|e| e.to_str()) {
+            hint.with_extension(ext);
+        }
+
         let probed = match symphonia::default::get_probe().format(
-            &Default::default(),
+            &hint,
             mss,
             &Default::default(),
             &Default::default(),
@@ -191,7 +199,7 @@ impl Track {
             Err(_) => return None,
         };
         let format = probed.format;
-        
+
         // Find the first audio track with a defined bits_per_coded_sample
         let track = format.tracks().iter().find(|t| t.codec_params.bits_per_coded_sample.is_some())?;
         track.codec_params.bits_per_coded_sample.map(|bps| bps as u32)
@@ -284,7 +292,7 @@ impl Track {
     /// Transpose metadata from an other track
     pub fn transpose_metadata(&mut self, other: &Track) {
         self.title = other.title.clone();
-        
+
         if let Some(val) = &other.date { self.date = Some(val.clone()); };
         if let Some(val) = &other.genre { self.genre = Some(val.clone()); };
         if let Some(val) = &other.cover { self.cover = Some(val.clone()); };
@@ -292,7 +300,7 @@ impl Track {
         if let Some(val) = &other.track_number { self.track_number = Some(val.clone()); };
         if let Some(val) = &other.disc_number { self.disc_number = Some(val.clone()); };
         if let Some(val) = &other.label { self.label = Some(val.clone()); };
-        
+
         // only add new references, do not overwrite existing ones
         self.transpose_refs(other);
 
@@ -329,8 +337,8 @@ impl Track {
             let reference_already_exists = self.references
                 .iter()
                 .any(|r|
-                    r.platform == ref_item.platform && 
-                    r.external_id == ref_item.external_id && 
+                    r.platform == ref_item.platform &&
+                    r.external_id == ref_item.external_id &&
                     r.ref_type == ref_item.ref_type
                 );
             if !reference_already_exists {
