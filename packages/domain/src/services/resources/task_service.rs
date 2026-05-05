@@ -39,6 +39,23 @@ impl TaskService {
         self.task_repo.create(conn, &task)
     }
 
+    /// Create a new pending task for an artist sync.
+    pub fn create_artist_sync(&self, conn: &mut SqliteConnection, url: &str, label: Option<String>) -> shared::types::SoundomeResult<Task> {
+        let task = Task {
+            id: None,
+            task_type: TaskType::SyncArtist,
+            status: TaskStatus::Pending,
+            payload: serde_json::json!({ "url": url }).to_string(),
+            label,
+            progress: 0,
+            total: None,
+            error: None,
+            created_at: None,
+            updated_at: None,
+        };
+        self.task_repo.create(conn, &task)
+    }
+
     pub fn set_running(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
         self.task_repo.set_running(conn, id)
     }

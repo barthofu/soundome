@@ -151,6 +151,49 @@ pub fn convert_playlist_item(
     })
 }
 
+/// Converts a Soundcloud BasicTrack (from user tracks endpoint) to a shared Track.
+pub fn convert_basic_track(
+    track: rsoundcloud::models::track::BasicTrack,
+    album: Option<rsoundcloud::models::playlist::BasicAlbumPlaylist>,
+) -> Track {
+    let user = &track.user;
+    let base_track = &track.track;
+    Track {
+        id: None,
+        needs_validation: false,
+        validation_reason: None,
+        title: base_track.title.clone(),
+        artists: vec![Artist {
+            id: None,
+            name: user.username.clone(),
+            icon: None,
+            references: vec![Reference {
+                id: None,
+                ref_type: ReferenceType::Metadata,
+                platform: shared::models::Platform::SoundCloud,
+                external_id: Some(user.id.to_string()),
+                external_url: None,
+            }],
+        }],
+        album: album.as_ref().map(|a| convert_basic_album(a)),
+        genre: base_track.genre.clone(),
+        duration: Some((base_track.duration / 1000) as i32),
+        file_path: None,
+        track_number: None,
+        disc_number: None,
+        label: base_track.label_name.clone(),
+        date: base_track.release_date.clone().or(Some(base_track.display_date.clone())),
+        cover: base_track.artwork_url.clone(),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::SoundCloud,
+            external_id: Some(base_track.id.to_string()),
+            external_url: Some(base_track.permalink_url.clone()),
+        }],
+    }
+}
+
 // =======================================================================
 // Processes
 // =======================================================================

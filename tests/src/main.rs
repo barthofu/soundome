@@ -41,6 +41,7 @@ async fn main() {
     let artist_repo = Arc::new(repositories::artist::DieselArtistRepository::new());
     let playlist_repo = Arc::new(repositories::playlist::DieselPlaylistRepository::new());
     let task_repo = Arc::new(repositories::task::DieselTaskRepository::new());
+    let sync_schedule_repo = Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),
@@ -48,6 +49,7 @@ async fn main() {
         artist: artist_repo.clone(),
         playlist: playlist_repo.clone(),
         task: task_repo.clone(),
+        sync_schedule: sync_schedule_repo.clone(),
     });
 
     let conn = &mut database::init_connection(&Config::get().database.url);

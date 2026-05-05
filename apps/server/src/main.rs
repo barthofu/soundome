@@ -83,11 +83,22 @@ fn rocket() -> _ {
                     }
 
                     tracing::info!("Re-launching stale task {} for URL {}", task_id, url);
-                    soundome_server::routes::download::spawn_playlist_sync_task(
-                        services.clone(),
-                        task_id,
-                        url,
-                    );
+                    match task.task_type {
+                        shared::models::TaskType::SyncArtist => {
+                            soundome_server::routes::download::spawn_artist_sync_task(
+                                services.clone(),
+                                task_id,
+                                url,
+                            );
+                        }
+                        _ => {
+                            soundome_server::routes::download::spawn_playlist_sync_task(
+                                services.clone(),
+                                task_id,
+                                url,
+                            );
+                        }
+                    }
                 }
             }
             Ok(_) => {} // no stale tasks

@@ -22,6 +22,7 @@ pub struct Task {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, AsRefStr)]
 pub enum TaskType {
     SyncPlaylist,
+    SyncArtist,
     DownloadTrack,
 }
 
@@ -29,6 +30,7 @@ impl TaskType {
     pub fn from_str(s: &str) -> Self {
         match s {
             "SyncPlaylist" => TaskType::SyncPlaylist,
+            "SyncArtist" => TaskType::SyncArtist,
             "DownloadTrack" => TaskType::DownloadTrack,
             _ => TaskType::DownloadTrack,
         }

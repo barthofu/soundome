@@ -5,7 +5,7 @@ use std::env;
 use async_trait::async_trait;
 use config::Config;
 use rspotify::{
-    model::{AlbumId, ArtistId, Country, Market, PlaylistId, SearchResult, SearchType, TrackId},
+    model::{AlbumId, AlbumType as SpotifyAlbumType, ArtistId, Country, Market, PlaylistId, SearchResult, SearchType, TrackId},
     prelude::BaseClient,
     ClientCredsSpotify, Credentials,
 };
@@ -23,15 +23,15 @@ pub struct Spotify {
 impl Spotify {
     pub fn new(client_id: &str, client_secret: &str) -> SoundomeResult<Self> {
         let credentials = Credentials::new(client_id, client_secret);
-        
+
         // If proxy is enabled and ALL_PROXY is not set, set it using the proxy rotator
         if let Some(proxy_config) = Config::get().proxy.as_ref() {
             if proxy_config.enabled && env::var("ALL_PROXY").is_err() {
                 let proxy_url = ProxyRotator::get().get_next_proxy();
-                env::set_var("ALL_PROXY", proxy_url.unwrap_or_default()); 
+                env::set_var("ALL_PROXY", proxy_url.unwrap_or_default());
             }
         }
-        
+
         let client = ClientCredsSpotify::new(credentials);
 
         client
@@ -142,6 +142,54 @@ impl Source for Spotify {
         Ok(mappers::convert_full_artist(&full_artist))
     }
 
+    async fn get_artist_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
+        let id = ArtistId::from_id(self.url_to_id(url))
+            .map_err(|_| Error::InvalidUrl(url.to_string()))?;
+
+        // Fetch all albums (albums + singles) for this artist
+        let market = Some(Market::Country(Country::France));
+        let include_groups = [SpotifyAlbumType::Album, SpotifyAlbumType::Single];
+        let mut all_tracks: Vec<Track> = Vec::new();
+        let mut offset: u32 = 0;
+        let limit: u32 = 50;
+
+        loop {
+            let albums_page = self
+                .client
+                .artist_albums_manual(id.as_ref(), include_groups, market, Some(limit), Some(offset))
+                .map_err(|e| {
+                    error!("Spotify API error fetching artist albums {}: {}", url, e);
+                    Error::NotFound(format!("Spotify artist albums from {}", url))
+                })?;
+
+            for album in &albums_page.items {
+                let Some(album_id) = &album.id else { continue };
+
+                // Fetch tracks for this album
+                let tracks_page = self
+                    .client
+                    .album_track_manual(album_id.as_ref(), market, Some(50), Some(0))
+                    .map_err(|e| {
+                        error!("Spotify API error fetching album tracks for {}: {}", album_id, e);
+                        Error::NotFound(format!("Spotify album tracks for {}", album_id))
+                    })?;
+
+                for track in &tracks_page.items {
+                    all_tracks.push(mappers::convert_simplified_track(track, album));
+                }
+            }
+
+            // Check if there are more albums
+            if albums_page.offset + albums_page.items.len() as u32 >= albums_page.total {
+                break;
+            }
+            offset += limit;
+        }
+
+        tracing::info!("Fetched {} tracks from artist discography on Spotify", all_tracks.len());
+        Ok(all_tracks)
+    }
+
     async fn get_artists_from_query(&self, search: &str) -> SoundomeResult<Vec<Artist>> {
         let res = self
             .client
@@ -197,7 +245,7 @@ impl Source for Spotify {
 
     async fn clean_tracks_metadata(&self, _tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
         Ok(())
-    } 
+    }
 
     fn is_valid_track_url(url: &str) -> bool {
         url.contains("open.spotify.com/track/")
@@ -205,5 +253,9 @@ impl Source for Spotify {
 
     fn is_valid_playlist_url(url: &str) -> bool {
         url.contains("open.spotify.com/playlist/")
+    }
+
+    fn is_valid_artist_url(url: &str) -> bool {
+        url.contains("open.spotify.com/artist/")
     }
 }

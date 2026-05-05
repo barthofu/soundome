@@ -23,6 +23,7 @@ pub struct Soundcloud {
 impl Soundcloud {
     const TRACK_REGEX: &str = r"^(https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)(?:[a-z0-9\-_]{1,25}))\/(?:(?:(?!sets|playlist|stats|settings|logout|notifications|you|messages)(?:[a-z0-9\-_]{1,100}))(?:\/s\-[a-zA-Z0-9\-_]{1,10})?))(?:[a-z0-9\-\?=\/]*)$";
     const PLAYLIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/sets\/[a-z0-9\-_]{1,100}(?:[a-z0-9\-\?=\/]*)$";
+    const ARTIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/?(?:\?.*)?$";
 
     pub async fn new() -> SoundomeResult<Self> {
         let client = match Config::get().proxy.as_ref() {
@@ -188,6 +189,19 @@ impl Source for Soundcloud {
         Ok(mappers::convert_artist(&artist))
     }
 
+    async fn get_artist_tracks_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {
+        let tracks = self
+            .client
+            .get_user_tracks(ResourceId::Url(url.to_string()))
+            .await
+            .map_err(|_| Error::NotFound(format!("Soundcloud artist tracks from {}", url)))?;
+
+        Ok(tracks
+            .into_iter()
+            .map(|basic_track| mappers::convert_basic_track(basic_track, None))
+            .collect())
+    }
+
     async fn get_artists_from_query(&self, search: &str) -> Result<Vec<Artist>, Error> {
         let users = self
             .client
@@ -243,6 +257,15 @@ impl Source for Soundcloud {
 
     fn is_valid_playlist_url(url: &str) -> bool {
         let re = Regex::new(Self::PLAYLIST_REGEX).unwrap(); // safe unwrap
+        re.is_match(url).unwrap_or(false)
+    }
+
+    fn is_valid_artist_url(url: &str) -> bool {
+        // Artist URL must not match track or playlist patterns
+        if Self::is_valid_track_url(url) || Self::is_valid_playlist_url(url) {
+            return false;
+        }
+        let re = Regex::new(Self::ARTIST_REGEX).unwrap(); // safe unwrap
         re.is_match(url).unwrap_or(false)
     }
 }

@@ -44,6 +44,17 @@ fn is_playlist_url(url: &str) -> bool {
         || url.contains("/album/")
 }
 
+fn is_artist_url(url: &str) -> bool {
+    url.contains("open.spotify.com/artist/")
+        || url.contains("music.youtube.com/channel/")
+        || (url.contains("soundcloud.com/")
+            && !is_playlist_url(url)
+            && !url.contains("/sets/")
+            && url.trim_end_matches('/')
+                .split('/')
+                .count() == 4) // https://soundcloud.com/username
+}
+
 /// Spawn a background OS thread that runs `sync_playlist_from_url` for the given task.
 ///
 /// The task must already exist in the DB. The thread creates its own SQLite connection
@@ -91,11 +102,58 @@ pub fn spawn_playlist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: 
     });
 }
 
+/// Spawn a background OS thread that runs `sync_artist_from_url` for the given task.
+///
+/// The task must already exist in the DB. The thread creates its own SQLite connection
+/// and single-threaded Tokio runtime.
+pub fn spawn_artist_sync_task(services: Arc<ServiceLayer>, task_id: i32, url: String) {
+    let db_url = Config::get().database.url.clone();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to build background tokio runtime");
+
+        rt.block_on(async move {
+            let conn = &mut database::init_connection(&db_url);
+
+            if let Err(e) = services.task_service.set_running(conn, task_id) {
+                tracing::error!("Failed to set task {} as running: {}", task_id, e);
+            }
+
+            match services
+                .download_service
+                .sync_artist_from_url(&url, conn, Some(task_id))
+                .await
+            {
+                Ok(_) => {
+                    if let Err(e) = services.task_service.set_completed(conn, task_id) {
+                        tracing::error!("Failed to mark task {} as completed: {}", task_id, e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Artist sync task {} failed: {}", task_id, e);
+                    if let Err(e2) =
+                        services.task_service.set_failed(conn, task_id, &e.to_string())
+                    {
+                        tracing::error!(
+                            "Failed to mark task {} as failed: {}",
+                            task_id,
+                            e2
+                        );
+                    }
+                }
+            }
+        });
+    });
+}
+
 // ================================================================================================
 // Routes
 // ================================================================================================
 
-/// Download a single track (synchronous) or start a background playlist sync (returns a task_id).
+/// Download a single track (synchronous), or start a background playlist/artist sync (returns a task_id).
 #[openapi]
 #[post("/download", format = "json", data = "<body>")]
 pub async fn download(
@@ -130,6 +188,32 @@ pub async fn download(
 
         Ok(Json(serde_json::json!({
             "type": "playlist",
+            "task_id": task_id,
+        })))
+    } else if is_artist_url(&url) {
+        // --- Async path: artist sync, create task, spawn background thread ---
+
+        let url_clone = url.clone();
+        let services_for_db = services.clone();
+        let task = db
+            .run(move |conn| {
+                services_for_db.task_service.create_artist_sync(conn, &url_clone, None)
+            })
+            .await
+            .map_err(|err| {
+                crate::utils::error::Error::Custom(CustomError {
+                    status: Status::InternalServerError,
+                    code: "TaskCreateFailed".to_string(),
+                    message: err.to_string(),
+                })
+            })?;
+
+        let task_id = task.id.expect("created task must have an id");
+
+        spawn_artist_sync_task(services, task_id, url);
+
+        Ok(Json(serde_json::json!({
+            "type": "artist",
             "task_id": task_id,
         })))
     } else {

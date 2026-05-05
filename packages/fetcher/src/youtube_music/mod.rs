@@ -25,7 +25,7 @@ impl YoutubeMusic {
     const ARTIST_REGEX: &str = r"^https:\/\/music\.youtube\.com\/channel\/([A-Za-z0-9_-]+)$";
 
     pub fn new() -> SoundomeResult<Self> {
-        
+
         let client = match Config::get().proxy.as_ref() {
             Some(proxy_config) if proxy_config.enabled => {
                 let reqwest_client = HttpClientBuilder::get_reqwest_client_builder()?;
@@ -202,6 +202,53 @@ impl Source for YoutubeMusic {
         Ok(mappers::convert_artist(&artist))
     }
 
+    async fn get_artist_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
+        let artist_id = self
+            .get_artist_id_from_url(url)
+            .ok_or(Error::InvalidUrl(url.to_string()))?;
+
+        // Fetch full discography: all albums for this artist
+        let albums = self
+            .client
+            .query()
+            .music_artist_albums(&artist_id, None, None)
+            .await
+            .map_err(|_| {
+                Error::NotFound(format!("Youtube Music artist albums from {}", url))
+            })?;
+
+        tracing::info!("Found {} albums for artist on YouTube Music", albums.len());
+
+        // For each album, fetch all tracks
+        let mut all_tracks: Vec<Track> = Vec::new();
+        for album_item in &albums {
+            let album = self
+                .client
+                .query()
+                .music_album(&album_item.id)
+                .await;
+
+            match album {
+                Ok(album) => {
+                    let tracks = join_all(
+                        album
+                            .tracks
+                            .into_iter()
+                            .map(|track| self.get_complete_track_from_music_track(track)),
+                    )
+                    .await;
+                    all_tracks.extend(tracks);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to fetch album {} ({}): {}", album_item.name, album_item.id, e);
+                }
+            }
+        }
+
+        tracing::info!("Fetched {} tracks from artist discography on YouTube Music", all_tracks.len());
+        Ok(all_tracks)
+    }
+
     async fn get_artists_from_query(&self, search: &str) -> SoundomeResult<Vec<Artist>> {
         let results = self
             .client
@@ -259,7 +306,7 @@ impl Source for YoutubeMusic {
 
     async fn clean_tracks_metadata(&self, _tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
         Ok(())
-    } 
+    }
 
     fn is_valid_track_url(url: &str) -> bool {
         let re = Regex::new(Self::TRACK_REGEX).unwrap(); // safe unwrap
@@ -268,6 +315,11 @@ impl Source for YoutubeMusic {
 
     fn is_valid_playlist_url(url: &str) -> bool {
         let re = Regex::new(Self::PLAYLIST_REGEX).unwrap(); // safe unwrap
+        re.is_match(url).unwrap_or(false)
+    }
+
+    fn is_valid_artist_url(url: &str) -> bool {
+        let re = Regex::new(Self::ARTIST_REGEX).unwrap(); // safe unwrap
         re.is_match(url).unwrap_or(false)
     }
 }

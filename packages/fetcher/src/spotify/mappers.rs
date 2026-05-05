@@ -1,5 +1,6 @@
 use rspotify::model::{
-    FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist
+    FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist,
+    SimplifiedTrack,
 };
 use shared::{
     errors::Error,
@@ -147,6 +148,36 @@ pub fn convert_playlist_item(item: &PlaylistItem, pos: u32) -> Option<PlaylistTr
         PlayableItem::Episode(_) => None,
         PlayableItem::Unknown(_) => None,
     })
+}
+
+/// Converts a simplified Spotify track (from album listing) to a shared Track.
+/// Requires the parent album to be passed separately for context.
+pub fn convert_simplified_track(track: &SimplifiedTrack, album: &SimplifiedAlbum) -> Track {
+    let artists = track.artists.iter().map(convert_artist).collect();
+
+    Track {
+        id: None,
+        needs_validation: false,
+        validation_reason: None,
+        title: track.name.clone(),
+        artists,
+        album: Some(convert_simplified_album(album)),
+        genre: None,
+        duration: Some(track.duration.num_seconds() as i32),
+        file_path: None,
+        track_number: Some(track.track_number as i32),
+        disc_number: Some(track.disc_number as i32),
+        label: None,
+        date: album.release_date.clone(),
+        cover: album.images.get(0).map(|image| image.url.clone()),
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: shared::models::Platform::Spotify,
+            external_id: track.id.as_ref().map(|id| id.to_string()),
+            external_url: track.external_urls.get("spotify").cloned(),
+        }],
+    }
 }
 
 // =========================================
