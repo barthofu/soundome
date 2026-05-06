@@ -54,6 +54,7 @@ Primary entry point: `apps/server/src/main.rs`
 ### `packages/organizer`
 
 - filesystem placement and final library layout
+- `playlist_writer` module: writes `.m3u8` playlist files to the configured output directory
 
 ### `packages/config`
 
@@ -77,7 +78,10 @@ Primary entry point: `apps/server/src/main.rs`
 - `apps/server/src/main.rs`: repository and service wiring
 - `apps/server/src/routes/`: HTTP layer
 - `apps/server/src/routes/metrics.rs`: Prometheus metrics handler (`GET /metrics`)
+- `apps/server/src/routes/playlists.rs`: `POST /api/playlists/:id/export` — on-demand M3U8 regeneration
 - `packages/domain/src/services/download_service.rs`: main business workflow
+- `packages/domain/src/services/resources/playlist_service.rs`: playlist CRUD and M3U8 export orchestration
+- `packages/organizer/src/playlist_writer.rs`: M3U8 file writer
 - `packages/shared/src/models/`: track, album, artist, playlist, and reference models
 - `packages/shared/src/libs/http.rs`: proxy rotation and proxy-aware HTTP client builder
 - `packages/database/src/repositories/`: persistence implementations

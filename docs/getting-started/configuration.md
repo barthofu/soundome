@@ -184,6 +184,24 @@ Proxy URLs support HTTP, HTTPS, and SOCKS5. Credentials can be embedded directly
 
 ---
 
+## `[playlists]` (optional)
+
+Controls the export of playlists as `.m3u8` files. Omit this section to use the default output directory.
+
+After each playlist sync, Soundome writes one `.m3u8` file per playlist so that Navidrome, Jellyfin, mpd, and any other M3U8-compliant player can discover the playlists without depending on Soundome at runtime.
+
+See [../operations/playlist-m3u8-export.md](../operations/playlist-m3u8-export.md) for full operational details.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `m3u8_dir` | string | `"{base_library_dir}/Playlists/"` | Directory where `.m3u8` files are written. May be relative to the working directory or absolute. |
+
+| Key | Environment variable |
+|---|---|
+| `playlists.m3u8_dir` | `SOUNDOME__PLAYLISTS__M3U8_DIR` |
+
+---
+
 ## Practical guidance
 
 - Copy `config.example.toml` to `config.toml` and fill in your values before first run.
