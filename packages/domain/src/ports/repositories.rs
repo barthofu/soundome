@@ -173,6 +173,12 @@ pub trait PlaylistRepository: Send + Sync {
         track_id: i32,
         position: Option<i32>,
     ) -> SoundomeResult<()>;
+    /// Return all finalized tracks belonging to a playlist, ordered by position.
+    fn get_tracks(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+    ) -> SoundomeResult<Vec<Track>>;
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
 }
 

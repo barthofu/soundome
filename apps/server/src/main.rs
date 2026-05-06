@@ -253,6 +253,7 @@ fn rocket() -> _ {
                 routes::artists::update,
                 routes::artists::delete,
                 routes::artists::merge,
+                routes::playlists::export,
             ],
         )
         // .mount("/api", routes![routes::audio::stream,])

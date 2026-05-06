@@ -18,6 +18,8 @@ pub struct Config {
     pub tagger: TaggerConfig,
     #[serde(default)]
     pub server: ServerConfig,
+    #[serde(default)]
+    pub playlists: PlaylistsConfig,
 }
 
 // ===============================================================================
@@ -258,4 +260,18 @@ pub struct ServerConfig {
     /// TCP port to listen on.
     /// ENV: SOUNDOME__SERVER__PORT
     pub port: Option<u16>,
+}
+
+// ===============================================================================
+// Playlists
+// ===============================================================================
+
+/// Configuration for playlist-related features.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(unused)]
+pub struct PlaylistsConfig {
+    /// Directory where `.m3u8` playlist files are written.
+    /// May be relative (to the working directory) or absolute.
+    /// Defaults to `{base_library_dir}/Playlists/` when absent.
+    pub m3u8_dir: Option<String>,
 }

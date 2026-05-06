@@ -60,6 +60,15 @@ impl PlaylistService {
             .add_track(conn, playlist_id, track_id, position)
     }
 
+    /// Return all finalized tracks in the playlist, ordered by position.
+    pub fn get_tracks(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+    ) -> shared::types::SoundomeResult<Vec<shared::models::Track>> {
+        self.playlist_repo.get_tracks(conn, playlist_id)
+    }
+
     pub fn count(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<i64> {
         self.playlist_repo.count(conn)
     }
