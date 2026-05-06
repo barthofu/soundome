@@ -38,9 +38,13 @@ For each track to import:
 8. Persist the result.
    8.1. Save tracks, albums, artists, playlist links, and references to the database.
 
-9. Handle failures.
-   9.1. Clean up temporary files when a step fails.
-   9.2. Log the failure clearly so the user can retry or validate manually.
+9. Export playlist.
+   9.1. If the import came from a playlist, regenerate the `.m3u8` file for that playlist in the configured output directory. Failures are logged as warnings and do not block the import.
+   9.2. The exported file can also be regenerated on demand via `POST /api/playlists/:id/export`.
+
+10. Handle failures.
+   10.1. Clean up temporary files when a step fails.
+   10.2. Log the failure clearly so the user can retry or validate manually.
 
 ## Import a local file from an ingest directory
 

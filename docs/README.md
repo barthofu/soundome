@@ -39,6 +39,7 @@ This directory is the main documentation hub for the repository. The content is 
 - [operations/README.md](operations/README.md): operational entry point.
 - [operations/proxy-configuration.md](operations/proxy-configuration.md): proxy support, formats, and limitations.
 - [operations/proxy-usage-example.md](operations/proxy-usage-example.md): code-level usage of the shared proxy-aware HTTP layer.
+- [operations/playlist-m3u8-export.md](operations/playlist-m3u8-export.md): M3U8 export behavior, configuration, and code entry points.
 
 ## Diagrams and supporting assets
 

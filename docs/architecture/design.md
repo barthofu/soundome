@@ -49,6 +49,14 @@ The web app covers:
 - approval or rejection of pending validations
 - background task monitoring for playlist sync
 
+## Playlist M3U8 export
+
+After each playlist sync, `PlaylistService::export_m3u8` writes one `.m3u8` file per playlist to a configurable output directory (default: `{base_library_dir}/Playlists/`). This makes playlists visible to external music players such as Navidrome or Jellyfin without requiring Soundome to be running.
+
+The export can also be triggered on demand via `POST /api/playlists/:id/export`.
+
+See [../operations/playlist-m3u8-export.md](../operations/playlist-m3u8-export.md) for full operational details.
+
 ## Configuration and globals
 
 `shared::init_globals()` initializes:
