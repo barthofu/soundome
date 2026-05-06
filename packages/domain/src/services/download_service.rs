@@ -805,11 +805,7 @@ impl DownloadService {
     }
 
     /// Tag the downloaded file with the track metadata, then move it to the correct location
-    async fn process_track_file(
-        &self,
-        track: &mut Track,
-        file_path: &Path,
-    ) -> SoundomeResult<()> {
+    async fn process_track_file(&self, track: &mut Track, file_path: &Path) -> SoundomeResult<()> {
         tagger::file::tag_file_with_track(&file_path.to_path_buf(), track)?;
         tracing::info!("Tagged file with downloaded_track metadata");
 
@@ -839,29 +835,8 @@ impl DownloadService {
         playlist: &Playlist,
         playlist_id: i32,
     ) {
-        let tracks = match self.playlist_service.get_tracks(conn, playlist_id) {
-            Ok(t) => t,
-            Err(e) => {
-                tracing::warn!(
-                    "M3U8 export: failed to load tracks for playlist {}: {}",
-                    playlist_id,
-                    e
-                );
-                return;
-            }
-        };
-
-        let cfg = Config::get();
-        let output_dir = match &cfg.playlists.m3u8_dir {
-            Some(dir) => std::path::PathBuf::from(dir),
-            None => std::path::PathBuf::from(&cfg.general.base_library_dir).join("Playlists"),
-        };
-
-        match organizer::playlist_writer::write_m3u8(playlist, &tracks, &output_dir) {
-            Ok(path) => tracing::info!(
-                "M3U8 playlist exported: {:?}",
-                path
-            ),
+        match self.playlist_service.export_m3u8(conn, playlist_id) {
+            Ok(path) => tracing::info!("M3U8 playlist exported: {:?}", path),
             Err(e) => tracing::warn!(
                 "M3U8 export failed for playlist \"{}\": {}",
                 playlist.name,

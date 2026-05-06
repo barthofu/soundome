@@ -20,7 +20,6 @@ domain = { path = "../../packages/domain" }
 shared = { path = "../../packages/shared" }
 config = { path = "../../packages/config" }
 database = { path = "../../packages/database" }
-organizer = { path = "../../packages/organizer" }
 
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true }

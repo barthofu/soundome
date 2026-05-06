@@ -57,7 +57,9 @@ impl YoutubeMusic {
                 .music_artist(&artist.id.clone().unwrap_or("".to_string()), false)
                 .await
                 .ok();
-            if let Some(artist) = artist { artists.push(artist); }
+            if let Some(artist) = artist {
+                artists.push(artist);
+            }
         }
         let album = self
             .client

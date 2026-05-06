@@ -29,7 +29,11 @@ fn sanitize_name(name: &str) -> String {
 ///   require manual validation (`needs_validation == true`).
 ///
 /// Returns the path of the written file.
-pub fn write_m3u8(playlist: &Playlist, tracks: &[Track], output_dir: &Path) -> SoundomeResult<PathBuf> {
+pub fn write_m3u8(
+    playlist: &Playlist,
+    tracks: &[Track],
+    output_dir: &Path,
+) -> SoundomeResult<PathBuf> {
     std::fs::create_dir_all(output_dir).map_err(|e| {
         Error::Custom(format!(
             "Failed to create M3U8 output directory {:?}: {}",
@@ -40,12 +44,12 @@ pub fn write_m3u8(playlist: &Playlist, tracks: &[Track], output_dir: &Path) -> S
     let file_name = format!("{}.m3u8", sanitize_name(&playlist.name));
     let file_path = output_dir.join(&file_name);
 
-    let mut file = std::fs::File::create(&file_path).map_err(|e| {
-        Error::Custom(format!("Failed to create M3U8 file {:?}: {}", file_path, e))
-    })?;
+    let mut file = std::fs::File::create(&file_path)
+        .map_err(|e| Error::Custom(format!("Failed to create M3U8 file {:?}: {}", file_path, e)))?;
 
     writeln!(file, "#EXTM3U").map_err(|e| Error::Custom(format!("M3U8 write error: {}", e)))?;
-    writeln!(file, "#EXTENC:UTF-8").map_err(|e| Error::Custom(format!("M3U8 write error: {}", e)))?;
+    writeln!(file, "#EXTENC:UTF-8")
+        .map_err(|e| Error::Custom(format!("M3U8 write error: {}", e)))?;
 
     for track in tracks {
         // Skip tracks that have not been finalized or require validation.
@@ -57,10 +61,7 @@ pub fn write_m3u8(playlist: &Playlist, tracks: &[Track], output_dir: &Path) -> S
         };
 
         // Duration in seconds; -1 when unknown (valid per M3U8 spec).
-        let duration_secs = track
-            .duration
-            .map(|ms| ms / 1000)
-            .unwrap_or(-1);
+        let duration_secs = track.duration.map(|ms| ms / 1000).unwrap_or(-1);
 
         // Display string: "Artist1, Artist2 - Title"
         let artist_str = if track.artists.is_empty() {
@@ -102,7 +103,12 @@ mod tests {
         }
     }
 
-    fn make_track(title: &str, artist: &str, duration_ms: Option<i32>, path: Option<&str>) -> Track {
+    fn make_track(
+        title: &str,
+        artist: &str,
+        duration_ms: Option<i32>,
+        path: Option<&str>,
+    ) -> Track {
         Track {
             id: Some(1),
             title: title.to_string(),
@@ -132,8 +138,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let playlist = make_playlist("My Playlist");
         let tracks = vec![
-            make_track("Windowlicker", "Aphex Twin", Some(213_000), Some("/library/Aphex Twin/Windowlicker.flac")),
-            make_track("Archangel", "Burial", Some(187_000), Some("/library/Burial/Archangel.flac")),
+            make_track(
+                "Windowlicker",
+                "Aphex Twin",
+                Some(213_000),
+                Some("/library/Aphex Twin/Windowlicker.flac"),
+            ),
+            make_track(
+                "Archangel",
+                "Burial",
+                Some(187_000),
+                Some("/library/Burial/Archangel.flac"),
+            ),
         ];
 
         let path = write_m3u8(&playlist, &tracks, dir.path()).unwrap();

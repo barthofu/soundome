@@ -92,8 +92,7 @@ impl PlaylistRepository for DieselPlaylistRepository {
         // Load track entities joined via the junction table, ordered by position.
         let track_entities: Vec<TrackEntity> = schema::playlist_tracks::table
             .inner_join(
-                schema::track::table
-                    .on(schema::playlist_tracks::track_id.eq(schema::track::id)),
+                schema::track::table.on(schema::playlist_tracks::track_id.eq(schema::track::id)),
             )
             .filter(schema::playlist_tracks::playlist_id.eq(playlist_id))
             .order(schema::playlist_tracks::position.asc())
