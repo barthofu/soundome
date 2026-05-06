@@ -259,3 +259,15 @@ metadata_providers = ["musicbrainz", "bandcamp", "spotify"]
 # Hosts and domains that bypass the proxy.
 # ENV: SOUNDOME__PROXY__NO_PROXY
 # no_proxy = ["localhost", "127.0.0.1", "*.local"]
+
+# =============================================================================
+# Playlists
+# =============================================================================
+
+# [playlists]
+
+# Directory where .m3u8 playlist files are written after each sync.
+# May be an absolute path or relative to the working directory.
+# Defaults to "{general.base_library_dir}/Playlists/" when absent.
+# ENV: SOUNDOME__PLAYLISTS__M3U8_DIR
+# m3u8_dir = "library/Playlists"

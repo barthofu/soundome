@@ -10,7 +10,7 @@ use fetcher::{Fetcher, Source};
 use shared::models::ReferenceType;
 use shared::{
     errors::Error,
-    models::{Album, AlbumType, Artist, Track},
+    models::{Album, AlbumType, Artist, Playlist, Track},
     types::SoundomeResult,
     utils::enums::Match,
 };
@@ -235,6 +235,9 @@ impl DownloadService {
             existing_count,
             new_tracks.len() - new_processed_tracks.len(),
         );
+
+        // Best-effort: export updated playlist as an M3U8 file.
+        self.export_playlist_m3u8(conn, &playlist, playlist_id);
 
         Ok(new_processed_tracks)
     }
@@ -826,6 +829,45 @@ impl DownloadService {
         let inserted_track = self.track_service.create_or_update(conn, track)?;
         tracing::info!("Saved track in the database");
         Ok(inserted_track)
+    }
+
+    /// Best-effort M3U8 export: fetch playlist tracks from DB and write the file.
+    /// Failures are logged as warnings and do not propagate.
+    fn export_playlist_m3u8(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist: &Playlist,
+        playlist_id: i32,
+    ) {
+        let tracks = match self.playlist_service.get_tracks(conn, playlist_id) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(
+                    "M3U8 export: failed to load tracks for playlist {}: {}",
+                    playlist_id,
+                    e
+                );
+                return;
+            }
+        };
+
+        let cfg = Config::get();
+        let output_dir = match &cfg.playlists.m3u8_dir {
+            Some(dir) => std::path::PathBuf::from(dir),
+            None => std::path::PathBuf::from(&cfg.general.base_library_dir).join("Playlists"),
+        };
+
+        match organizer::playlist_writer::write_m3u8(playlist, &tracks, &output_dir) {
+            Ok(path) => tracing::info!(
+                "M3U8 playlist exported: {:?}",
+                path
+            ),
+            Err(e) => tracing::warn!(
+                "M3U8 export failed for playlist \"{}\": {}",
+                playlist.name,
+                e
+            ),
+        }
     }
 }
 

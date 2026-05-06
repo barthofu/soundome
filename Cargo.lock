@@ -2845,6 +2845,7 @@ version = "0.1.0"
 dependencies = [
  "config 0.1.0",
  "shared",
+ "tempfile",
  "tracing",
 ]
 
@@ -4440,6 +4441,7 @@ dependencies = [
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "libsqlite3-sys",
  "okapi",
+ "organizer",
  "rocket",
  "rocket_okapi",
  "rocket_sync_db_pools",

@@ -1,10 +1,14 @@
 use domain::ports::repositories::PlaylistRepository;
 
+use diesel::prelude::*;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::{models::Playlist, types::SoundomeResult};
 
 use crate::{
-    entities::{NewPlaylistEntity, NewPlaylistTrackEntity, PlaylistEntity},
+    entities::{
+        AlbumEntity, ArtistEntity, NewPlaylistEntity, NewPlaylistTrackEntity, PlaylistEntity,
+        TrackEntity, TrackRefEntity,
+    },
     mappers::map_error,
     schema,
 };
@@ -78,6 +82,72 @@ impl PlaylistRepository for DieselPlaylistRepository {
             .execute(conn)
             .map_err(map_error)?;
         Ok(())
+    }
+
+    fn get_tracks(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+    ) -> SoundomeResult<Vec<shared::models::Track>> {
+        // Load track entities joined via the junction table, ordered by position.
+        let track_entities: Vec<TrackEntity> = schema::playlist_tracks::table
+            .inner_join(
+                schema::track::table
+                    .on(schema::playlist_tracks::track_id.eq(schema::track::id)),
+            )
+            .filter(schema::playlist_tracks::playlist_id.eq(playlist_id))
+            .order(schema::playlist_tracks::position.asc())
+            .select(schema::track::all_columns)
+            .load(conn)
+            .map_err(|e| {
+                shared::errors::Error::Database(format!(
+                    "Failed to load tracks for playlist {}: {}",
+                    playlist_id, e
+                ))
+            })?;
+
+        let mut result = Vec::with_capacity(track_entities.len());
+        for track in track_entities {
+            let album = if let Some(album_id) = track.album_id {
+                schema::album::table
+                    .filter(schema::album::id.eq(album_id))
+                    .first::<AlbumEntity>(conn)
+                    .ok()
+            } else {
+                None
+            };
+
+            let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                )
+                .filter(schema::artist_tracks::track_id.eq(track.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to load artists for track {}: {}",
+                        track.id, e
+                    ))
+                })?;
+
+            let references: Vec<TrackRefEntity> = schema::track_ref::table
+                .filter(schema::track_ref::track_id.eq(track.id))
+                .load(conn)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to load references for track {}: {}",
+                        track.id, e
+                    ))
+                })?;
+
+            result.push(TrackEntity::convert_to_domain(
+                track, album, artists, references,
+            ));
+        }
+
+        Ok(result)
     }
 
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {

@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use shared::{errors::Error, models::Track, types::SoundomeResult};
 use std::fs;
 
+pub mod playlist_writer;
+
 /// Moves the track file to the organized library structure based on artist and album.
 /// Updates the track's file_path to the new location.
 /// If the destination file already exists, it will be replaced.
