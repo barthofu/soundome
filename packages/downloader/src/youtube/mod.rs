@@ -12,9 +12,8 @@ use invidious::{
 use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
 use shared::{
     errors::Error,
-    models::{
-        Artist, Reference, Track
-    }, types::SoundomeResult,
+    models::{Artist, Reference, Track},
+    types::SoundomeResult,
 };
 
 pub struct Youtube<'a> {
@@ -93,7 +92,7 @@ impl Youtube<'_> {
                     id: None,
                     name: video.author,
                     icon: None,
-                    references: vec![]
+                    references: vec![],
                 }],
                 album: None,
                 duration: Some(video.length as i32),
@@ -141,11 +140,16 @@ impl Provider for Youtube<'_> {
             .ok_or(Error::NoMatch("youtube".to_string(), track.display()))?
             .get_provider()
             .ok_or(Error::NoMatch("youtube".to_string(), track.display()))?;
-        
+
         Ok(best_match)
     }
 
-    async fn download(&mut self, url: &str, file_name: &str, base_library_dir: PathBuf) -> SoundomeResult<PathBuf> {
+    async fn download(
+        &mut self,
+        url: &str,
+        file_name: &str,
+        base_library_dir: PathBuf,
+    ) -> SoundomeResult<PathBuf> {
         // if the url is a youtube music one, convert it to a youtube one
         // let url = url.replace("music.youtube.com", "www.youtube.com");
 

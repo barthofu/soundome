@@ -1,8 +1,8 @@
-use bandcamp::{SearchResultItem, search};
+use bandcamp::{search, SearchResultItem};
+use shared::models::{Album, Artist, Track};
 use shared::models::{AlbumType, Platform, Reference, ReferenceType};
 use shared::utils::enums::Match;
 use shared::utils::string::{string_similarity, SimilarityAlgorithm};
-use shared::models::{Album, Artist, Track};
 
 use crate::TagProvider;
 

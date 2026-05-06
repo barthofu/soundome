@@ -1,12 +1,12 @@
 /* other */
+pub mod download;
 pub mod errors;
+pub mod images;
 pub mod metrics;
 pub mod misc;
-pub mod validations;
-pub mod download;
-pub mod tasks;
 pub mod sync_schedules;
-pub mod images;
+pub mod tasks;
+pub mod validations;
 
 /* resources */
 pub mod albums;

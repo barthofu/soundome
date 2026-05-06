@@ -14,7 +14,6 @@ pub struct Artist {
 }
 
 impl Artist {
-
     pub fn get_source(&self) -> Option<Reference> {
         self.references
             .iter()
@@ -58,28 +57,25 @@ impl Artist {
 
     /// Returns a normalized similarity score (between 0 and 1) of the match between two artists
     pub fn compare(&self, other: &Artist) -> f64 {
-        let name_similarity = string_similarity(
-            &self.name,
-            &other.name,
-            SimilarityAlgorithm::Smart,
-        );
+        let name_similarity =
+            string_similarity(&self.name, &other.name, SimilarityAlgorithm::Smart);
 
         name_similarity
     }
-    
+
     pub fn transpose_metadata(&mut self, other: &Artist) {
         self.name = other.name.clone();
-        if let Some(icon) = &other.icon { self.icon = Some(icon.clone()); };
+        if let Some(icon) = &other.icon {
+            self.icon = Some(icon.clone());
+        };
 
         // only add new references, do not overwrite existing ones
         for ref_item in &other.references {
-            let reference_already_exists = self.references
-                .iter()
-                .any(|r| 
-                    r.platform == ref_item.platform && 
-                    r.external_id == ref_item.external_id && 
-                    r.ref_type == ref_item.ref_type
-                );
+            let reference_already_exists = self.references.iter().any(|r| {
+                r.platform == ref_item.platform
+                    && r.external_id == ref_item.external_id
+                    && r.ref_type == ref_item.ref_type
+            });
 
             if !reference_already_exists {
                 self.references.push(ref_item.clone());

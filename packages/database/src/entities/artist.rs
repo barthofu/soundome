@@ -2,9 +2,14 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket_okapi::JsonSchema;
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 
-use crate::{entities::{album::AlbumEntity, track::TrackEntity}, schema::{artist, artist_albums, artist_ref, artist_tracks}};
+use crate::{
+    entities::{album::AlbumEntity, track::TrackEntity},
+    schema::{artist, artist_albums, artist_ref, artist_tracks},
+};
 
-#[derive(Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(
+    Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd,
+)]
 #[diesel(table_name = artist)]
 pub struct ArtistEntity {
     pub id: i32,
@@ -30,7 +35,18 @@ pub struct UpdateArtistEntity {
 // Associations
 // ================================================================================================
 
-#[derive(Debug, Clone, Associations, Queryable, Selectable, Identifiable, Insertable, Serialize, PartialEq, PartialOrd)]
+#[derive(
+    Debug,
+    Clone,
+    Associations,
+    Queryable,
+    Selectable,
+    Identifiable,
+    Insertable,
+    Serialize,
+    PartialEq,
+    PartialOrd,
+)]
 #[diesel(belongs_to(ArtistEntity, foreign_key = artist_id))]
 #[diesel(belongs_to(TrackEntity, foreign_key = track_id))]
 #[diesel(table_name = artist_tracks)]
@@ -40,7 +56,18 @@ pub struct ArtistTrackEntity {
     pub artist_id: i32,
 }
 
-#[derive(Debug, Clone, Associations, Queryable, Selectable, Identifiable, Insertable, Serialize, PartialEq, PartialOrd)]
+#[derive(
+    Debug,
+    Clone,
+    Associations,
+    Queryable,
+    Selectable,
+    Identifiable,
+    Insertable,
+    Serialize,
+    PartialEq,
+    PartialOrd,
+)]
 #[diesel(belongs_to(ArtistEntity, foreign_key = artist_id))]
 #[diesel(belongs_to(AlbumEntity, foreign_key = album_id))]
 #[diesel(table_name = artist_albums)]
@@ -54,7 +81,19 @@ pub struct ArtistAlbumEntity {
 // Artist Source
 // ================================================================================================
 
-#[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(
+    Debug,
+    Clone,
+    Associations,
+    Queryable,
+    Identifiable,
+    Insertable,
+    Serialize,
+    Ord,
+    Eq,
+    PartialEq,
+    PartialOrd,
+)]
 #[diesel(table_name = artist_ref)]
 #[diesel(belongs_to(ArtistEntity, foreign_key = artist_id))]
 pub struct ArtistRefEntity {

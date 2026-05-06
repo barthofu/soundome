@@ -2,11 +2,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-
     // ============================================================================================
     // Generic errors
     // ============================================================================================
-
     #[error("not found: {0}")]
     NotFound(String),
     #[error("no match {0} found for {1}")]

@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
 use audiotags::Tag;
-use config::Config;
 use fake::{locales::EN, Fake};
 use std::time::Instant;
 
 use crate::TrackTagComment;
 
 pub async fn file_tests() {
-    
-    let oritingal_file_path = PathBuf::from("/home/coder/library/JEANNINE/Unknown Album/Synaptic Highway.mp3");
+    let oritingal_file_path =
+        PathBuf::from("/home/coder/library/JEANNINE/Unknown Album/Synaptic Highway.mp3");
 
     // copy the origin file 1000 times
     use fake::faker::name::raw::*;
@@ -30,7 +29,10 @@ pub async fn file_tests() {
     let start = Instant::now();
 
     let comments = Vec::from_iter((1..=1000).map(|i| {
-        let file_path = PathBuf::from(format!("/home/coder/library/JEANNINE/Unknown Album/Synaptic Highway {}.mp3", i));
+        let file_path = PathBuf::from(format!(
+            "/home/coder/library/JEANNINE/Unknown Album/Synaptic Highway {}.mp3",
+            i
+        ));
         get_tag_comment(&file_path).unwrap_or_else(|| TrackTagComment {
             title: format!("Synaptic Highway {}", i),
             artists: vec![Name(EN).fake()],
@@ -39,10 +41,6 @@ pub async fn file_tests() {
 
     let duration = start.elapsed();
     println!("Time taken to read comments: {:?}", duration);
-
-
-
-
 
     // let comments = Vec::new();
     // for i in 1..=1001 {
@@ -55,7 +53,6 @@ pub async fn file_tests() {
     //     }
     // }
 
-
     // for i in 1..10 {
     //     let file_path = PathBuf::from(format!("/home/coder/library/JEANNINE/Unknown Album/Synaptic Highway {}.mp3", i));
     //     if let Some(comment) = get_tag_comment(&file_path) {
@@ -64,8 +61,6 @@ pub async fn file_tests() {
     //         println!("Failed to read track from file: {:?}", file_path);
     //     }
     // }
-
-
 
     println!("Total comments read: {}", comments.len());
 
@@ -84,12 +79,9 @@ pub async fn file_tests() {
 }
 
 fn set_tag_comment(file_path: &PathBuf, comment: &TrackTagComment) {
-    let comment_str = serde_json::to_string(comment)
-        .expect("Failed to serialize comment to JSON");
+    let comment_str = serde_json::to_string(comment).expect("Failed to serialize comment to JSON");
 
-    let mut tag = Tag::new()
-        .read_from_path(&file_path)
-        .unwrap();
+    let mut tag = Tag::new().read_from_path(&file_path).unwrap();
 
     tag.set_comment(comment_str);
     tag.write_to_path(file_path.display().to_string().as_str())
@@ -97,9 +89,7 @@ fn set_tag_comment(file_path: &PathBuf, comment: &TrackTagComment) {
 }
 
 fn get_tag_comment(file_path: &PathBuf) -> Option<TrackTagComment> {
-    let tag = Tag::new()
-        .read_from_path(&file_path)
-        .unwrap();
+    let tag = Tag::new().read_from_path(&file_path).unwrap();
 
     // println!("Tag: {:#?}", tag.comment());
 

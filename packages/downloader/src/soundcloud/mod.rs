@@ -4,7 +4,11 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use fetcher::Source;
-use shared::{errors::Error, models::{Reference, Track}, types::SoundomeResult};
+use shared::{
+    errors::Error,
+    models::{Reference, Track},
+    types::SoundomeResult,
+};
 
 use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
 
@@ -49,11 +53,16 @@ impl Provider for SoundCloud {
             .ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?
             .get_provider()
             .ok_or(Error::NoMatch("youtube music".to_string(), track.display()))?;
-        
+
         Ok(best_match)
     }
 
-    async fn download(&mut self, url: &str, file_name: &str, base_library_dir: PathBuf) -> Result<PathBuf, Error> {
+    async fn download(
+        &mut self,
+        url: &str,
+        file_name: &str,
+        base_library_dir: PathBuf,
+    ) -> Result<PathBuf, Error> {
         download_with_ytdlp(url, file_name, base_library_dir).await
     }
 

@@ -1,11 +1,8 @@
 use audiotags::{AudioTag, Tag};
 use shared::{
     errors::Error,
-    models::{
-        Album,
-        Artist,
-        Track,
-    }, types::SoundomeResult,
+    models::{Album, Artist, Track},
+    types::SoundomeResult,
 };
 use std::{path::PathBuf, str::FromStr};
 
@@ -75,19 +72,18 @@ fn convert_track_to_tag(tag: &mut Box<dyn AudioTag + Send + Sync>, track: &Track
     // tag.album_cover()
 
     tag.set_comment(
-        "Downloaded by Soundome\n---".to_string()
-            // + "\nSource: "
-            // + track
-            //     .source
-            //     .as_ref()
-            //     .unwrap_or(&TrackSource::Unknown)
-            //     .as_ref()
-            // + "\nProvider: "
-            // + track
-            //     .provider
-            //     .as_ref()
-            //     .unwrap_or(&TrackProvider::Unknown)
-            //     .as_ref(),
+        "Downloaded by Soundome\n---".to_string(), // + "\nSource: "
+                                                   // + track
+                                                   //     .source
+                                                   //     .as_ref()
+                                                   //     .unwrap_or(&TrackSource::Unknown)
+                                                   //     .as_ref()
+                                                   // + "\nProvider: "
+                                                   // + track
+                                                   //     .provider
+                                                   //     .as_ref()
+                                                   //     .unwrap_or(&TrackProvider::Unknown)
+                                                   //     .as_ref(),
     );
 }
 

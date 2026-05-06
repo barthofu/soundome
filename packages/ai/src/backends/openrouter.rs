@@ -3,7 +3,11 @@ use std::time::Duration;
 use async_trait::async_trait;
 use config::{models::OpenRouterConfig, Config};
 use openrouter_api::{
-    api::structured, models::{provider_preferences::{DataCollection, ProviderPreferences, ProviderSort}, structured::{JsonSchemaConfig, JsonSchemaDefinition}}, ChatCompletionRequest, Message, MessageContent, OpenRouterClient, Ready, Unconfigured
+    models::{
+        provider_preferences::{DataCollection, ProviderPreferences, ProviderSort},
+        structured::{JsonSchemaConfig, JsonSchemaDefinition},
+    },
+    ChatCompletionRequest, Message, MessageContent, OpenRouterClient, Ready, Unconfigured,
 };
 use serde::{Deserialize, Serialize};
 use shared::{
@@ -25,8 +29,11 @@ impl OpenRouterAI {
     const DEFAULT_MODEL: &str = "google/gemini-2.0-flash-lite-001";
 
     pub fn new(openrouter_config: &OpenRouterConfig) -> SoundomeResult<Self> {
-        let base_url = with_default(openrouter_config.base_url.clone(), "https://openrouter.ai/api/v1/".to_string());
-        
+        let base_url = with_default(
+            openrouter_config.base_url.clone(),
+            "https://openrouter.ai/api/v1/".to_string(),
+        );
+
         let client_builder = OpenRouterClient::<Unconfigured>::new()
             .with_base_url(base_url.clone())
             .map_err(|_| {
@@ -35,7 +42,10 @@ impl OpenRouterAI {
                     base_url
                 ))
             })?
-            .with_timeout(Duration::from_secs(with_default(openrouter_config.timeout, 60)))
+            .with_timeout(Duration::from_secs(with_default(
+                openrouter_config.timeout,
+                60,
+            )))
             .with_http_referer("")
             .with_site_title("Soudome");
 
@@ -55,7 +65,10 @@ impl OpenRouterAI {
 
         Ok(Self {
             client: client,
-            model: with_default(openrouter_config.model.clone(), Self::DEFAULT_MODEL.to_string()),
+            model: with_default(
+                openrouter_config.model.clone(),
+                Self::DEFAULT_MODEL.to_string(),
+            ),
             provider: openrouter_config.provider.clone(),
         })
     }
@@ -63,10 +76,7 @@ impl OpenRouterAI {
     // Utils
 
     fn get_message(&self, prompt: &str) -> Message {
-        Message::text(
-            openrouter_api::ChatRole::User,
-            prompt.to_string(),
-        )
+        Message::text(openrouter_api::ChatRole::User, prompt.to_string())
     }
 
     fn get_provider(
@@ -79,8 +89,6 @@ impl OpenRouterAI {
             .with_data_collection(DataCollection::Deny) // Enable Zero Data Retention (ZDR)
             .with_require_parameters(require_parameters.unwrap_or(false))
             .with_sort(sort.unwrap_or_else(|| ProviderSort::Throughput))
-
-
 
         //     .with_order(self.provider.clone().map(|p| vec![p.clone()]).unwrap
         //         .into_iter()
@@ -120,7 +128,8 @@ impl AIBackend for OpenRouterAI {
             ..Default::default()
         };
 
-        let content = self.client
+        let content = self
+            .client
             .chat()
             .map_err(|err| {
                 Error::Network(format!(
@@ -143,7 +152,9 @@ impl AIBackend for OpenRouterAI {
 
         match content {
             MessageContent::Text(text) => Ok(text),
-            _ => Err(Error::Network("Unexpected non-text response from OpenRouter".to_string())),
+            _ => Err(Error::Network(
+                "Unexpected non-text response from OpenRouter".to_string(),
+            )),
         }
     }
 
@@ -173,24 +184,20 @@ impl AIBackend for OpenRouterAI {
         // };
 
         self.client
-            .structured().map_err(|err| {
+            .structured()
+            .map_err(|err| {
                 Error::Network(format!(
                     "Failed to initiate OpenRouter structured generation on model {}: {}",
                     self.model, err
                 ))
             })?
-            .generate(
-                &self.model, 
-                messages, 
-                schema
-                )
-            .await.map_err(|err| {
+            .generate(&self.model, messages, schema)
+            .await
+            .map_err(|err| {
                 Error::Network(format!(
                     "Failed to get OpenRouter structured response on model {}: {}",
                     self.model, err
                 ))
             })
     }
-
-    
 }

@@ -91,10 +91,7 @@ impl AIBackend for AIBackendInstance {
                                             .map_err(Error::Json);
                                     }
                                     Err(e) => {
-                                        tracing::warn!(
-                                            "Fallback AI backend also failed: {}",
-                                            e
-                                        );
+                                        tracing::warn!("Fallback AI backend also failed: {}", e);
                                         last_err = e;
                                     }
                                 }

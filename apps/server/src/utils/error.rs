@@ -7,9 +7,9 @@ use rocket_okapi::gen::OpenApiGenerator;
 use rocket_okapi::response::OpenApiResponderInner;
 use rocket_okapi::util::add_schema_response;
 use schemars::JsonSchema;
+use std::fmt;
 use std::io::Cursor;
 use thiserror::Error;
-use std::fmt;
 
 #[derive(JsonSchema, Serialize, Debug, Clone)]
 pub struct ErrorResponse {

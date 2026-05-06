@@ -10,9 +10,8 @@ use rustypipe::{
 };
 use shared::{
     errors::Error,
-    models::{
-        Album, Artist, Reference, Track
-    }, types::SoundomeResult,
+    models::{Album, Artist, Reference, Track},
+    types::SoundomeResult,
 };
 
 use crate::{utils::ytdlp::download_with_ytdlp, Matcher, Provider};
@@ -130,7 +129,12 @@ impl Provider for YoutubeMusic {
         Ok(best_match)
     }
 
-    async fn download(&mut self, url: &str, file_name: &str, base_library_dir: PathBuf) -> SoundomeResult<PathBuf> {
+    async fn download(
+        &mut self,
+        url: &str,
+        file_name: &str,
+        base_library_dir: PathBuf,
+    ) -> SoundomeResult<PathBuf> {
         download_with_ytdlp(url, file_name, base_library_dir).await
     }
 

@@ -1,15 +1,29 @@
-use std::{path::PathBuf, sync::Arc, sync::atomic::{AtomicBool, Ordering}};
+use std::{
+    path::PathBuf,
+    sync::atomic::{AtomicBool, Ordering},
+    sync::Arc,
+};
 
 use config::Config;
 use diesel::SqliteConnection;
 use fetcher::{Fetcher, Source};
-use shared::{errors::Error, models::{Album, AlbumType, Artist, Track}, types::SoundomeResult, utils::enums::Match};
 use shared::models::ReferenceType;
-use tagger::TagProvider;
+use shared::{
+    errors::Error,
+    models::{Album, AlbumType, Artist, Track},
+    types::SoundomeResult,
+    utils::enums::Match,
+};
 
 pub use tagger::enricher::MatchCandidate;
 
-use super::{album_service::AlbumService, artist_service::ArtistService, playlist_service::PlaylistService, task_service::TaskService, track_service::{TrackService, ValidationPatch}};
+use super::{
+    album_service::AlbumService,
+    artist_service::ArtistService,
+    playlist_service::PlaylistService,
+    task_service::TaskService,
+    track_service::{TrackService, ValidationPatch},
+};
 
 pub struct DownloadService {
     track_service: Arc<TrackService>,
@@ -38,7 +52,11 @@ impl DownloadService {
     }
 
     /// Main entry point for downloading a track from a given URL (from any supported platform)
-    pub async fn download_track_from_url(&self, url: &str, conn: &mut SqliteConnection) -> SoundomeResult<Track> {
+    pub async fn download_track_from_url(
+        &self,
+        url: &str,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Track> {
         tracing::info!("===========\nDownloading track from {:?}\n------", url);
 
         // Check if track already exists in DB
@@ -51,7 +69,11 @@ impl DownloadService {
         // Fetch track info from URL
         let mut track = fetcher.get_track_from_url(url).await?;
         fetcher.clean_track_metadata(&mut track).await?;
-        tracing::info!("Fetched track info from {}: {}", track.get_source_platform().as_ref(), track.display());
+        tracing::info!(
+            "Fetched track info from {}: {}",
+            track.get_source_platform().as_ref(),
+            track.display()
+        );
 
         // Orchestrator workflow
         let final_track = self.orchestrator_workflow(conn, track).await?;
@@ -60,15 +82,29 @@ impl DownloadService {
 
     /// Main entry point for downloading a playlist from a given URL (from any supported platform).
     /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
-    pub async fn sync_playlist_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>, cancel_flag: Option<Arc<AtomicBool>>) -> SoundomeResult<Vec<Track>> {
-        tracing::info!("====================\nDownloading playlist from {:?}\n---------", url);
+    pub async fn sync_playlist_from_url(
+        &self,
+        url: &str,
+        conn: &mut SqliteConnection,
+        task_id: Option<i32>,
+        cancel_flag: Option<Arc<AtomicBool>>,
+    ) -> SoundomeResult<Vec<Track>> {
+        tracing::info!(
+            "====================\nDownloading playlist from {:?}\n---------",
+            url
+        );
 
         let fetcher = Fetcher::new().await;
 
         // Fetch playlist metadata and upsert in DB
-        let playlist_meta = fetcher.get_playlist_from_url(url).await
+        let playlist_meta = fetcher
+            .get_playlist_from_url(url)
+            .await
             .unwrap_or_else(|e| {
-                tracing::warn!("Could not fetch playlist metadata ({}), using URL as name", e);
+                tracing::warn!(
+                    "Could not fetch playlist metadata ({}), using URL as name",
+                    e
+                );
                 shared::models::Playlist {
                     id: None,
                     name: url.to_string(),
@@ -79,7 +115,11 @@ impl DownloadService {
             });
         let playlist = self.playlist_service.upsert(conn, &playlist_meta)?;
         let playlist_id = playlist.id.expect("persisted playlist must have an id");
-        tracing::info!("Playlist upserted in DB: \"{}\" (id={})", playlist.name, playlist_id);
+        tracing::info!(
+            "Playlist upserted in DB: \"{}\" (id={})",
+            playlist.name,
+            playlist_id
+        );
 
         let playlist_tracks = fetcher.get_playlist_tracks_from_url(url).await?;
         let total_tracks = playlist_tracks.len();
@@ -90,20 +130,34 @@ impl DownloadService {
         let mut existing_count = 0;
         for pt in &playlist_tracks {
             let track = &pt.track;
-            let track_url = track.get_source()
+            let track_url = track
+                .get_source()
                 .and_then(|s| s.external_url.clone())
                 .unwrap_or_else(|| "unknown".to_string());
             let position = pt.position.map(|p| p as i32);
             if let Some(existing) = self.track_service.get_by_url(conn, &track_url) {
-                tracing::warn!("   -> Track already exists in DB, linking to playlist: {}", track.display());
+                tracing::warn!(
+                    "   -> Track already exists in DB, linking to playlist: {}",
+                    track.display()
+                );
                 let track_id = existing.id.expect("persisted track must have an id");
-                if let Err(e) = self.playlist_service.add_track(conn, playlist_id, track_id, position) {
-                    tracing::error!("Failed to link existing track {} to playlist: {}", track_id, e);
+                if let Err(e) =
+                    self.playlist_service
+                        .add_track(conn, playlist_id, track_id, position)
+                {
+                    tracing::error!(
+                        "Failed to link existing track {} to playlist: {}",
+                        track_id,
+                        e
+                    );
                 }
                 existing_count += 1;
                 if let Some(tid) = task_id {
                     let current = (existing_count) as i32;
-                    if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                    if let Err(e) =
+                        self.task_service
+                            .update_progress(conn, tid, current, total_tracks as i32)
+                    {
                         tracing::warn!("Failed to update task progress: {}", e);
                     }
                 }
@@ -112,11 +166,17 @@ impl DownloadService {
             }
         }
 
-        tracing::info!("{} new tracks to download after filtering existing ones", new_tracks.len());
+        tracing::info!(
+            "{} new tracks to download after filtering existing ones",
+            new_tracks.len()
+        );
 
         // Clean metadata for all new tracks
         let mut new_track_values: Vec<Track> = new_tracks.iter().map(|(_, t)| t.clone()).collect();
-        if let Err(e) = fetcher.clean_tracks_metadata(&mut new_track_values.iter_mut().collect::<Vec<_>>()).await {
+        if let Err(e) = fetcher
+            .clean_tracks_metadata(&mut new_track_values.iter_mut().collect::<Vec<_>>())
+            .await
+        {
             tracing::warn!("Failed to clean tracks title and artist name: {}", e);
         }
 
@@ -124,8 +184,15 @@ impl DownloadService {
         let mut new_processed_tracks = Vec::new();
         for (i, (position, _)) in new_tracks.iter().enumerate() {
             // Check for cancellation before processing next track
-            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
-                tracing::info!("Playlist sync cancelled after processing {}/{} new tracks", i, new_tracks.len());
+            if cancel_flag
+                .as_ref()
+                .is_some_and(|f| f.load(Ordering::Relaxed))
+            {
+                tracing::info!(
+                    "Playlist sync cancelled after processing {}/{} new tracks",
+                    i,
+                    new_tracks.len()
+                );
                 return Err(Error::Cancelled);
             }
 
@@ -135,17 +202,27 @@ impl DownloadService {
                 Ok(t) => {
                     tracing::info!("Successfully processed track: {}", t.display());
                     if let Some(track_id) = t.id {
-                        if let Err(e) = self.playlist_service.add_track(conn, playlist_id, track_id, *position) {
-                            tracing::error!("Failed to link new track {} to playlist: {}", track_id, e);
+                        if let Err(e) =
+                            self.playlist_service
+                                .add_track(conn, playlist_id, track_id, *position)
+                        {
+                            tracing::error!(
+                                "Failed to link new track {} to playlist: {}",
+                                track_id,
+                                e
+                            );
                         }
                     }
                     new_processed_tracks.push(t);
-                },
-                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e)
+                }
+                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
             }
             if let Some(tid) = task_id {
                 let current = (existing_count as i32) + (i as i32) + 1;
-                if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                if let Err(e) =
+                    self.task_service
+                        .update_progress(conn, tid, current, total_tracks as i32)
+                {
                     tracing::warn!("Failed to update task progress: {}", e);
                 }
             }
@@ -164,8 +241,17 @@ impl DownloadService {
 
     /// Main entry point for downloading/syncing all tracks from an artist URL.
     /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
-    pub async fn sync_artist_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>, cancel_flag: Option<Arc<AtomicBool>>) -> SoundomeResult<Vec<Track>> {
-        tracing::info!("====================\nSyncing artist from {:?}\n---------", url);
+    pub async fn sync_artist_from_url(
+        &self,
+        url: &str,
+        conn: &mut SqliteConnection,
+        task_id: Option<i32>,
+        cancel_flag: Option<Arc<AtomicBool>>,
+    ) -> SoundomeResult<Vec<Track>> {
+        tracing::info!(
+            "====================\nSyncing artist from {:?}\n---------",
+            url
+        );
 
         let fetcher = Fetcher::new().await;
 
@@ -173,7 +259,11 @@ impl DownloadService {
         let artist_meta = fetcher.get_artist_from_url(url).await?;
         let artist = self.artist_service.create_or_ignore(conn, &artist_meta)?;
         let artist_id = artist.id.expect("persisted artist must have an id");
-        tracing::info!("Artist upserted in DB: \"{}\" (id={})", artist.name, artist_id);
+        tracing::info!(
+            "Artist upserted in DB: \"{}\" (id={})",
+            artist.name,
+            artist_id
+        );
 
         // Fetch all tracks from this artist
         let artist_tracks = fetcher.get_artist_tracks_from_url(url).await?;
@@ -184,7 +274,8 @@ impl DownloadService {
         let mut new_tracks: Vec<Track> = Vec::new();
         let mut existing_count = 0;
         for track in &artist_tracks {
-            let track_url = track.get_source()
+            let track_url = track
+                .get_source()
                 .and_then(|s| s.external_url.clone())
                 .unwrap_or_else(|| "unknown".to_string());
             if self.track_service.get_by_url(conn, &track_url).is_some() {
@@ -192,7 +283,10 @@ impl DownloadService {
                 existing_count += 1;
                 if let Some(tid) = task_id {
                     let current = existing_count as i32;
-                    if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                    if let Err(e) =
+                        self.task_service
+                            .update_progress(conn, tid, current, total_tracks as i32)
+                    {
                         tracing::warn!("Failed to update task progress: {}", e);
                     }
                 }
@@ -201,10 +295,16 @@ impl DownloadService {
             }
         }
 
-        tracing::info!("{} new tracks to download after filtering existing ones", new_tracks.len());
+        tracing::info!(
+            "{} new tracks to download after filtering existing ones",
+            new_tracks.len()
+        );
 
         // Clean metadata for all new tracks
-        if let Err(e) = fetcher.clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>()).await {
+        if let Err(e) = fetcher
+            .clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>())
+            .await
+        {
             tracing::warn!("Failed to clean tracks title and artist name: {}", e);
         }
 
@@ -212,8 +312,15 @@ impl DownloadService {
         let mut new_processed_tracks = Vec::new();
         for (i, track) in new_tracks.iter().enumerate() {
             // Check for cancellation before processing next track
-            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
-                tracing::info!("Artist sync cancelled after processing {}/{} new tracks", i, new_tracks.len());
+            if cancel_flag
+                .as_ref()
+                .is_some_and(|f| f.load(Ordering::Relaxed))
+            {
+                tracing::info!(
+                    "Artist sync cancelled after processing {}/{} new tracks",
+                    i,
+                    new_tracks.len()
+                );
                 return Err(Error::Cancelled);
             }
 
@@ -222,12 +329,15 @@ impl DownloadService {
                 Ok(t) => {
                     tracing::info!("Successfully processed track: {}", t.display());
                     new_processed_tracks.push(t);
-                },
-                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e)
+                }
+                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
             }
             if let Some(tid) = task_id {
                 let current = (existing_count as i32) + (i as i32) + 1;
-                if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                if let Err(e) =
+                    self.task_service
+                        .update_progress(conn, tid, current, total_tracks as i32)
+                {
                     tracing::warn!("Failed to update task progress: {}", e);
                 }
             }
@@ -246,14 +356,32 @@ impl DownloadService {
 
     /// Main entry point for downloading/syncing all tracks from an album URL.
     /// `task_id` is optional; when provided, progress is persisted to the task table in real-time.
-    pub async fn sync_album_from_url(&self, url: &str, conn: &mut SqliteConnection, task_id: Option<i32>, cancel_flag: Option<Arc<AtomicBool>>) -> SoundomeResult<Vec<Track>> {
-        tracing::info!("====================\nSyncing album from {:?}\n---------", url);
+    pub async fn sync_album_from_url(
+        &self,
+        url: &str,
+        conn: &mut SqliteConnection,
+        task_id: Option<i32>,
+        cancel_flag: Option<Arc<AtomicBool>>,
+    ) -> SoundomeResult<Vec<Track>> {
+        tracing::info!(
+            "====================\nSyncing album from {:?}\n---------",
+            url
+        );
 
         let fetcher = Fetcher::new().await;
 
         // Fetch album metadata
         let album_meta = fetcher.get_album_from_url(url).await?;
-        tracing::info!("Album: \"{}\" by {}", album_meta.title, album_meta.artists.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "));
+        tracing::info!(
+            "Album: \"{}\" by {}",
+            album_meta.title,
+            album_meta
+                .artists
+                .iter()
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
 
         // Fetch all tracks from this album
         let album_tracks = fetcher.get_album_tracks_from_url(url).await?;
@@ -264,7 +392,8 @@ impl DownloadService {
         let mut new_tracks: Vec<Track> = Vec::new();
         let mut existing_count = 0;
         for track in &album_tracks {
-            let track_url = track.get_source()
+            let track_url = track
+                .get_source()
                 .and_then(|s| s.external_url.clone())
                 .unwrap_or_else(|| "unknown".to_string());
             if self.track_service.get_by_url(conn, &track_url).is_some() {
@@ -272,7 +401,10 @@ impl DownloadService {
                 existing_count += 1;
                 if let Some(tid) = task_id {
                     let current = existing_count as i32;
-                    if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                    if let Err(e) =
+                        self.task_service
+                            .update_progress(conn, tid, current, total_tracks as i32)
+                    {
                         tracing::warn!("Failed to update task progress: {}", e);
                     }
                 }
@@ -281,10 +413,16 @@ impl DownloadService {
             }
         }
 
-        tracing::info!("{} new tracks to download after filtering existing ones", new_tracks.len());
+        tracing::info!(
+            "{} new tracks to download after filtering existing ones",
+            new_tracks.len()
+        );
 
         // Clean metadata for all new tracks
-        if let Err(e) = fetcher.clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>()).await {
+        if let Err(e) = fetcher
+            .clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>())
+            .await
+        {
             tracing::warn!("Failed to clean tracks title and artist name: {}", e);
         }
 
@@ -292,8 +430,15 @@ impl DownloadService {
         let mut new_processed_tracks = Vec::new();
         for (i, track) in new_tracks.iter().enumerate() {
             // Check for cancellation before processing next track
-            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
-                tracing::info!("Album sync cancelled after processing {}/{} new tracks", i, new_tracks.len());
+            if cancel_flag
+                .as_ref()
+                .is_some_and(|f| f.load(Ordering::Relaxed))
+            {
+                tracing::info!(
+                    "Album sync cancelled after processing {}/{} new tracks",
+                    i,
+                    new_tracks.len()
+                );
                 return Err(Error::Cancelled);
             }
 
@@ -302,12 +447,15 @@ impl DownloadService {
                 Ok(t) => {
                     tracing::info!("Successfully processed track: {}", t.display());
                     new_processed_tracks.push(t);
-                },
-                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e)
+                }
+                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
             }
             if let Some(tid) = task_id {
                 let current = (existing_count as i32) + (i as i32) + 1;
-                if let Err(e) = self.task_service.update_progress(conn, tid, current, total_tracks as i32) {
+                if let Err(e) =
+                    self.task_service
+                        .update_progress(conn, tid, current, total_tracks as i32)
+                {
                     tracing::warn!("Failed to update task progress: {}", e);
                 }
             }
@@ -355,17 +503,34 @@ impl DownloadService {
         let mut track = self.track_service.get_by_id(conn, id)?;
 
         // 2. Apply metadata patch
-        if let Some(title) = patch.title { track.title = title; }
-        if let Some(genre) = patch.genre { track.genre = Some(genre); }
-        if let Some(date) = patch.date { track.date = Some(date); }
-        if let Some(tn) = patch.track_number { track.track_number = Some(tn); }
-        if let Some(dn) = patch.disc_number { track.disc_number = Some(dn); }
-        if let Some(label) = patch.label { track.label = Some(label); }
+        if let Some(title) = patch.title {
+            track.title = title;
+        }
+        if let Some(genre) = patch.genre {
+            track.genre = Some(genre);
+        }
+        if let Some(date) = patch.date {
+            track.date = Some(date);
+        }
+        if let Some(tn) = patch.track_number {
+            track.track_number = Some(tn);
+        }
+        if let Some(dn) = patch.disc_number {
+            track.disc_number = Some(dn);
+        }
+        if let Some(label) = patch.label {
+            track.label = Some(label);
+        }
 
         if let Some(names) = patch.artists {
             let mut artists: Vec<Artist> = Vec::with_capacity(names.len());
             for name in names {
-                let artist = Artist { id: None, name, icon: None, references: vec![] };
+                let artist = Artist {
+                    id: None,
+                    name,
+                    icon: None,
+                    references: vec![],
+                };
                 let saved = self.artist_service.create_or_ignore(conn, &artist)?;
                 artists.push(saved);
             }
@@ -406,7 +571,11 @@ impl DownloadService {
     // == Sub private and utils methods (internal)
     // ============================================================================================
 
-    async fn orchestrator_workflow(&self, conn: &mut SqliteConnection, track: Track) -> SoundomeResult<Track> {
+    async fn orchestrator_workflow(
+        &self,
+        conn: &mut SqliteConnection,
+        track: Track,
+    ) -> SoundomeResult<Track> {
         let mut track = track;
 
         // Step 1: Enrich metadata
@@ -418,7 +587,9 @@ impl DownloadService {
         let file_path = self.download_track(&mut track).await?;
 
         if should_validate {
-            tracing::warn!("Track marked for validation — saved with staging file_path, skipping tag/organize");
+            tracing::warn!(
+                "Track marked for validation — saved with staging file_path, skipping tag/organize"
+            );
             let saved_track = self.save_track(conn, &track).await?;
             return Ok(saved_track);
         }
@@ -431,10 +602,15 @@ impl DownloadService {
 
         match existing_track {
             Some(existing_track) => {
-                tracing::info!("Existing track found in DB: {}, will compare quality", existing_track.display());
+                tracing::info!(
+                    "Existing track found in DB: {}, will compare quality",
+                    existing_track.display()
+                );
 
                 let mut existing_track = existing_track;
-                let new_track_is_better_quality = self.track_service.is_better_quality(&existing_track, &track);
+                let new_track_is_better_quality = self
+                    .track_service
+                    .is_better_quality(&existing_track, &track);
 
                 if new_track_is_better_quality {
                     tracing::warn!("New one has better quality, will replace");
@@ -445,7 +621,8 @@ impl DownloadService {
                     existing_track.transpose_refs(&track_for_merge);
                     apply_source_provider_replacement(&mut existing_track, &track);
 
-                    self.process_track_file(&mut existing_track, &file_path).await?;
+                    self.process_track_file(&mut existing_track, &file_path)
+                        .await?;
                     let updated_track = self.save_track(conn, &existing_track).await?;
                     return Ok(updated_track);
                 } else {
@@ -477,17 +654,18 @@ impl DownloadService {
     /// Returns:
     /// - boolean indicating if the track should be marked as "to validate"
     /// - boolean indicating if the track should be compared in quality (already exists in DB)
-    async fn enrich_metada(&self, conn: &mut SqliteConnection, track: &mut Track) -> SoundomeResult<(bool, Option<Track>)> {
+    async fn enrich_metada(
+        &self,
+        conn: &mut SqliteConnection,
+        track: &mut Track,
+    ) -> SoundomeResult<(bool, Option<Track>)> {
         // Check if album/artists with same source ref url exist in DB and associate them
-        let existing_album = track
-            .album
-            .as_ref()
-            .and_then(|a|
-                a.get_source()
-                    .or_else(|| a.get_metadata())
-                    .and_then(|s| s.external_url)
-                    .and_then(|url| self.album_service.get_by_url(conn, &url))
-            );
+        let existing_album = track.album.as_ref().and_then(|a| {
+            a.get_source()
+                .or_else(|| a.get_metadata())
+                .and_then(|s| s.external_url)
+                .and_then(|url| self.album_service.get_by_url(conn, &url))
+        });
         if let Some(existing_album) = existing_album {
             track.album = Some(existing_album);
         }
@@ -509,26 +687,32 @@ impl DownloadService {
         // Apply best match metadata
         if let Match::Exact(matched_track) = best_match {
             // TODO: Check if ref already exists in DB, if yes then apply references recursively to track and unfound album/artists
-            tracing::info!("Exact match found from metadata provider: {:?}", matched_track.get_metadata().and_then(|m| m.external_url));
+            tracing::info!(
+                "Exact match found from metadata provider: {:?}",
+                matched_track.get_metadata().and_then(|m| m.external_url)
+            );
             // find for existing tracks in the database
 
-            if let Some(mb_ref) = matched_track.get_metadata().and_then(|s| s.external_url.clone()) {
+            if let Some(mb_ref) = matched_track
+                .get_metadata()
+                .and_then(|s| s.external_url.clone())
+            {
                 if let Some(existing_track) = self.track_service.get_by_url(conn, &mb_ref) {
-                    tracing::warn!("Track already exists in DB with MusicBrainz ref: {}, skipping enrichment", existing_track.display());
+                    tracing::warn!(
+                        "Track already exists in DB with MusicBrainz ref: {}, skipping enrichment",
+                        existing_track.display()
+                    );
                     return Ok((false, Some(existing_track)));
                 }
             }
 
             // Check if album/artists with same musicbrainz source url exist in DB and associate them
-            let existing_album = track
-                .album
-                .as_ref()
-                .and_then(|a|
-                    a.get_source()
-                        .or_else(|| a.get_metadata())
-                        .and_then(|s| s.external_url)
-                        .and_then(|url| self.album_service.get_by_url(conn, &url))
-                );
+            let existing_album = track.album.as_ref().and_then(|a| {
+                a.get_source()
+                    .or_else(|| a.get_metadata())
+                    .and_then(|s| s.external_url)
+                    .and_then(|url| self.album_service.get_by_url(conn, &url))
+            });
             if let Some(existing_album) = existing_album {
                 track.album = Some(existing_album);
             }
@@ -548,7 +732,9 @@ impl DownloadService {
             Ok((false, None)) // no need to validate
         } else if let Match::Partial(matched_track) = best_match {
             // Partial match: keep current (source) metadata, but attach MusicBrainz IDs/URLs for later review.
-            tracing::warn!("Partial match found from metadata providers - will mark for validation");
+            tracing::warn!(
+                "Partial match found from metadata providers - will mark for validation"
+            );
 
             track.transpose_refs(&matched_track);
             track.needs_validation = true;
@@ -572,14 +758,20 @@ impl DownloadService {
     async fn download_track(&self, track: &mut Track) -> SoundomeResult<PathBuf> {
         // Get the best download URL
         let provider_ref = downloader::search(&track).await?;
-        tracing::info!("Found download URL from {:?}: {:?}", provider_ref.platform, provider_ref.external_url);
+        tracing::info!(
+            "Found download URL from {:?}: {:?}",
+            provider_ref.platform,
+            provider_ref.external_url
+        );
         track.references.push(provider_ref.clone());
 
         let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
 
         // Download the track to staging
         let file_path = downloader::download(
-            &track.get_source().ok_or(Error::Custom("track source not defined".to_string()))?,
+            &track
+                .get_source()
+                .ok_or(Error::Custom("track source not defined".to_string()))?,
             &provider_ref,
             &track.title,
             staging_dir,
@@ -593,21 +785,28 @@ impl DownloadService {
 
     /// Simple deduplication based on comparition of title and artist(s) against existing tracks in DB
     async fn dedupe_track(&self, conn: &mut SqliteConnection, track: &Track) -> Option<Track> {
-        let result = self.track_service.find_track_by_title_and_artist(conn, track);
+        let result = self
+            .track_service
+            .find_track_by_title_and_artist(conn, track);
 
         match result {
             Some(existing_track) => {
-                tracing::warn!("Similar track found in DB: {}, will compare quality", existing_track.display());
+                tracing::warn!(
+                    "Similar track found in DB: {}, will compare quality",
+                    existing_track.display()
+                );
                 Some(existing_track)
-            },
-            None => {
-                None
-            },
+            }
+            None => None,
         }
     }
 
     /// Tag the downloaded file with the track metadata, then move it to the correct location
-    async fn process_track_file(&self, track: &mut Track, file_path: &PathBuf) -> SoundomeResult<()> {
+    async fn process_track_file(
+        &self,
+        track: &mut Track,
+        file_path: &PathBuf,
+    ) -> SoundomeResult<()> {
         tagger::file::tag_file_with_track(&file_path.clone(), &track)?;
         tracing::info!("Tagged file with downloaded_track metadata");
 
@@ -619,7 +818,11 @@ impl DownloadService {
     }
 
     /// Save the track in the database
-    async fn save_track(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Track> {
+    async fn save_track(
+        &self,
+        conn: &mut SqliteConnection,
+        track: &Track,
+    ) -> SoundomeResult<Track> {
         let inserted_track = self.track_service.create_or_update(conn, track)?;
         tracing::info!("Saved track in the database");
         Ok(inserted_track)

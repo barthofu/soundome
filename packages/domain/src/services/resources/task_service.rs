@@ -14,7 +14,11 @@ impl TaskService {
         Self { task_repo }
     }
 
-    pub fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<Task> {
+    pub fn get_by_id(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> shared::types::SoundomeResult<Task> {
         self.task_repo.get_by_id(conn, id)
     }
 
@@ -23,7 +27,12 @@ impl TaskService {
     }
 
     /// Create a new pending task for a playlist sync.
-    pub fn create_playlist_sync(&self, conn: &mut SqliteConnection, url: &str, label: Option<String>) -> shared::types::SoundomeResult<Task> {
+    pub fn create_playlist_sync(
+        &self,
+        conn: &mut SqliteConnection,
+        url: &str,
+        label: Option<String>,
+    ) -> shared::types::SoundomeResult<Task> {
         let task = Task {
             id: None,
             task_type: TaskType::SyncPlaylist,
@@ -40,7 +49,12 @@ impl TaskService {
     }
 
     /// Create a new pending task for an artist sync.
-    pub fn create_artist_sync(&self, conn: &mut SqliteConnection, url: &str, label: Option<String>) -> shared::types::SoundomeResult<Task> {
+    pub fn create_artist_sync(
+        &self,
+        conn: &mut SqliteConnection,
+        url: &str,
+        label: Option<String>,
+    ) -> shared::types::SoundomeResult<Task> {
         let task = Task {
             id: None,
             task_type: TaskType::SyncArtist,
@@ -57,7 +71,12 @@ impl TaskService {
     }
 
     /// Create a new pending task for an album sync.
-    pub fn create_album_sync(&self, conn: &mut SqliteConnection, url: &str, label: Option<String>) -> shared::types::SoundomeResult<Task> {
+    pub fn create_album_sync(
+        &self,
+        conn: &mut SqliteConnection,
+        url: &str,
+        label: Option<String>,
+    ) -> shared::types::SoundomeResult<Task> {
         let task = Task {
             id: None,
             task_type: TaskType::SyncAlbum,
@@ -73,39 +92,74 @@ impl TaskService {
         self.task_repo.create(conn, &task)
     }
 
-    pub fn set_running(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
+    pub fn set_running(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> shared::types::SoundomeResult<()> {
         self.task_repo.set_running(conn, id)
     }
 
-    pub fn update_progress(&self, conn: &mut SqliteConnection, id: i32, progress: i32, total: i32) -> shared::types::SoundomeResult<()> {
+    pub fn update_progress(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        progress: i32,
+        total: i32,
+    ) -> shared::types::SoundomeResult<()> {
         self.task_repo.update_progress(conn, id, progress, total)
     }
 
-    pub fn set_completed(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
+    pub fn set_completed(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> shared::types::SoundomeResult<()> {
         self.task_repo.set_completed(conn, id)
     }
 
-    pub fn set_failed(&self, conn: &mut SqliteConnection, id: i32, error: &str) -> shared::types::SoundomeResult<()> {
+    pub fn set_failed(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        error: &str,
+    ) -> shared::types::SoundomeResult<()> {
         self.task_repo.set_failed(conn, id, error)
     }
 
-    pub fn set_cancelled(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<()> {
+    pub fn set_cancelled(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> shared::types::SoundomeResult<()> {
         self.task_repo.set_cancelled(conn, id)
     }
 
     /// Return all tasks currently stuck in `Running` status (e.g. after a crash).
-    pub fn get_stale_running(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<Vec<Task>> {
-        self.task_repo.get_by_status(conn, TaskStatus::Running.as_ref())
+    pub fn get_stale_running(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> shared::types::SoundomeResult<Vec<Task>> {
+        self.task_repo
+            .get_by_status(conn, TaskStatus::Running.as_ref())
     }
 
     /// Reset a task (Running or Failed) back to Pending so it can be re-executed.
     /// Progress is zeroed — already-processed tracks will be skipped automatically.
-    pub fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> shared::types::SoundomeResult<Task> {
+    pub fn reset_for_retry(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> shared::types::SoundomeResult<Task> {
         self.task_repo.reset_for_retry(conn, id)?;
         self.task_repo.get_by_id(conn, id)
     }
 
-    pub fn count_by_status(&self, conn: &mut SqliteConnection, status: &str) -> shared::types::SoundomeResult<i64> {
+    pub fn count_by_status(
+        &self,
+        conn: &mut SqliteConnection,
+        status: &str,
+    ) -> shared::types::SoundomeResult<i64> {
         self.task_repo.count_by_status(conn, status)
     }
 }

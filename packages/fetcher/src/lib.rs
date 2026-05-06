@@ -35,7 +35,6 @@ pub trait Source {
     fn is_valid_album_url(url: &str) -> bool;
 }
 
-
 pub struct Fetcher {
     spotify: Option<Spotify>,
     youtube_music: Option<YoutubeMusic>,
@@ -45,25 +44,22 @@ pub struct Fetcher {
 impl Fetcher {
     pub async fn new() -> Self {
         Self {
-            spotify: Config::get()
-                .providers
-                .spotify
-                .as_ref()
-                .and_then(|cfg| {
-                    Spotify::new(&cfg.client_id, &cfg.client_secret)
-                        .map_err(|e| {
-                            tracing::error!("Failed to initialize Spotify source: {:?}", e);
-                            e
-                        })
-                        .ok()
-                }),
+            spotify: Config::get().providers.spotify.as_ref().and_then(|cfg| {
+                Spotify::new(&cfg.client_id, &cfg.client_secret)
+                    .map_err(|e| {
+                        tracing::error!("Failed to initialize Spotify source: {:?}", e);
+                        e
+                    })
+                    .ok()
+            }),
             youtube_music: YoutubeMusic::new()
                 .map_err(|e| {
                     tracing::error!("Failed to initialize YouTube Music source: {:?}", e);
                     e
                 })
                 .ok(),
-            soundcloud: Soundcloud::new().await
+            soundcloud: Soundcloud::new()
+                .await
                 .map_err(|e| {
                     tracing::error!("Failed to initialize SoundCloud source: {:?}", e);
                     e
@@ -75,27 +71,22 @@ impl Fetcher {
 
 #[async_trait]
 impl Source for Fetcher {
-
     async fn get_track_from_url(&self, url: &str) -> SoundomeResult<Track> {
         match url {
-            _ if Spotify::is_valid_track_url(url) => {
-                match &self.spotify {
-                    Some(spotify) => spotify.get_track_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
-                }
-            }
-            _ if YoutubeMusic::is_valid_track_url(url) => {
-                match &self.youtube_music {
-                    Some(youtube_music) => youtube_music.get_track_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::YoutubeMusic.to_string())),
-                }
-            }
-            _ if Soundcloud::is_valid_track_url(url) => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.get_track_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            _ if Spotify::is_valid_track_url(url) => match &self.spotify {
+                Some(spotify) => spotify.get_track_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if YoutubeMusic::is_valid_track_url(url) => match &self.youtube_music {
+                Some(youtube_music) => youtube_music.get_track_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(
+                    Platform::YoutubeMusic.to_string(),
+                )),
+            },
+            _ if Soundcloud::is_valid_track_url(url) => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.get_track_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Err(Error::InvalidUrl(format!(
                 "{} is not compatible with any 'source' available",
                 url
@@ -105,24 +96,20 @@ impl Source for Fetcher {
 
     async fn get_playlist_from_url(&self, url: &str) -> SoundomeResult<Playlist> {
         match url {
-            _ if Spotify::is_valid_playlist_url(url) => {
-                match &self.spotify {
-                    Some(spotify) => spotify.get_playlist_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
-                }
-            }
-            _ if YoutubeMusic::is_valid_playlist_url(url) => {
-                match &self.youtube_music {
-                    Some(youtube_music) => youtube_music.get_playlist_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::YoutubeMusic.to_string())),
-                }
-            }
-            _ if Soundcloud::is_valid_playlist_url(url) => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.get_playlist_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            _ if Spotify::is_valid_playlist_url(url) => match &self.spotify {
+                Some(spotify) => spotify.get_playlist_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if YoutubeMusic::is_valid_playlist_url(url) => match &self.youtube_music {
+                Some(youtube_music) => youtube_music.get_playlist_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(
+                    Platform::YoutubeMusic.to_string(),
+                )),
+            },
+            _ if Soundcloud::is_valid_playlist_url(url) => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.get_playlist_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Err(Error::InvalidUrl(format!(
                 "{} is not compatible with any 'source' available",
                 url
@@ -132,24 +119,20 @@ impl Source for Fetcher {
 
     async fn get_playlist_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<PlaylistTrack>> {
         match url {
-            _ if Spotify::is_valid_playlist_url(url) => {
-                match &self.spotify {
-                    Some(spotify) => spotify.get_playlist_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
-                }
-            }
-            _ if YoutubeMusic::is_valid_playlist_url(url) => {
-                match &self.youtube_music {
-                    Some(youtube_music) => youtube_music.get_playlist_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::YoutubeMusic.to_string())),
-                }
-            }
-            _ if Soundcloud::is_valid_playlist_url(url) => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.get_playlist_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            _ if Spotify::is_valid_playlist_url(url) => match &self.spotify {
+                Some(spotify) => spotify.get_playlist_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if YoutubeMusic::is_valid_playlist_url(url) => match &self.youtube_music {
+                Some(youtube_music) => youtube_music.get_playlist_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(
+                    Platform::YoutubeMusic.to_string(),
+                )),
+            },
+            _ if Soundcloud::is_valid_playlist_url(url) => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.get_playlist_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Err(Error::InvalidUrl(format!(
                 "{} is not compatible with any 'source' available",
                 url
@@ -158,29 +141,27 @@ impl Source for Fetcher {
     }
 
     async fn get_tracks_from_query(&self, _search: &str) -> SoundomeResult<Vec<Track>> {
-        Err(Error::NotImplemented("get_tracks_from_query is not implemented yet".to_string()))
+        Err(Error::NotImplemented(
+            "get_tracks_from_query is not implemented yet".to_string(),
+        ))
     }
 
     async fn get_artist_from_url(&self, url: &str) -> SoundomeResult<Artist> {
         match url {
-            _ if Spotify::is_valid_artist_url(url) => {
-                match &self.spotify {
-                    Some(spotify) => spotify.get_artist_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
-                }
-            }
-            _ if YoutubeMusic::is_valid_artist_url(url) => {
-                match &self.youtube_music {
-                    Some(youtube_music) => youtube_music.get_artist_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::YoutubeMusic.to_string())),
-                }
-            }
-            _ if Soundcloud::is_valid_artist_url(url) => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.get_artist_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            _ if Spotify::is_valid_artist_url(url) => match &self.spotify {
+                Some(spotify) => spotify.get_artist_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if YoutubeMusic::is_valid_artist_url(url) => match &self.youtube_music {
+                Some(youtube_music) => youtube_music.get_artist_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(
+                    Platform::YoutubeMusic.to_string(),
+                )),
+            },
+            _ if Soundcloud::is_valid_artist_url(url) => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.get_artist_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Err(Error::InvalidUrl(format!(
                 "{} is not compatible with any 'source' available",
                 url
@@ -190,24 +171,20 @@ impl Source for Fetcher {
 
     async fn get_artist_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
         match url {
-            _ if Spotify::is_valid_artist_url(url) => {
-                match &self.spotify {
-                    Some(spotify) => spotify.get_artist_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
-                }
-            }
-            _ if YoutubeMusic::is_valid_artist_url(url) => {
-                match &self.youtube_music {
-                    Some(youtube_music) => youtube_music.get_artist_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::YoutubeMusic.to_string())),
-                }
-            }
-            _ if Soundcloud::is_valid_artist_url(url) => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.get_artist_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            _ if Spotify::is_valid_artist_url(url) => match &self.spotify {
+                Some(spotify) => spotify.get_artist_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if YoutubeMusic::is_valid_artist_url(url) => match &self.youtube_music {
+                Some(youtube_music) => youtube_music.get_artist_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(
+                    Platform::YoutubeMusic.to_string(),
+                )),
+            },
+            _ if Soundcloud::is_valid_artist_url(url) => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.get_artist_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Err(Error::InvalidUrl(format!(
                 "{} is not compatible with any 'source' available",
                 url
@@ -216,29 +193,27 @@ impl Source for Fetcher {
     }
 
     async fn get_artists_from_query(&self, _search: &str) -> SoundomeResult<Vec<Artist>> {
-        Err(Error::NotImplemented("get_artists_from_query is not implemented yet".to_string()))
+        Err(Error::NotImplemented(
+            "get_artists_from_query is not implemented yet".to_string(),
+        ))
     }
 
     async fn get_album_from_url(&self, url: &str) -> SoundomeResult<Album> {
         match url {
-            _ if Spotify::is_valid_album_url(url) => {
-                match &self.spotify {
-                    Some(spotify) => spotify.get_album_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
-                }
-            }
-            _ if YoutubeMusic::is_valid_album_url(url) => {
-                match &self.youtube_music {
-                    Some(youtube_music) => youtube_music.get_album_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::YoutubeMusic.to_string())),
-                }
-            }
-            _ if Soundcloud::is_valid_album_url(url) => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.get_album_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            _ if Spotify::is_valid_album_url(url) => match &self.spotify {
+                Some(spotify) => spotify.get_album_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if YoutubeMusic::is_valid_album_url(url) => match &self.youtube_music {
+                Some(youtube_music) => youtube_music.get_album_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(
+                    Platform::YoutubeMusic.to_string(),
+                )),
+            },
+            _ if Soundcloud::is_valid_album_url(url) => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.get_album_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Err(Error::InvalidUrl(format!(
                 "{} is not compatible with any 'source' available",
                 url
@@ -247,29 +222,27 @@ impl Source for Fetcher {
     }
 
     async fn get_albums_from_query(&self, _search: &str) -> SoundomeResult<Vec<Album>> {
-        Err(Error::NotImplemented("get_albums_from_query is not implemented yet".to_string()))
+        Err(Error::NotImplemented(
+            "get_albums_from_query is not implemented yet".to_string(),
+        ))
     }
 
     async fn get_album_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
         match url {
-            _ if Spotify::is_valid_album_url(url) => {
-                match &self.spotify {
-                    Some(spotify) => spotify.get_album_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
-                }
-            }
-            _ if YoutubeMusic::is_valid_album_url(url) => {
-                match &self.youtube_music {
-                    Some(youtube_music) => youtube_music.get_album_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::YoutubeMusic.to_string())),
-                }
-            }
-            _ if Soundcloud::is_valid_album_url(url) => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.get_album_tracks_from_url(url).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            _ if Spotify::is_valid_album_url(url) => match &self.spotify {
+                Some(spotify) => spotify.get_album_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if YoutubeMusic::is_valid_album_url(url) => match &self.youtube_music {
+                Some(youtube_music) => youtube_music.get_album_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(
+                    Platform::YoutubeMusic.to_string(),
+                )),
+            },
+            _ if Soundcloud::is_valid_album_url(url) => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.get_album_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Err(Error::InvalidUrl(format!(
                 "{} is not compatible with any 'source' available",
                 url
@@ -279,12 +252,10 @@ impl Source for Fetcher {
 
     async fn clean_track_metadata(&self, track: &mut Track) -> SoundomeResult<()> {
         match track.get_source_platform() {
-            Platform::SoundCloud => {
-                match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.clean_track_metadata(track).await,
-                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                }
-            }
+            Platform::SoundCloud => match &self.soundcloud {
+                Some(soundcloud) => soundcloud.clean_track_metadata(track).await,
+                None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+            },
             _ => Ok(()),
         }
     }
@@ -292,13 +263,11 @@ impl Source for Fetcher {
     async fn clean_tracks_metadata(&self, tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
         match tracks.first() {
             Some(track) => match track.get_source_platform() {
-                Platform::SoundCloud => {
-                    match &self.soundcloud {
-                        Some(soundcloud) => soundcloud.clean_tracks_metadata(tracks).await,
-                        None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
-                    }
-                }
-                _ => Ok(())
+                Platform::SoundCloud => match &self.soundcloud {
+                    Some(soundcloud) => soundcloud.clean_tracks_metadata(tracks).await,
+                    None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
+                },
+                _ => Ok(()),
             },
             None => Ok(()),
         }

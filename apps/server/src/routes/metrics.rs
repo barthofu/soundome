@@ -8,24 +8,39 @@ use crate::utils::database::Db;
 /// Prometheus metrics endpoint — returns library statistics as Prometheus text format.
 /// Not registered with OpenAPI; scrape at `GET /metrics`.
 #[get("/metrics")]
-pub async fn metrics(
-    db: Db,
-    services: &rocket::State<Arc<ServiceLayer>>,
-) -> (ContentType, String) {
+pub async fn metrics(db: Db, services: &rocket::State<Arc<ServiceLayer>>) -> (ContentType, String) {
     let services = Arc::clone(services);
 
     let body = db
         .run(move |conn| {
             let tracks = services.track_service.count(conn).unwrap_or(0);
-            let tracks_pending = services.track_service.count_pending_validations(conn).unwrap_or(0);
+            let tracks_pending = services
+                .track_service
+                .count_pending_validations(conn)
+                .unwrap_or(0);
             let albums = services.album_service.count(conn).unwrap_or(0);
             let artists = services.artist_service.count(conn).unwrap_or(0);
             let playlists = services.playlist_service.count(conn).unwrap_or(0);
-            let tasks_pending = services.task_service.count_by_status(conn, "Pending").unwrap_or(0);
-            let tasks_running = services.task_service.count_by_status(conn, "Running").unwrap_or(0);
-            let tasks_completed = services.task_service.count_by_status(conn, "Completed").unwrap_or(0);
-            let tasks_failed = services.task_service.count_by_status(conn, "Failed").unwrap_or(0);
-            let tasks_cancelled = services.task_service.count_by_status(conn, "Cancelled").unwrap_or(0);
+            let tasks_pending = services
+                .task_service
+                .count_by_status(conn, "Pending")
+                .unwrap_or(0);
+            let tasks_running = services
+                .task_service
+                .count_by_status(conn, "Running")
+                .unwrap_or(0);
+            let tasks_completed = services
+                .task_service
+                .count_by_status(conn, "Completed")
+                .unwrap_or(0);
+            let tasks_failed = services
+                .task_service
+                .count_by_status(conn, "Failed")
+                .unwrap_or(0);
+            let tasks_cancelled = services
+                .task_service
+                .count_by_status(conn, "Cancelled")
+                .unwrap_or(0);
 
             format!(
                 "\
@@ -57,8 +72,7 @@ soundome_tasks_total{{status=\"Cancelled\"}} {tasks_cancelled}
         .await;
 
     (
-        ContentType::new("text", "plain")
-            .with_params([("version", "0.0.4"), ("charset", "utf-8")]),
+        ContentType::new("text", "plain").with_params([("version", "0.0.4"), ("charset", "utf-8")]),
         body,
     )
 }

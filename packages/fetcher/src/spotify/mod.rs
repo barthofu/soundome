@@ -5,12 +5,18 @@ use std::env;
 use async_trait::async_trait;
 use config::Config;
 use rspotify::{
-    model::{AlbumId, AlbumType as SpotifyAlbumType, ArtistId, Country, Market, PlaylistId, SearchResult, SearchType, TrackId},
+    model::{
+        AlbumId, AlbumType as SpotifyAlbumType, ArtistId, Country, Market, PlaylistId,
+        SearchResult, SearchType, TrackId,
+    },
     prelude::BaseClient,
     ClientCredsSpotify, Credentials,
 };
 use shared::{
-    errors::Error, http::ProxyRotator, models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track}, types::SoundomeResult
+    errors::Error,
+    http::ProxyRotator,
+    models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track},
+    types::SoundomeResult,
 };
 use tracing::error;
 
@@ -156,7 +162,13 @@ impl Source for Spotify {
         loop {
             let albums_page = self
                 .client
-                .artist_albums_manual(id.as_ref(), include_groups, market, Some(limit), Some(offset))
+                .artist_albums_manual(
+                    id.as_ref(),
+                    include_groups,
+                    market,
+                    Some(limit),
+                    Some(offset),
+                )
                 .map_err(|e| {
                     error!("Spotify API error fetching artist albums {}: {}", url, e);
                     Error::NotFound(format!("Spotify artist albums from {}", url))
@@ -170,7 +182,10 @@ impl Source for Spotify {
                     .client
                     .album_track_manual(album_id.as_ref(), market, Some(50), Some(0))
                     .map_err(|e| {
-                        error!("Spotify API error fetching album tracks for {}: {}", album_id, e);
+                        error!(
+                            "Spotify API error fetching album tracks for {}: {}",
+                            album_id, e
+                        );
                         Error::NotFound(format!("Spotify album tracks for {}", album_id))
                     })?;
 
@@ -186,7 +201,10 @@ impl Source for Spotify {
             offset += limit;
         }
 
-        tracing::info!("Fetched {} tracks from artist discography on Spotify", all_tracks.len());
+        tracing::info!(
+            "Fetched {} tracks from artist discography on Spotify",
+            all_tracks.len()
+        );
         Ok(all_tracks)
     }
 
@@ -246,7 +264,10 @@ impl Source for Spotify {
 
         let simplified_album = rspotify::model::SimplifiedAlbum {
             album_group: None,
-            album_type: Some(<rspotify::model::AlbumType as Into<&'static str>>::into(album.album_type).to_lowercase()),
+            album_type: Some(
+                <rspotify::model::AlbumType as Into<&'static str>>::into(album.album_type)
+                    .to_lowercase(),
+            ),
             artists: album.artists.clone(),
             available_markets: vec![],
             external_urls: album.external_urls.clone(),

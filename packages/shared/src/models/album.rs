@@ -13,7 +13,7 @@ pub struct Album {
     pub album_type: AlbumType,
     pub cover: Option<String>,
     pub date: Option<String>,
-    pub references: Vec<Reference>
+    pub references: Vec<Reference>,
 }
 
 struct Weights;
@@ -24,7 +24,6 @@ impl Weights {
 }
 
 impl Album {
-
     pub fn get_source(&self) -> Option<Reference> {
         self.references
             .iter()
@@ -67,18 +66,17 @@ impl Album {
     }
 
     pub fn compare(&self, other: &Album) -> f64 {
-        let title_similarity = string_similarity(
-            &self.title,
-            &other.title,
-            SimilarityAlgorithm::Smart,
-        );
+        let title_similarity =
+            string_similarity(&self.title, &other.title, SimilarityAlgorithm::Smart);
 
         let artists_similarity = if !self.artists.is_empty() && !other.artists.is_empty() {
             let mut total = 0.0;
             for artist in &self.artists {
-                let best_match = other.artists.iter()
+                let best_match = other
+                    .artists
+                    .iter()
                     .map(|a| artist.compare(a))
-                    .fold(0./0., f64::max); // max or NaN
+                    .fold(0. / 0., f64::max); // max or NaN
                 total += best_match;
             }
             total / self.artists.len() as f64
@@ -86,7 +84,8 @@ impl Album {
             0.0
         };
 
-        let release_date_similarity = if let (Some(date1), Some(date2)) = (&self.date, &other.date) {
+        let release_date_similarity = if let (Some(date1), Some(date2)) = (&self.date, &other.date)
+        {
             if date1 == date2 {
                 1.0
             } else {
@@ -98,26 +97,29 @@ impl Album {
 
         // Weighted average
         let total_weight = Weights::TITLE + Weights::ARTISTS + Weights::RELEASE_DATE;
-        (title_similarity * Weights::TITLE +
-         artists_similarity * Weights::ARTISTS +
-         release_date_similarity * Weights::RELEASE_DATE) / total_weight
+        (title_similarity * Weights::TITLE
+            + artists_similarity * Weights::ARTISTS
+            + release_date_similarity * Weights::RELEASE_DATE)
+            / total_weight
     }
 
     pub fn transpose_metadata(&mut self, other: &Album) {
         self.title = other.title.clone();
         self.album_type = other.album_type.clone();
-        if let Some(cover) = &other.cover { self.cover = Some(cover.clone()); };
-        if let Some(date) = &other.date { self.date = Some(date.clone()); };
-        
+        if let Some(cover) = &other.cover {
+            self.cover = Some(cover.clone());
+        };
+        if let Some(date) = &other.date {
+            self.date = Some(date.clone());
+        };
+
         // only add new references, do not overwrite existing ones
         for ref_item in &other.references {
-            let reference_already_exists = self.references
-                .iter()
-                .any(|r| 
-                    r.platform == ref_item.platform && 
-                    r.external_id == ref_item.external_id && 
-                    r.ref_type == ref_item.ref_type
-                );
+            let reference_already_exists = self.references.iter().any(|r| {
+                r.platform == ref_item.platform
+                    && r.external_id == ref_item.external_id
+                    && r.ref_type == ref_item.ref_type
+            });
 
             if !reference_already_exists {
                 self.references.push(ref_item.clone());

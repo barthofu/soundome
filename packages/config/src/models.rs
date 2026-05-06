@@ -43,8 +43,12 @@ impl Default for GeneralConfig {
 }
 
 impl GeneralConfig {
-    fn default_base_library_dir() -> String { "./library".to_string() }
-    fn default_temp_download_dir() -> String { "./temp".to_string() }
+    fn default_base_library_dir() -> String {
+        "./library".to_string()
+    }
+    fn default_temp_download_dir() -> String {
+        "./temp".to_string()
+    }
 }
 
 // ===============================================================================
@@ -70,7 +74,9 @@ impl Default for LogsConfig {
 }
 
 impl LogsConfig {
-    fn default_level() -> String { "info".to_string() }
+    fn default_level() -> String {
+        "info".to_string()
+    }
 }
 
 // ===============================================================================
@@ -95,7 +101,9 @@ impl Default for DatabaseConfig {
 }
 
 impl DatabaseConfig {
-    fn default_url() -> String { "./data/soundome.db".to_string() }
+    fn default_url() -> String {
+        "./data/soundome.db".to_string()
+    }
 }
 
 // ===============================================================================
@@ -202,7 +210,11 @@ impl Default for TaggerConfig {
 
 impl TaggerConfig {
     fn default_providers() -> Vec<String> {
-        vec!["musicbrainz".to_string(), "bandcamp".to_string(), "spotify".to_string()]
+        vec![
+            "musicbrainz".to_string(),
+            "bandcamp".to_string(),
+            "spotify".to_string(),
+        ]
     }
 }
 

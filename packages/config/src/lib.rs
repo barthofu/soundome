@@ -9,12 +9,11 @@ pub use models::Config;
 pub static GLOBAL_CONFIG: OnceLock<Config> = OnceLock::new();
 
 impl Config {
-
     pub fn init() -> Result<(), config::ConfigError> {
         let config = Self::load()?;
-        GLOBAL_CONFIG.set(config).map_err(|_| {
-            config::ConfigError::Message("Failed to set global config".into())
-        })
+        GLOBAL_CONFIG
+            .set(config)
+            .map_err(|_| config::ConfigError::Message("Failed to set global config".into()))
     }
 
     pub fn load() -> Result<Self, config::ConfigError> {

@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use domain::services::ServiceLayer;
 use diesel::SqliteConnection;
+use domain::services::ServiceLayer;
 
 pub async fn domain_tests(services: &Arc<ServiceLayer>, conn: &mut SqliteConnection) {
     download_track(services, conn).await;
-    
 }
 
 async fn download_track(services: &Arc<ServiceLayer>, conn: &mut SqliteConnection) {
@@ -17,7 +16,10 @@ async fn download_track(services: &Arc<ServiceLayer>, conn: &mut SqliteConnectio
 
     // Skone - Générations
     let url = "https://soundcloud.com/skonebzh/generations";
-    let res = services.download_service.download_track_from_url(url, conn).await;
+    let res = services
+        .download_service
+        .download_track_from_url(url, conn)
+        .await;
     match res {
         Ok(track) => println!("Downloaded track: {}", track.display()),
         Err(e) => eprintln!("Error downloading track: {:?}", e),
@@ -26,7 +28,10 @@ async fn download_track(services: &Arc<ServiceLayer>, conn: &mut SqliteConnectio
     // tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let url = "https://open.spotify.com/track/0vlYmeolmAWluXfdPZskor?si=6e5b593dd5304b26";
-    let res = services.download_service.download_track_from_url(url, conn).await;
+    let res = services
+        .download_service
+        .download_track_from_url(url, conn)
+        .await;
     match res {
         Ok(track) => println!("Downloaded track: {}", track.display()),
         Err(e) => eprintln!("Error downloading track: {:?}", e),

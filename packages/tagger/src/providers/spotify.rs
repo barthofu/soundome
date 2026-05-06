@@ -7,9 +7,7 @@ use rspotify::{
     ClientCredsSpotify, Credentials,
 };
 use shared::http::ProxyRotator;
-use shared::models::{
-    Album, AlbumType, Artist, Platform, Reference, ReferenceType, Track,
-};
+use shared::models::{Album, AlbumType, Artist, Platform, Reference, ReferenceType, Track};
 use shared::utils::enums::Match;
 use shared::utils::string::{string_similarity, SimilarityAlgorithm};
 
@@ -62,7 +60,10 @@ impl Spotify {
     }
 
     fn search_tracks(&self, query: &str) -> Vec<Track> {
-        match self.client.search(query, SearchType::Track, None, None, Some(10), Some(0)) {
+        match self
+            .client
+            .search(query, SearchType::Track, None, None, Some(10), Some(0))
+        {
             Ok(SearchResult::Tracks(page)) => {
                 page.items.into_iter().map(|t| convert_track(&t)).collect()
             }

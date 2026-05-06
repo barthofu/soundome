@@ -8,7 +8,9 @@ use crate::schema::{album, album_ref};
 // Album
 // ================================================================================================
 
-#[derive(Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(
+    Debug, Clone, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd,
+)]
 #[diesel(table_name = album)]
 pub struct AlbumEntity {
     pub id: i32,
@@ -40,7 +42,19 @@ pub struct UpdateAlbumEntity {
 // Album Source
 // ================================================================================================
 
-#[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(
+    Debug,
+    Clone,
+    Associations,
+    Queryable,
+    Identifiable,
+    Insertable,
+    Serialize,
+    Ord,
+    Eq,
+    PartialEq,
+    PartialOrd,
+)]
 #[diesel(table_name = album_ref)]
 #[diesel(belongs_to(AlbumEntity, foreign_key = album_id))]
 pub struct AlbumRefEntity {

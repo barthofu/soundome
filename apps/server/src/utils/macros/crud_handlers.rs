@@ -79,12 +79,6 @@ pub mod resource {
             }
         };
     }
-
-    pub(crate) use create;
-    pub(crate) use delete;
-    pub(crate) use get;
-    pub(crate) use get_all;
-    pub(crate) use update;
 }
 
 pub mod association {
@@ -206,8 +200,4 @@ pub mod association {
             }
         };
     }
-
-    pub(crate) use associate;
-    pub(crate) use dissociate;
-    pub(crate) use get;
 }

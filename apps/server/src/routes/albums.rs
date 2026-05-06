@@ -37,7 +37,10 @@ impl AlbumDto {
             artists: album
                 .artists
                 .into_iter()
-                .map(|a| AlbumArtistDto { id: a.id, name: a.name })
+                .map(|a| AlbumArtistDto {
+                    id: a.id,
+                    name: a.name,
+                })
                 .collect(),
             album_type: album.album_type.as_ref().to_string(),
             cover: album.cover,
@@ -66,12 +69,21 @@ pub async fn get_all(
     let services = Arc::clone(services);
     db.run(move |conn| services.album_service.get_all(conn))
         .await
-        .map(|albums| Json(albums.into_iter().filter_map(AlbumDto::from_album).collect()))
-        .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "Internal".to_string(),
-            message: err.to_string(),
-        }))
+        .map(|albums| {
+            Json(
+                albums
+                    .into_iter()
+                    .filter_map(AlbumDto::from_album)
+                    .collect(),
+            )
+        })
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }
 
 #[openapi]
@@ -89,11 +101,13 @@ pub async fn get(
                 .ok_or_else(|| shared::errors::Error::Database("Album has no id".to_string()))
         })
         .map(Json)
-        .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-            status: Status::NotFound,
-            code: "NotFound".to_string(),
-            message: err.to_string(),
-        }))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::NotFound,
+                code: "NotFound".to_string(),
+                message: err.to_string(),
+            })
+        })
 }
 
 #[openapi]
@@ -109,9 +123,15 @@ pub async fn update(
 
     db.run(move |conn| {
         let mut album = services.album_service.get_by_id(conn, id)?;
-        if let Some(title) = body.title { album.title = title; }
-        if let Some(date) = body.date { album.date = Some(date); }
-        if let Some(cover) = body.cover { album.cover = Some(cover); }
+        if let Some(title) = body.title {
+            album.title = title;
+        }
+        if let Some(date) = body.date {
+            album.date = Some(date);
+        }
+        if let Some(cover) = body.cover {
+            album.cover = Some(cover);
+        }
         services.album_service.update(conn, id, &album)
     })
     .await
@@ -120,11 +140,13 @@ pub async fn update(
             .ok_or_else(|| shared::errors::Error::Database("Album has no id".to_string()))
     })
     .map(Json)
-    .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-        status: Status::InternalServerError,
-        code: "Internal".to_string(),
-        message: err.to_string(),
-    }))
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
 }
 
 #[openapi]
@@ -138,9 +160,11 @@ pub async fn delete(
     db.run(move |conn| services.album_service.delete_by_id(conn, id))
         .await
         .map(|_| Json(Success { success: true }))
-        .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "Internal".to_string(),
-            message: err.to_string(),
-        }))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }

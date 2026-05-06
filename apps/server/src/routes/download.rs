@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use config::Config;
 use domain::services::ServiceLayer;
@@ -55,9 +55,7 @@ fn is_artist_url(url: &str) -> bool {
         || (url.contains("soundcloud.com/")
             && !is_playlist_url(url)
             && !url.contains("/sets/")
-            && url.trim_end_matches('/')
-                .split('/')
-                .count() == 4) // https://soundcloud.com/username
+            && url.trim_end_matches('/').split('/').count() == 4) // https://soundcloud.com/username
 }
 
 /// Spawn a background OS thread that runs `sync_playlist_from_url` for the given task.
@@ -104,14 +102,11 @@ pub fn spawn_playlist_sync_task(
                 }
                 Err(e) => {
                     tracing::error!("Playlist sync task {} failed: {}", task_id, e);
-                    if let Err(e2) =
-                        services.task_service.set_failed(conn, task_id, &e.to_string())
+                    if let Err(e2) = services
+                        .task_service
+                        .set_failed(conn, task_id, &e.to_string())
                     {
-                        tracing::error!(
-                            "Failed to mark task {} as failed: {}",
-                            task_id,
-                            e2
-                        );
+                        tracing::error!("Failed to mark task {} as failed: {}", task_id, e2);
                     }
                 }
             }
@@ -165,14 +160,11 @@ pub fn spawn_artist_sync_task(
                 }
                 Err(e) => {
                     tracing::error!("Artist sync task {} failed: {}", task_id, e);
-                    if let Err(e2) =
-                        services.task_service.set_failed(conn, task_id, &e.to_string())
+                    if let Err(e2) = services
+                        .task_service
+                        .set_failed(conn, task_id, &e.to_string())
                     {
-                        tracing::error!(
-                            "Failed to mark task {} as failed: {}",
-                            task_id,
-                            e2
-                        );
+                        tracing::error!("Failed to mark task {} as failed: {}", task_id, e2);
                     }
                 }
             }
@@ -226,14 +218,11 @@ pub fn spawn_album_sync_task(
                 }
                 Err(e) => {
                     tracing::error!("Album sync task {} failed: {}", task_id, e);
-                    if let Err(e2) =
-                        services.task_service.set_failed(conn, task_id, &e.to_string())
+                    if let Err(e2) = services
+                        .task_service
+                        .set_failed(conn, task_id, &e.to_string())
                     {
-                        tracing::error!(
-                            "Failed to mark task {} as failed: {}",
-                            task_id,
-                            e2
-                        );
+                        tracing::error!("Failed to mark task {} as failed: {}", task_id, e2);
                     }
                 }
             }
@@ -267,7 +256,9 @@ pub async fn download(
         let services_for_db = services.clone();
         let task = db
             .run(move |conn| {
-                services_for_db.task_service.create_playlist_sync(conn, &url_clone, None)
+                services_for_db
+                    .task_service
+                    .create_playlist_sync(conn, &url_clone, None)
             })
             .await
             .map_err(|err| {
@@ -294,7 +285,9 @@ pub async fn download(
         let services_for_db = services.clone();
         let task = db
             .run(move |conn| {
-                services_for_db.task_service.create_artist_sync(conn, &url_clone, None)
+                services_for_db
+                    .task_service
+                    .create_artist_sync(conn, &url_clone, None)
             })
             .await
             .map_err(|err| {
@@ -321,7 +314,9 @@ pub async fn download(
         let services_for_db = services.clone();
         let task = db
             .run(move |conn| {
-                services_for_db.task_service.create_album_sync(conn, &url_clone, None)
+                services_for_db
+                    .task_service
+                    .create_album_sync(conn, &url_clone, None)
             })
             .await
             .map_err(|err| {
@@ -346,8 +341,11 @@ pub async fn download(
         let track = db
             .run(move |conn| {
                 tokio::task::block_in_place(|| {
-                    Handle::current()
-                        .block_on(services.download_service.download_track_from_url(&url, conn))
+                    Handle::current().block_on(
+                        services
+                            .download_service
+                            .download_track_from_url(&url, conn),
+                    )
                 })
             })
             .await

@@ -31,7 +31,10 @@ impl CancellationRegistry {
 
     /// Signal cancellation for the given task. Returns `true` if the task was found.
     pub fn cancel(&self, task_id: i32) -> bool {
-        let guard = self.flags.read().expect("cancellation registry lock poisoned");
+        let guard = self
+            .flags
+            .read()
+            .expect("cancellation registry lock poisoned");
         if let Some(flag) = guard.get(&task_id) {
             flag.store(true, Ordering::Relaxed);
             true
@@ -50,7 +53,10 @@ impl CancellationRegistry {
 
     /// Check whether cancellation was requested for the given task.
     pub fn is_cancelled(&self, task_id: i32) -> bool {
-        let guard = self.flags.read().expect("cancellation registry lock poisoned");
+        let guard = self
+            .flags
+            .read()
+            .expect("cancellation registry lock poisoned");
         guard
             .get(&task_id)
             .map(|f| f.load(Ordering::Relaxed))

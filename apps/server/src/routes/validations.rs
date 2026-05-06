@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use domain::services::{download_service::MatchCandidate, track_service::ValidationPatch, ServiceLayer};
+use domain::services::{
+    download_service::MatchCandidate, track_service::ValidationPatch, ServiceLayer,
+};
 use rocket::{delete, get, http::Status, patch, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
@@ -61,7 +63,10 @@ impl PendingValidationDto {
             artists: track
                 .artists
                 .into_iter()
-                .map(|a| ArtistDto { id: a.id, name: a.name })
+                .map(|a| ArtistDto {
+                    id: a.id,
+                    name: a.name,
+                })
                 .collect(),
             album: track.album.map(|a| AlbumDto {
                 id: a.id,
@@ -69,7 +74,10 @@ impl PendingValidationDto {
                 artists: a
                     .artists
                     .into_iter()
-                    .map(|a| ArtistDto { id: a.id, name: a.name })
+                    .map(|a| ArtistDto {
+                        id: a.id,
+                        name: a.name,
+                    })
                     .collect(),
             }),
             date: track.date,
@@ -127,27 +135,23 @@ pub async fn get_pending(
 ) -> Result<Json<Vec<PendingValidationDto>>, crate::utils::error::Error> {
     let services = Arc::clone(services);
 
-    db.run(move |conn| {
-        services
-            .track_service
-            .get_pending_validations(conn)
-    })
-    .await
-    .map(|tracks| {
-        Json(
-            tracks
-                .into_iter()
-                .filter_map(PendingValidationDto::from_track)
-                .collect(),
-        )
-    })
-    .map_err(|err| {
-        crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "Internal".to_string(),
-            message: err.to_string(),
+    db.run(move |conn| services.track_service.get_pending_validations(conn))
+        .await
+        .map(|tracks| {
+            Json(
+                tracks
+                    .into_iter()
+                    .filter_map(PendingValidationDto::from_track)
+                    .collect(),
+            )
         })
-    })
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }
 
 #[openapi]
@@ -173,14 +177,18 @@ pub async fn approve_validation(
             label: body.label,
         };
         tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current()
-                .block_on(services.download_service.finalize_validated_track(conn, id, patch))
+            tokio::runtime::Handle::current().block_on(
+                services
+                    .download_service
+                    .finalize_validated_track(conn, id, patch),
+            )
         })
     })
     .await
     .and_then(|track| {
-        PendingValidationDto::from_track(track)
-            .ok_or_else(|| shared::errors::Error::Internal("track has no id after validation".into()))
+        PendingValidationDto::from_track(track).ok_or_else(|| {
+            shared::errors::Error::Internal("track has no id after validation".into())
+        })
     })
     .map(Json)
     .map_err(|err| {
@@ -238,11 +246,26 @@ impl MatchCandidateDto {
     fn from_candidate(c: MatchCandidate) -> Self {
         Self {
             title: c.track.title,
-            artists: c.track.artists.into_iter().map(|a| ArtistDto { id: a.id, name: a.name }).collect(),
+            artists: c
+                .track
+                .artists
+                .into_iter()
+                .map(|a| ArtistDto {
+                    id: a.id,
+                    name: a.name,
+                })
+                .collect(),
             album: c.track.album.map(|a| AlbumDto {
                 id: a.id,
                 title: a.title,
-                artists: a.artists.into_iter().map(|a| ArtistDto { id: a.id, name: a.name }).collect(),
+                artists: a
+                    .artists
+                    .into_iter()
+                    .map(|a| ArtistDto {
+                        id: a.id,
+                        name: a.name,
+                    })
+                    .collect(),
             }),
             date: c.track.date,
             genre: c.track.genre,
@@ -253,7 +276,12 @@ impl MatchCandidateDto {
             label: c.track.label,
             score: c.score,
             provider: c.provider,
-            references: c.track.references.into_iter().map(reference_to_dto).collect(),
+            references: c
+                .track
+                .references
+                .into_iter()
+                .map(reference_to_dto)
+                .collect(),
         }
     }
 }
@@ -275,7 +303,12 @@ pub async fn get_match_candidates(
     })
     .await
     .map(|candidates| {
-        Json(candidates.into_iter().map(MatchCandidateDto::from_candidate).collect())
+        Json(
+            candidates
+                .into_iter()
+                .map(MatchCandidateDto::from_candidate)
+                .collect(),
+        )
     })
     .map_err(|err| {
         crate::utils::error::Error::Custom(CustomError {
@@ -296,25 +329,21 @@ pub async fn get_recent(
     let services = Arc::clone(services);
     let limit = limit.unwrap_or(20).min(100);
 
-    db.run(move |conn| {
-        services
-            .track_service
-            .get_recent(conn, limit)
-    })
-    .await
-    .map(|tracks| {
-        Json(
-            tracks
-                .into_iter()
-                .filter_map(PendingValidationDto::from_track)
-                .collect(),
-        )
-    })
-    .map_err(|err| {
-        crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "Internal".to_string(),
-            message: err.to_string(),
+    db.run(move |conn| services.track_service.get_recent(conn, limit))
+        .await
+        .map(|tracks| {
+            Json(
+                tracks
+                    .into_iter()
+                    .filter_map(PendingValidationDto::from_track)
+                    .collect(),
+            )
         })
-    })
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }

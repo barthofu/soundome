@@ -1,12 +1,10 @@
 use rspotify::model::{
-    FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum, SimplifiedArtist,
-    SimplifiedTrack,
+    FullAlbum, FullArtist, FullTrack, PlayableItem, PlaylistItem, SimplifiedAlbum,
+    SimplifiedArtist, SimplifiedTrack,
 };
 use shared::{
     errors::Error,
-    models::{
-        Album, AlbumType, Artist, PlaylistTrack, Reference, ReferenceType, Track,
-    },
+    models::{Album, AlbumType, Artist, PlaylistTrack, Reference, ReferenceType, Track},
 };
 
 /// Converts an rspotify ClientError into a shared Error.
@@ -30,7 +28,7 @@ pub fn convert_artist(artist: &SimplifiedArtist) -> Artist {
             platform: shared::models::Platform::Spotify,
             external_id: artist.id.as_ref().map(|id| id.to_string()),
             external_url: artist.external_urls.get("spotify").cloned(),
-        }]
+        }],
     }
 }
 

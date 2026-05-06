@@ -7,7 +7,8 @@ use async_trait::async_trait;
 use config::Config;
 use shared::{
     errors::Error,
-    models::{Platform, Reference, ReferenceType, Track}, types::SoundomeResult,
+    models::{Platform, Reference, ReferenceType, Track},
+    types::SoundomeResult,
 };
 use std::path::PathBuf;
 
@@ -18,7 +19,12 @@ pub trait Provider {
     async fn search(&self, track: &Track) -> SoundomeResult<Reference>;
 
     /// Download the track from the given url at the given base directory
-    async fn download(&mut self, url: &str, file_name: &str, base_library_dir: PathBuf) -> SoundomeResult<PathBuf>;
+    async fn download(
+        &mut self,
+        url: &str,
+        file_name: &str,
+        base_library_dir: PathBuf,
+    ) -> SoundomeResult<PathBuf>;
 
     /// Check if the given url is a valid url for the provider
     fn is_valid_url(url: &str) -> bool;
@@ -75,15 +81,13 @@ pub async fn search(track: &Track) -> SoundomeResult<Reference> {
             external_id: source.external_id.clone(),
             external_url: source.external_url.clone(),
         }),
-        Platform::SoundCloud => Ok(
-            Reference {
-                id: None,
-                ref_type: shared::models::ReferenceType::Provider,
-                platform: Platform::SoundCloud,
-                external_id: source.external_id.clone(),
-                external_url: source.external_url.clone(),
-            },
-        ),
+        Platform::SoundCloud => Ok(Reference {
+            id: None,
+            ref_type: shared::models::ReferenceType::Provider,
+            platform: Platform::SoundCloud,
+            external_id: source.external_id.clone(),
+            external_url: source.external_url.clone(),
+        }),
         _ => Err(Error::Unknown),
     }
 }
@@ -106,9 +110,10 @@ pub async fn download(
         ));
     }
 
-    let url = provider.external_url.clone().ok_or(Error::Custom(
-        "track source url not defined".to_string(),
-    ))?;
+    let url = provider
+        .external_url
+        .clone()
+        .ok_or(Error::Custom("track source url not defined".to_string()))?;
 
     match source.platform {
         Platform::Spotify => {
@@ -121,9 +126,7 @@ pub async fn download(
                     .flatten(),
             );
 
-            youtube
-                .download(&url, &track_title, output_dir)
-                .await
+            youtube.download(&url, &track_title, output_dir).await
         }
         Platform::Youtube => {
             let mut youtube = youtube::Youtube::new(
@@ -134,21 +137,15 @@ pub async fn download(
                     .map(|youtube| youtube.invidious_instance.clone())
                     .flatten(),
             );
-            youtube
-                .download(&url, &track_title, output_dir)
-                .await
+            youtube.download(&url, &track_title, output_dir).await
         }
         Platform::YoutubeMusic => {
             let mut youtube_music = youtube_music::YoutubeMusic::new();
-            youtube_music
-                .download(&url, &track_title, output_dir)
-                .await
+            youtube_music.download(&url, &track_title, output_dir).await
         }
         Platform::SoundCloud => {
             let mut soundcloud = soundcloud::SoundCloud::new().await?;
-            soundcloud
-                .download(&url, &track_title, output_dir)
-                .await
+            soundcloud.download(&url, &track_title, output_dir).await
         }
         _ => Err(Error::Unknown),
     }

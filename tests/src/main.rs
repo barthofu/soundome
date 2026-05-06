@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
+use ::domain::{ports::repositories::RepositoryLayer, services::ServiceLayer};
 use config::Config;
 use database::repositories;
-use ::domain::{ports::repositories::RepositoryLayer, services::ServiceLayer};
 
 use serde::{Deserialize, Serialize};
 use shared::{init_globals, utils::logs::init_logger};
-use tracing::error;
 
 mod domain;
 mod file;
@@ -26,7 +25,6 @@ struct Track {
 #[dotenvy::load(path = "./.env", required = true)]
 #[tokio::main]
 async fn main() {
-
     println!("Starting tests...");
 
     init_globals().unwrap_or_else(|err| {
@@ -41,7 +39,8 @@ async fn main() {
     let artist_repo = Arc::new(repositories::artist::DieselArtistRepository::new());
     let playlist_repo = Arc::new(repositories::playlist::DieselPlaylistRepository::new());
     let task_repo = Arc::new(repositories::task::DieselTaskRepository::new());
-    let sync_schedule_repo = Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
+    let sync_schedule_repo =
+        Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),

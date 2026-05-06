@@ -101,7 +101,6 @@ pub struct SimplifiedTrack {
     pub artists: Vec<String>,
 }
 
-
 // ================================================================================================
 // Implementations
 // ================================================================================================
@@ -116,7 +115,6 @@ impl Weights {
 }
 
 impl Track {
-
     pub fn get_primary_artist(&self) -> Artist {
         self.album
             .as_ref()
@@ -169,7 +167,9 @@ impl Track {
     }
 
     pub fn get_year(&self) -> Option<String> {
-        self.date.as_ref().and_then(|d| d.split('-').next().map(|s| s.to_string()))
+        self.date
+            .as_ref()
+            .and_then(|d| d.split('-').next().map(|s| s.to_string()))
     }
 
     pub fn get_bitrate(&self) -> Option<u32> {
@@ -201,8 +201,14 @@ impl Track {
         let format = probed.format;
 
         // Find the first audio track with a defined bits_per_coded_sample
-        let track = format.tracks().iter().find(|t| t.codec_params.bits_per_coded_sample.is_some())?;
-        track.codec_params.bits_per_coded_sample.map(|bps| bps as u32)
+        let track = format
+            .tracks()
+            .iter()
+            .find(|t| t.codec_params.bits_per_coded_sample.is_some())?;
+        track
+            .codec_params
+            .bits_per_coded_sample
+            .map(|bps| bps as u32)
     }
 
     /// Display a track in a user-friendly format
@@ -293,13 +299,27 @@ impl Track {
     pub fn transpose_metadata(&mut self, other: &Track) {
         self.title = other.title.clone();
 
-        if let Some(val) = &other.date { self.date = Some(val.clone()); };
-        if let Some(val) = &other.genre { self.genre = Some(val.clone()); };
-        if let Some(val) = &other.cover { self.cover = Some(val.clone()); };
-        if let Some(val) = &other.duration { self.duration = Some(val.clone()); };
-        if let Some(val) = &other.track_number { self.track_number = Some(val.clone()); };
-        if let Some(val) = &other.disc_number { self.disc_number = Some(val.clone()); };
-        if let Some(val) = &other.label { self.label = Some(val.clone()); };
+        if let Some(val) = &other.date {
+            self.date = Some(val.clone());
+        };
+        if let Some(val) = &other.genre {
+            self.genre = Some(val.clone());
+        };
+        if let Some(val) = &other.cover {
+            self.cover = Some(val.clone());
+        };
+        if let Some(val) = &other.duration {
+            self.duration = Some(val.clone());
+        };
+        if let Some(val) = &other.track_number {
+            self.track_number = Some(val.clone());
+        };
+        if let Some(val) = &other.disc_number {
+            self.disc_number = Some(val.clone());
+        };
+        if let Some(val) = &other.label {
+            self.label = Some(val.clone());
+        };
 
         // only add new references, do not overwrite existing ones
         self.transpose_refs(other);
@@ -316,7 +336,11 @@ impl Track {
         // Pour chaque artiste du self, si un artiste similaire existe dans other, on le transpose
         const SIMILARITY_THRESHOLD: f64 = 0.8;
         for artist in &mut self.artists {
-            if let Some(matching_artist) = other.artists.iter().find(|a| a.compare(artist) > SIMILARITY_THRESHOLD) {
+            if let Some(matching_artist) = other
+                .artists
+                .iter()
+                .find(|a| a.compare(artist) > SIMILARITY_THRESHOLD)
+            {
                 artist.transpose_metadata(matching_artist);
             }
         }
@@ -334,13 +358,11 @@ impl Track {
     /// Transpose references from another track (add only new references)
     pub fn transpose_refs(&mut self, other: &Track) {
         for ref_item in &other.references {
-            let reference_already_exists = self.references
-                .iter()
-                .any(|r|
-                    r.platform == ref_item.platform &&
-                    r.external_id == ref_item.external_id &&
-                    r.ref_type == ref_item.ref_type
-                );
+            let reference_already_exists = self.references.iter().any(|r| {
+                r.platform == ref_item.platform
+                    && r.external_id == ref_item.external_id
+                    && r.ref_type == ref_item.ref_type
+            });
             if !reference_already_exists {
                 self.references.push(ref_item.clone());
             }
@@ -351,11 +373,11 @@ impl Track {
             match &mut self.album {
                 Some(self_album) => {
                     for ref_item in &other_album.references {
-                        let exists = self_album.references.iter().any(|r|
-                            r.platform == ref_item.platform &&
-                            r.external_id == ref_item.external_id &&
-                            r.ref_type == ref_item.ref_type
-                        );
+                        let exists = self_album.references.iter().any(|r| {
+                            r.platform == ref_item.platform
+                                && r.external_id == ref_item.external_id
+                                && r.ref_type == ref_item.ref_type
+                        });
                         if !exists {
                             self_album.references.push(ref_item.clone());
                         }
@@ -374,11 +396,11 @@ impl Track {
                 .find(|a| a.compare(self_artist) > SIMILARITY_THRESHOLD)
             {
                 for ref_item in &other_artist.references {
-                    let exists = self_artist.references.iter().any(|r|
-                        r.platform == ref_item.platform &&
-                        r.external_id == ref_item.external_id &&
-                        r.ref_type == ref_item.ref_type
-                    );
+                    let exists = self_artist.references.iter().any(|r| {
+                        r.platform == ref_item.platform
+                            && r.external_id == ref_item.external_id
+                            && r.ref_type == ref_item.ref_type
+                    });
                     if !exists {
                         self_artist.references.push(ref_item.clone());
                     }

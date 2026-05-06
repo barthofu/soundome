@@ -77,11 +77,9 @@ impl AIBackend for OllamaAI {
             serde_json::from_value(schema_value).map_err(Error::Json)?;
         let format = FormatType::StructuredJson(Box::new(JsonStructure::new_for_schema(schema)));
 
-        let request = ChatMessageRequest::new(
-            self.model.clone(),
-            vec![ChatMessage::user(full_prompt)],
-        )
-        .format(format);
+        let request =
+            ChatMessageRequest::new(self.model.clone(), vec![ChatMessage::user(full_prompt)])
+                .format(format);
 
         let response = self
             .client

@@ -7,7 +7,6 @@ use crate::ports::repositories;
 
 pub mod download_service;
 
-
 // =================================================================================
 // Service Layer
 // =================================================================================
@@ -24,10 +23,7 @@ pub struct ServiceLayer {
 }
 
 impl ServiceLayer {
-    pub fn new(
-        repositories: Arc<repositories::RepositoryLayer>,
-    ) -> Self {
-
+    pub fn new(repositories: Arc<repositories::RepositoryLayer>) -> Self {
         // Resource services
         let track_service = Arc::new(track_service::TrackService::new(
             repositories.track.clone(),
@@ -38,9 +34,15 @@ impl ServiceLayer {
             repositories.album.clone(),
             repositories.artist.clone(),
         ));
-        let artist_service = Arc::new(artist_service::ArtistService::new(repositories.artist.clone()));
-        let playlist_service = Arc::new(playlist_service::PlaylistService::new(repositories.playlist.clone()));
-        let sync_schedule_service = Arc::new(sync_schedule_service::SyncScheduleService::new(repositories.sync_schedule.clone()));
+        let artist_service = Arc::new(artist_service::ArtistService::new(
+            repositories.artist.clone(),
+        ));
+        let playlist_service = Arc::new(playlist_service::PlaylistService::new(
+            repositories.playlist.clone(),
+        ));
+        let sync_schedule_service = Arc::new(sync_schedule_service::SyncScheduleService::new(
+            repositories.sync_schedule.clone(),
+        ));
         let task_service = Arc::new(task_service::TaskService::new(repositories.task.clone()));
 
         // Services

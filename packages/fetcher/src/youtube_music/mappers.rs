@@ -3,9 +3,7 @@ use rustypipe::model::{
 };
 use shared::{
     errors::Error,
-    models::{
-        Album, Artist, Reference, Track
-    },
+    models::{Album, Artist, Reference, Track},
 };
 
 /// Converts an rspotify ClientError into a shared Error.
@@ -49,7 +47,10 @@ pub fn convert_artist_id(artist: &ArtistId) -> Artist {
             ref_type: shared::models::ReferenceType::Source,
             platform: shared::models::Platform::YoutubeMusic,
             external_id: artist.id.clone(),
-            external_url: artist.id.clone().map(|id| format!("https://music.youtube.com/channel/{}", id)),
+            external_url: artist
+                .id
+                .clone()
+                .map(|id| format!("https://music.youtube.com/channel/{}", id)),
         }],
     }
 }

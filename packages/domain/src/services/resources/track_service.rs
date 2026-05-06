@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use diesel::{Connection, SqliteConnection};
-use shared::{errors::Error, models::{Album, AlbumType, Artist, ReferenceType, Track}, types::SoundomeResult};
+use shared::{
+    errors::Error,
+    models::{Album, AlbumType, Artist, ReferenceType, Track},
+    types::SoundomeResult,
+};
 
 use crate::ports::repositories::{AlbumRepository, ArtistRepository, TrackRepository};
 
@@ -27,7 +31,6 @@ pub struct TrackService {
 }
 
 impl TrackService {
-
     const SIMILARITY_THRESHOLD: f64 = 0.8;
 
     pub fn new(
@@ -56,7 +59,12 @@ impl TrackService {
         self.track_repo.create(conn, new_track)
     }
 
-    pub fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &Track) -> SoundomeResult<Track> {
+    pub fn update(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        updated_track: &Track,
+    ) -> SoundomeResult<Track> {
         self.track_repo.update(conn, id, updated_track)
     }
 
@@ -70,11 +78,18 @@ impl TrackService {
         self.track_repo.get_by_url(conn, url).ok()
     }
 
-    pub fn get_recent(&self, conn: &mut SqliteConnection, limit: i64) -> SoundomeResult<Vec<Track>> {
+    pub fn get_recent(
+        &self,
+        conn: &mut SqliteConnection,
+        limit: i64,
+    ) -> SoundomeResult<Vec<Track>> {
         self.track_repo.get_recent(conn, limit)
     }
 
-    pub fn get_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
+    pub fn get_pending_validations(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Vec<Track>> {
         self.track_repo.get_pending_validations(conn)
     }
 
@@ -87,21 +102,43 @@ impl TrackService {
     }
 
     /// Applies `patch` to an existing track, clears its validation flag, and persists.
-    pub fn validate_track(&self, conn: &mut SqliteConnection, id: i32, patch: ValidationPatch) -> SoundomeResult<Track> {
+    pub fn validate_track(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        patch: ValidationPatch,
+    ) -> SoundomeResult<Track> {
         conn.transaction(|tx| {
             let mut track = self.track_repo.get_by_id(tx, id)?;
 
-            if let Some(title) = patch.title { track.title = title; }
-            if let Some(genre) = patch.genre { track.genre = Some(genre); }
-            if let Some(date) = patch.date { track.date = Some(date); }
-            if let Some(tn) = patch.track_number { track.track_number = Some(tn); }
-            if let Some(dn) = patch.disc_number { track.disc_number = Some(dn); }
-            if let Some(label) = patch.label { track.label = Some(label); }
+            if let Some(title) = patch.title {
+                track.title = title;
+            }
+            if let Some(genre) = patch.genre {
+                track.genre = Some(genre);
+            }
+            if let Some(date) = patch.date {
+                track.date = Some(date);
+            }
+            if let Some(tn) = patch.track_number {
+                track.track_number = Some(tn);
+            }
+            if let Some(dn) = patch.disc_number {
+                track.disc_number = Some(dn);
+            }
+            if let Some(label) = patch.label {
+                track.label = Some(label);
+            }
 
             if let Some(names) = patch.artists {
                 let mut artists: Vec<Artist> = Vec::with_capacity(names.len());
                 for name in names {
-                    let artist = Artist { id: None, name, icon: None, references: vec![] };
+                    let artist = Artist {
+                        id: None,
+                        name,
+                        icon: None,
+                        references: vec![],
+                    };
                     let saved = self.artist_repo.create_or_ignore(tx, &artist)?;
                     artists.push(saved);
                 }
@@ -140,7 +177,6 @@ impl TrackService {
         conn: &mut SqliteConnection,
         track: &Track,
     ) -> Option<Track> {
-
         // First, we need to get comparative tracks
         let comparative_tracks = self.get_all(conn).ok()?;
         let mut best_match: Option<(&Track, f64)> = None;
@@ -165,7 +201,11 @@ impl TrackService {
 
     /// Creates or updates a track in the database along with its associated artists, album, and references.
     /// Si une entité existe (par ID ou clé unique), elle est mise à jour, sinon créée. Les relations sont maintenues.
-    pub fn create_or_update(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Track> {
+    pub fn create_or_update(
+        &self,
+        conn: &mut SqliteConnection,
+        track: &Track,
+    ) -> SoundomeResult<Track> {
         conn.transaction(|tx| {
             // 1) Album (+ artistes + références album)
             let album_id_opt = if let Some(album) = &track.album {
@@ -175,7 +215,9 @@ impl TrackService {
                 } else {
                     self.album_repo.create(tx, album)?
                 };
-                let album_id = saved_album.id.ok_or_else(|| Error::Internal("missing album id after create/update".into()))?;
+                let album_id = saved_album.id.ok_or_else(|| {
+                    Error::Internal("missing album id after create/update".into())
+                })?;
 
                 // Upsert artists of album and collect IDs
                 let mut album_artist_ids: Vec<i32> = Vec::with_capacity(album.artists.len());
@@ -185,7 +227,9 @@ impl TrackService {
                     } else {
                         self.artist_repo.create_or_ignore(tx, artist)?
                     };
-                    let artist_id = saved_artist.id.ok_or_else(|| Error::Internal("missing artist id after create/update".into()))?;
+                    let artist_id = saved_artist.id.ok_or_else(|| {
+                        Error::Internal("missing artist id after create/update".into())
+                    })?;
                     // album/artist refs are stored as metadata only
                     let mut refs = artist.references.clone();
                     for r in &mut refs {
@@ -197,7 +241,8 @@ impl TrackService {
                 }
                 // Replace album artists relationships only if the caller provided them
                 if !album.artists.is_empty() {
-                    self.artist_repo.set_album_artists(tx, album_id, &album_artist_ids)?;
+                    self.artist_repo
+                        .set_album_artists(tx, album_id, &album_artist_ids)?;
                 }
                 // Replace/merge album references (metadata only)
                 let mut album_refs = album.references.clone();
@@ -231,7 +276,9 @@ impl TrackService {
             } else {
                 self.track_repo.create(tx, &track_to_save)?
             };
-            let track_id = saved_track.id.ok_or_else(|| Error::Internal("missing track id after create/update".into()))?;
+            let track_id = saved_track
+                .id
+                .ok_or_else(|| Error::Internal("missing track id after create/update".into()))?;
 
             // 3) Artistes du track (remplacement)
             let mut track_artist_ids: Vec<i32> = Vec::with_capacity(track.artists.len());
@@ -241,7 +288,9 @@ impl TrackService {
                 } else {
                     self.artist_repo.create_or_ignore(tx, artist)?
                 };
-                let artist_id = saved_artist.id.ok_or_else(|| Error::Internal("missing artist id after create/update".into()))?;
+                let artist_id = saved_artist.id.ok_or_else(|| {
+                    Error::Internal("missing artist id after create/update".into())
+                })?;
                 // artist refs are stored as metadata only
                 let mut refs = artist.references.clone();
                 for r in &mut refs {
@@ -251,10 +300,12 @@ impl TrackService {
                 self.artist_repo.set_references(tx, artist_id, &refs)?;
                 track_artist_ids.push(artist_id);
             }
-            self.artist_repo.set_track_artists(tx, track_id, &track_artist_ids)?;
+            self.artist_repo
+                .set_track_artists(tx, track_id, &track_artist_ids)?;
 
             // 4) Références du track (remplacement)
-            self.track_repo.set_references(tx, track_id, &track.references)?;
+            self.track_repo
+                .set_references(tx, track_id, &track.references)?;
 
             // 5) Reload complet
             self.track_repo.get_by_id(tx, track_id)
@@ -266,7 +317,6 @@ impl TrackService {
     ///
     /// Returns true if the new track has better quality.
     pub fn is_better_quality(&self, existing_track: &Track, new_track: &Track) -> bool {
-
         let existing_bitrate = existing_track.get_bitrate();
         let new_bitrate = new_track.get_bitrate();
 
@@ -287,5 +337,4 @@ impl TrackService {
 
         Ok(file_deleted)
     }
-
 }

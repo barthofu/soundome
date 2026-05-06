@@ -10,7 +10,10 @@ use rustypipe::{
     model::{MusicArtist, TrackItem},
 };
 use shared::{
-    errors::Error, http::HttpClientBuilder, models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track}, types::SoundomeResult
+    errors::Error,
+    http::HttpClientBuilder,
+    models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track},
+    types::SoundomeResult,
 };
 
 use crate::Source;
@@ -25,7 +28,6 @@ impl YoutubeMusic {
     const ARTIST_REGEX: &str = r"^https:\/\/music\.youtube\.com\/channel\/([A-Za-z0-9_-]+)$";
 
     pub fn new() -> SoundomeResult<Self> {
-
         let client = match Config::get().proxy.as_ref() {
             Some(proxy_config) if proxy_config.enabled => {
                 let reqwest_client = HttpClientBuilder::get_reqwest_client_builder()?;
@@ -38,9 +40,7 @@ impl YoutubeMusic {
                 .expect("Failed to create RustyPipe client"),
         };
 
-        Ok(Self {
-            client,
-        })
+        Ok(Self { client })
     }
 
     // =================
@@ -213,20 +213,14 @@ impl Source for YoutubeMusic {
             .query()
             .music_artist_albums(&artist_id, None, None)
             .await
-            .map_err(|_| {
-                Error::NotFound(format!("Youtube Music artist albums from {}", url))
-            })?;
+            .map_err(|_| Error::NotFound(format!("Youtube Music artist albums from {}", url)))?;
 
         tracing::info!("Found {} albums for artist on YouTube Music", albums.len());
 
         // For each album, fetch all tracks
         let mut all_tracks: Vec<Track> = Vec::new();
         for album_item in &albums {
-            let album = self
-                .client
-                .query()
-                .music_album(&album_item.id)
-                .await;
+            let album = self.client.query().music_album(&album_item.id).await;
 
             match album {
                 Ok(album) => {
@@ -240,12 +234,20 @@ impl Source for YoutubeMusic {
                     all_tracks.extend(tracks);
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to fetch album {} ({}): {}", album_item.name, album_item.id, e);
+                    tracing::warn!(
+                        "Failed to fetch album {} ({}): {}",
+                        album_item.name,
+                        album_item.id,
+                        e
+                    );
                 }
             }
         }
 
-        tracing::info!("Fetched {} tracks from artist discography on YouTube Music", all_tracks.len());
+        tracing::info!(
+            "Fetched {} tracks from artist discography on YouTube Music",
+            all_tracks.len()
+        );
         Ok(all_tracks)
     }
 
@@ -305,9 +307,7 @@ impl Source for YoutubeMusic {
             .query()
             .music_album(album_id)
             .await
-            .map_err(|_| {
-                Error::NotFound(format!("Youtube Music album from {}", url))
-            })?;
+            .map_err(|_| Error::NotFound(format!("Youtube Music album from {}", url)))?;
 
         let tracks = join_all(
             album

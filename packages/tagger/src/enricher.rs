@@ -1,7 +1,7 @@
 use config::Config;
 use shared::{models::Track, utils::enums::Match};
 
-use crate::{TagProvider, providers};
+use crate::{providers, TagProvider};
 
 /// A scored candidate returned by metadata providers.
 #[derive(Debug, Clone)]
@@ -51,11 +51,18 @@ fn build_providers() -> Vec<MetadataProvider> {
         .metadata_providers
         .iter()
         .filter_map(|name| match name.as_str() {
-            "musicbrainz" => Some(MetadataProvider::MusicBrainz(providers::musicbrainz::MusicBrainz::new())),
+            "musicbrainz" => Some(MetadataProvider::MusicBrainz(
+                providers::musicbrainz::MusicBrainz::new(),
+            )),
             "spotify" => providers::spotify::Spotify::new().map(MetadataProvider::Spotify),
-            "bandcamp" => Some(MetadataProvider::Bandcamp(providers::bandcamp::Bandcamp::new())),
+            "bandcamp" => Some(MetadataProvider::Bandcamp(
+                providers::bandcamp::Bandcamp::new(),
+            )),
             other => {
-                tracing::warn!("Unknown tagger metadata provider in config: {:?}, skipping", other);
+                tracing::warn!(
+                    "Unknown tagger metadata provider in config: {:?}, skipping",
+                    other
+                );
                 None
             }
         })
@@ -119,12 +126,20 @@ pub async fn get_candidates_for_track(track: &Track) -> Vec<MatchCandidate> {
         for candidate in results {
             let score = track.compare(&candidate);
             if score > 0.0 {
-                candidates.push(MatchCandidate { track: candidate, score, provider: provider_name.to_string() });
+                candidates.push(MatchCandidate {
+                    track: candidate,
+                    score,
+                    provider: provider_name.to_string(),
+                });
             }
         }
     }
 
     // Sort by score descending
-    candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    candidates.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     candidates
 }

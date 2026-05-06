@@ -26,7 +26,6 @@ fn get_docs() -> SwaggerUIConfig {
 #[dotenvy::load(path = "./.env", required = false)]
 #[launch]
 fn rocket() -> _ {
-
     init_globals().unwrap_or_else(|err| {
         eprintln!("Failed to initialize globals: {}", err);
         std::process::exit(1);
@@ -41,7 +40,8 @@ fn rocket() -> _ {
     let artist_repo = Arc::new(repositories::artist::DieselArtistRepository::new());
     let playlist_repo = Arc::new(repositories::playlist::DieselPlaylistRepository::new());
     let task_repo = Arc::new(repositories::task::DieselTaskRepository::new());
-    let sync_schedule_repo = Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
+    let sync_schedule_repo =
+        Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),
@@ -62,7 +62,10 @@ fn rocket() -> _ {
         let conn = &mut database::init_connection(&db_url);
         match services.task_service.get_stale_running(conn) {
             Ok(stale_tasks) if !stale_tasks.is_empty() => {
-                tracing::warn!("Found {} stale Running task(s) from previous run, re-launching", stale_tasks.len());
+                tracing::warn!(
+                    "Found {} stale Running task(s) from previous run, re-launching",
+                    stale_tasks.len()
+                );
                 for task in stale_tasks {
                     let task_id = match task.id {
                         Some(id) => id,
@@ -74,7 +77,10 @@ fn rocket() -> _ {
                         .and_then(|v| v.get("url")?.as_str().map(String::from));
                     let Some(url) = url else {
                         tracing::warn!("Task {} has no url in payload, marking as failed", task_id);
-                        let _ = services.task_service.set_failed(conn, task_id, "no url in payload");
+                        let _ =
+                            services
+                                .task_service
+                                .set_failed(conn, task_id, "no url in payload");
                         continue;
                     };
 
@@ -126,50 +132,66 @@ fn rocket() -> _ {
         let db_url = Config::get().database.url.clone();
         let services_for_scheduler = services.clone();
         let registry_for_scheduler = cancellation_registry.clone();
-        std::thread::spawn(move || {
-            loop {
-                std::thread::sleep(std::time::Duration::from_secs(60));
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(60));
 
-                let conn = &mut database::init_connection(&db_url);
-                let due = match services_for_scheduler.sync_schedule_service.get_due(conn) {
-                    Ok(v) => v,
+            let conn = &mut database::init_connection(&db_url);
+            let due = match services_for_scheduler.sync_schedule_service.get_due(conn) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::error!("Scheduler: failed to query due schedules: {}", e);
+                    continue;
+                }
+            };
+            for schedule in due {
+                let schedule_id = match schedule.id {
+                    Some(id) => id,
+                    None => continue,
+                };
+                let url = schedule.playlist_url.clone();
+                let label = schedule.label.clone();
+                if let Err(e) = services_for_scheduler
+                    .sync_schedule_service
+                    .mark_ran(conn, schedule_id)
+                {
+                    tracing::error!(
+                        "Scheduler: failed to mark schedule {} as ran: {}",
+                        schedule_id,
+                        e
+                    );
+                    continue;
+                }
+                let task = match services_for_scheduler
+                    .task_service
+                    .create_playlist_sync(conn, &url, label)
+                {
+                    Ok(t) => t,
                     Err(e) => {
-                        tracing::error!("Scheduler: failed to query due schedules: {}", e);
+                        tracing::error!(
+                            "Scheduler: failed to create task for schedule {}: {}",
+                            schedule_id,
+                            e
+                        );
                         continue;
                     }
                 };
-                for schedule in due {
-                    let schedule_id = match schedule.id {
-                        Some(id) => id,
-                        None => continue,
-                    };
-                    let url = schedule.playlist_url.clone();
-                    let label = schedule.label.clone();
-                    if let Err(e) = services_for_scheduler.sync_schedule_service.mark_ran(conn, schedule_id) {
-                        tracing::error!("Scheduler: failed to mark schedule {} as ran: {}", schedule_id, e);
-                        continue;
-                    }
-                    let task = match services_for_scheduler.task_service.create_playlist_sync(conn, &url, label) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            tracing::error!("Scheduler: failed to create task for schedule {}: {}", schedule_id, e);
-                            continue;
-                        }
-                    };
-                    let task_id = match task.id {
-                        Some(id) => id,
-                        None => continue,
-                    };
-                    let cancel_flag = registry_for_scheduler.register(task_id);
-                    tracing::info!("Scheduler: triggering sync for schedule {} (url={})", schedule_id, url);
-                    soundome_server::routes::download::spawn_playlist_sync_task(
-                        services_for_scheduler.clone(),
-                        task_id,
-                        url,
-                        cancel_flag,
-                        registry_for_scheduler.clone(),
-                    );
-                }
+                let task_id = match task.id {
+                    Some(id) => id,
+                    None => continue,
+                };
+                let cancel_flag = registry_for_scheduler.register(task_id);
+                tracing::info!(
+                    "Scheduler: triggering sync for schedule {} (url={})",
+                    schedule_id,
+                    url
+                );
+                soundome_server::routes::download::spawn_playlist_sync_task(
+                    services_for_scheduler.clone(),
+                    task_id,
+                    url,
+                    cancel_flag,
+                    registry_for_scheduler.clone(),
+                );
             }
         });
     }
@@ -234,11 +256,14 @@ fn rocket() -> _ {
             ],
         )
         // .mount("/api", routes![routes::audio::stream,])
-        .mount("/api", routes![
-            routes::images::upload_artist_image,
-            routes::images::upload_album_image,
-            routes::images::upload_track_image,
-        ])
+        .mount(
+            "/api",
+            routes![
+                routes::images::upload_artist_image,
+                routes::images::upload_album_image,
+                routes::images::upload_track_image,
+            ],
+        )
         .mount("/", routes![routes::metrics::metrics])
         .mount("/swagger", make_swagger_ui(&get_docs()))
         .mount("/", FileServer::from("data/web"))

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain::services::ServiceLayer;
-use rocket::{get, post, http::Status, serde::json::Json};
+use rocket::{get, http::Status, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -146,13 +146,31 @@ pub async fn retry(
     let cancel_flag = registry.register(task_id);
     match task.task_type {
         TaskType::SyncPlaylist => {
-            super::download::spawn_playlist_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
+            super::download::spawn_playlist_sync_task(
+                services_for_spawn,
+                task_id,
+                url,
+                cancel_flag,
+                registry,
+            );
         }
         TaskType::SyncArtist => {
-            super::download::spawn_artist_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
+            super::download::spawn_artist_sync_task(
+                services_for_spawn,
+                task_id,
+                url,
+                cancel_flag,
+                registry,
+            );
         }
         TaskType::SyncAlbum => {
-            super::download::spawn_album_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
+            super::download::spawn_album_sync_task(
+                services_for_spawn,
+                task_id,
+                url,
+                cancel_flag,
+                registry,
+            );
         }
         _ => {
             return Err(crate::utils::error::Error::Custom(CustomError {
@@ -209,7 +227,10 @@ pub async fn cancel(
         return Err(crate::utils::error::Error::Custom(CustomError {
             status: Status::BadRequest,
             code: "InvalidState".to_string(),
-            message: format!("Task {} is in status {:?} and cannot be cancelled", id, task.status),
+            message: format!(
+                "Task {} is in status {:?} and cannot be cancelled",
+                id, task.status
+            ),
         }));
     }
 

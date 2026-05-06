@@ -2,13 +2,21 @@
 
 use domain::ports::repositories::AlbumRepository;
 
-use diesel::{ExpressionMethods, JoinOnDsl, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
-use shared::{models::{Album, Reference}, types::SoundomeResult};
+use diesel::{
+    ExpressionMethods, JoinOnDsl, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection,
+};
+use shared::{
+    models::{Album, Reference},
+    types::SoundomeResult,
+};
 
 use crate::{
-    delete_with_relations, entities::{
-        AlbumEntity, AlbumRefEntity, ArtistEntity, NewAlbumEntity, NewAlbumRefEntity, UpdateAlbumEntity
-    }, schema
+    delete_with_relations,
+    entities::{
+        AlbumEntity, AlbumRefEntity, ArtistEntity, NewAlbumEntity, NewAlbumRefEntity,
+        UpdateAlbumEntity,
+    },
+    schema,
 };
 
 use crate::diesel::Connection;
@@ -22,7 +30,6 @@ impl DieselAlbumRepository {
 }
 
 impl AlbumRepository for DieselAlbumRepository {
-
     // =================================================================================
     // Custom
     // =================================================================================
@@ -32,16 +39,18 @@ impl AlbumRepository for DieselAlbumRepository {
             .filter(schema::album_ref::external_url.eq(url))
             .first::<AlbumRefEntity>(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by url: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by url: {}", err))
             })?;
 
         self.get_by_id(conn, album_ref.album_id)
     }
 
-    fn create_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[Reference]) -> SoundomeResult<()> {
+    fn create_references(
+        &self,
+        conn: &mut SqliteConnection,
+        album_id: i32,
+        references: &[Reference],
+    ) -> SoundomeResult<()> {
         for reference in references {
             let new_album_ref = NewAlbumRefEntity::convert_from_domain(reference, album_id);
 
@@ -58,7 +67,12 @@ impl AlbumRepository for DieselAlbumRepository {
         Ok(())
     }
 
-    fn set_references(&self, conn: &mut SqliteConnection, album_id: i32, references: &[Reference]) -> SoundomeResult<()> {
+    fn set_references(
+        &self,
+        conn: &mut SqliteConnection,
+        album_id: i32,
+        references: &[Reference],
+    ) -> SoundomeResult<()> {
         // Merge semantics: keep existing rows (and their ids), only insert missing refs.
         if references.is_empty() {
             return Ok(());
@@ -67,7 +81,9 @@ impl AlbumRepository for DieselAlbumRepository {
         let existing: Vec<AlbumRefEntity> = schema::album_ref::table
             .filter(schema::album_ref::album_id.eq(album_id))
             .load(conn)
-            .map_err(|err| shared::errors::Error::Database(format!("Failed to load album references: {}", err)))?;
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to load album references: {}", err))
+            })?;
 
         for reference in references {
             if reference.external_id.is_none() && reference.external_url.is_none() {
@@ -101,7 +117,11 @@ impl AlbumRepository for DieselAlbumRepository {
         Ok(())
     }
 
-    fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Album> {
+    fn create_or_ignore(
+        &self,
+        conn: &mut SqliteConnection,
+        album: &Album,
+    ) -> SoundomeResult<Album> {
         // If album already has an ID, return it as-is
         if let Some(id) = album.id {
             return self.get_by_id(conn, id);
@@ -111,16 +131,21 @@ impl AlbumRepository for DieselAlbumRepository {
             .filter(schema::album::title.eq(&album.title))
             .first(conn)
             .optional()
-            .map_err(|err| shared::errors::Error::Database(format!("Failed to look up album: {}", err)))?;
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to look up album: {}", err))
+            })?;
         if let Some(entity) = exact {
             return self.get_by_id(conn, entity.id);
         }
         // Case-insensitive fallback (Unicode-safe: compare lowercased in Rust)
         let title_lower = album.title.to_lowercase();
-        let all: Vec<AlbumEntity> = schema::album::table
-            .load(conn)
-            .map_err(|err| shared::errors::Error::Database(format!("Failed to load albums for dedup: {}", err)))?;
-        if let Some(entity) = all.into_iter().find(|e| e.title.to_lowercase() == title_lower) {
+        let all: Vec<AlbumEntity> = schema::album::table.load(conn).map_err(|err| {
+            shared::errors::Error::Database(format!("Failed to load albums for dedup: {}", err))
+        })?;
+        if let Some(entity) = all
+            .into_iter()
+            .find(|e| e.title.to_lowercase() == title_lower)
+        {
             return self.get_by_id(conn, entity.id);
         }
         // Not found: create the album and its references
@@ -166,27 +191,22 @@ impl AlbumRepository for DieselAlbumRepository {
     // =================================================================================
 
     fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Album>> {
-        let albums: Vec<AlbumEntity> = schema::album::table
-            .load(conn)
-            .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get all albums: {}",
-                    err
-                ))
-            })?;
+        let albums: Vec<AlbumEntity> = schema::album::table.load(conn).map_err(|err| {
+            shared::errors::Error::Database(format!("Failed to get all albums: {}", err))
+        })?;
 
         let mut result = Vec::new();
         for album in albums {
             let artists: Vec<ArtistEntity> = schema::artist_albums::table
-                .inner_join(schema::artist::table.on(schema::artist_albums::artist_id.eq(schema::artist::id)))
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_albums::artist_id.eq(schema::artist::id)),
+                )
                 .filter(schema::artist_albums::album_id.eq(album.id))
                 .select(schema::artist::all_columns)
                 .load(conn)
                 .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to get album artists: {}",
-                        err
-                    ))
+                    shared::errors::Error::Database(format!("Failed to get album artists: {}", err))
                 })?;
 
             let references: Vec<AlbumRefEntity> = schema::album_ref::table
@@ -210,47 +230,31 @@ impl AlbumRepository for DieselAlbumRepository {
             .filter(schema::album::id.eq(id))
             .first(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by id: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by id: {}", err))
             })?;
 
         let artists: Vec<ArtistEntity> = schema::artist_albums::table
-            .inner_join(schema::artist::table.on(schema::artist_albums::artist_id.eq(schema::artist::id)))
+            .inner_join(
+                schema::artist::table.on(schema::artist_albums::artist_id.eq(schema::artist::id)),
+            )
             .filter(schema::artist_albums::album_id.eq(album.id))
             .select(schema::artist::all_columns)
             .load(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by id: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by id: {}", err))
             })?;
 
         let references: Vec<AlbumRefEntity> = schema::album_ref::table
             .filter(schema::album_ref::album_id.eq(album.id))
             .load(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by id: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by id: {}", err))
             })?;
 
-        Ok(AlbumEntity::convert_to_domain(
-            album,
-            artists,
-            references,
-        ))
+        Ok(AlbumEntity::convert_to_domain(album, artists, references))
     }
 
-    fn create(
-        &self,
-        conn: &mut SqliteConnection,
-        new_album: &Album,
-    ) -> SoundomeResult<Album> {
-
+    fn create(&self, conn: &mut SqliteConnection, new_album: &Album) -> SoundomeResult<Album> {
         let new_album_entity = NewAlbumEntity::convert_from_domain(new_album);
         let inserted_album = diesel::insert_into(schema::album::table)
             .values(&new_album_entity)
@@ -261,10 +265,7 @@ impl AlbumRepository for DieselAlbumRepository {
                     .first::<AlbumEntity>(conn)
             })
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to create resource: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to create resource: {}", err))
             })?;
 
         Ok(AlbumEntity::convert_to_domain(
@@ -286,34 +287,43 @@ impl AlbumRepository for DieselAlbumRepository {
             .set(&updated_album_entity)
             .execute(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to update resource: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to update resource: {}", err))
             })?;
 
         self.get_by_id(conn, id)
     }
 
     fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
-
         delete_with_relations!(
             conn,
             id,
             [
-                (schema::album_ref::table, schema::album_ref::album_id, "Failed to delete album references"),
-                (schema::artist_albums::table, schema::artist_albums::album_id, "Failed to delete artist-album relations"),
-                (schema::album::table, schema::album::id, "Failed to delete resource"),
+                (
+                    schema::album_ref::table,
+                    schema::album_ref::album_id,
+                    "Failed to delete album references"
+                ),
+                (
+                    schema::artist_albums::table,
+                    schema::artist_albums::album_id,
+                    "Failed to delete artist-album relations"
+                ),
+                (
+                    schema::album::table,
+                    schema::album::id,
+                    "Failed to delete resource"
+                ),
             ]
         )?;
         Ok(())
-
     }
 
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
         schema::album::table
             .count()
             .get_result(conn)
-            .map_err(|err| shared::errors::Error::Database(format!("Failed to count albums: {}", err)))
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to count albums: {}", err))
+            })
     }
 }

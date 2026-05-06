@@ -44,7 +44,10 @@ impl TaskRepository for DieselTaskRepository {
             .order(schema::task::id.desc())
             .load::<TaskEntity>(conn)
             .map_err(map_error)?;
-        Ok(entities.into_iter().map(TaskEntity::convert_to_domain).collect())
+        Ok(entities
+            .into_iter()
+            .map(TaskEntity::convert_to_domain)
+            .collect())
     }
 
     fn set_running(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
@@ -58,7 +61,13 @@ impl TaskRepository for DieselTaskRepository {
         Ok(())
     }
 
-    fn update_progress(&self, conn: &mut SqliteConnection, id: i32, progress: i32, total: i32) -> SoundomeResult<()> {
+    fn update_progress(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        progress: i32,
+        total: i32,
+    ) -> SoundomeResult<()> {
         diesel::update(schema::task::table.filter(schema::task::id.eq(id)))
             .set((
                 schema::task::progress.eq(progress),
@@ -111,13 +120,20 @@ impl TaskRepository for DieselTaskRepository {
         Ok(())
     }
 
-    fn get_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<Vec<Task>> {
+    fn get_by_status(
+        &self,
+        conn: &mut SqliteConnection,
+        status: &str,
+    ) -> SoundomeResult<Vec<Task>> {
         let entities = schema::task::table
             .filter(schema::task::status.eq(status))
             .order(schema::task::id.asc())
             .load::<TaskEntity>(conn)
             .map_err(map_error)?;
-        Ok(entities.into_iter().map(TaskEntity::convert_to_domain).collect())
+        Ok(entities
+            .into_iter()
+            .map(TaskEntity::convert_to_domain)
+            .collect())
     }
 
     fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {

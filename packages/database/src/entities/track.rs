@@ -2,9 +2,24 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket_okapi::JsonSchema;
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 
-use crate::{entities::AlbumEntity, schema::{track, track_ref}};
+use crate::{
+    entities::AlbumEntity,
+    schema::{track, track_ref},
+};
 
-#[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(
+    Debug,
+    Clone,
+    Associations,
+    Queryable,
+    Identifiable,
+    Insertable,
+    Serialize,
+    Ord,
+    Eq,
+    PartialEq,
+    PartialOrd,
+)]
 #[diesel(table_name = track)]
 #[diesel(belongs_to(AlbumEntity, foreign_key = album_id))]
 pub struct TrackEntity {
@@ -64,7 +79,19 @@ pub struct UpdateTrackEntity {
 // Track Source
 // ================================================================================================
 
-#[derive(Debug, Clone, Associations, Queryable, Identifiable, Insertable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(
+    Debug,
+    Clone,
+    Associations,
+    Queryable,
+    Identifiable,
+    Insertable,
+    Serialize,
+    Ord,
+    Eq,
+    PartialEq,
+    PartialOrd,
+)]
 #[diesel(table_name = track_ref)]
 #[diesel(belongs_to(TrackEntity, foreign_key = track_id))]
 pub struct TrackRefEntity {

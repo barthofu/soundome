@@ -6,7 +6,9 @@ use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{cancellation::CancellationRegistry, database::Db, error::CustomError, response::Success};
+use crate::utils::{
+    cancellation::CancellationRegistry, database::Db, error::CustomError, response::Success,
+};
 
 // ================================================================================================
 // DTOs
@@ -69,12 +71,19 @@ pub async fn get_all(
     let schedules = db
         .run(move |conn| services.sync_schedule_service.get_all(conn))
         .await
-        .map_err(|e| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: e.to_string(),
-        }))?;
-    Ok(Json(schedules.into_iter().filter_map(SyncScheduleDto::from_model).collect()))
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: e.to_string(),
+            })
+        })?;
+    Ok(Json(
+        schedules
+            .into_iter()
+            .filter_map(SyncScheduleDto::from_model)
+            .collect(),
+    ))
 }
 
 /// Get a sync schedule by id.
@@ -89,18 +98,22 @@ pub async fn get_by_id(
     let schedule = db
         .run(move |conn| services.sync_schedule_service.get_by_id(conn, id))
         .await
-        .map_err(|e| crate::utils::error::Error::Custom(CustomError {
-            status: Status::NotFound,
-            code: "NOT_FOUND".to_string(),
-            message: e.to_string(),
-        }))?;
-    SyncScheduleDto::from_model(schedule).map(Json).ok_or_else(|| {
-        crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: "Failed to map schedule".to_string(),
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::NotFound,
+                code: "NOT_FOUND".to_string(),
+                message: e.to_string(),
+            })
+        })?;
+    SyncScheduleDto::from_model(schedule)
+        .map(Json)
+        .ok_or_else(|| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: "Failed to map schedule".to_string(),
+            })
         })
-    })
 }
 
 /// Create a new sync schedule.
@@ -116,21 +129,27 @@ pub async fn create(
     let interval = body.interval_seconds.unwrap_or(3600);
     let schedule = db
         .run(move |conn| {
-            services.sync_schedule_service.create(conn, body.playlist_url, body.label, interval)
+            services
+                .sync_schedule_service
+                .create(conn, body.playlist_url, body.label, interval)
         })
         .await
-        .map_err(|e| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: e.to_string(),
-        }))?;
-    SyncScheduleDto::from_model(schedule).map(Json).ok_or_else(|| {
-        crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: "Failed to map schedule".to_string(),
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: e.to_string(),
+            })
+        })?;
+    SyncScheduleDto::from_model(schedule)
+        .map(Json)
+        .ok_or_else(|| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: "Failed to map schedule".to_string(),
+            })
         })
-    })
 }
 
 /// Update a sync schedule (label, interval, or enabled flag).
@@ -160,18 +179,22 @@ pub async fn update(
             services.sync_schedule_service.update(conn, id, &existing)
         })
         .await
-        .map_err(|e| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: e.to_string(),
-        }))?;
-    SyncScheduleDto::from_model(schedule).map(Json).ok_or_else(|| {
-        crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: "Failed to map schedule".to_string(),
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: e.to_string(),
+            })
+        })?;
+    SyncScheduleDto::from_model(schedule)
+        .map(Json)
+        .ok_or_else(|| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: "Failed to map schedule".to_string(),
+            })
         })
-    })
 }
 
 /// Delete a sync schedule.
@@ -185,11 +208,13 @@ pub async fn delete(
     let services = Arc::clone(services);
     db.run(move |conn| services.sync_schedule_service.delete(conn, id))
         .await
-        .map_err(|e| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: e.to_string(),
-        }))?;
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: e.to_string(),
+            })
+        })?;
     Ok(Json(Success { success: true }))
 }
 
@@ -215,30 +240,42 @@ pub async fn trigger(
             Ok::<_, shared::errors::Error>(s)
         })
         .await
-        .map_err(|e| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: e.to_string(),
-        }))?;
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: e.to_string(),
+            })
+        })?;
 
     let url = schedule.playlist_url.clone();
     let label = schedule.label.clone();
 
     let task = db
         .run(move |conn| {
-            services_for_task.task_service.create_playlist_sync(conn, &url, label)
+            services_for_task
+                .task_service
+                .create_playlist_sync(conn, &url, label)
         })
         .await
-        .map_err(|e| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "INTERNAL".to_string(),
-            message: e.to_string(),
-        }))?;
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "INTERNAL".to_string(),
+                message: e.to_string(),
+            })
+        })?;
 
     let task_id = task.id.unwrap();
     let url = schedule.playlist_url.clone();
     let cancel_flag = registry.register(task_id);
-    crate::routes::download::spawn_playlist_sync_task(services_for_spawn, task_id, url, cancel_flag, registry);
+    crate::routes::download::spawn_playlist_sync_task(
+        services_for_spawn,
+        task_id,
+        url,
+        cancel_flag,
+        registry,
+    );
 
     Ok(Json(serde_json::json!({ "task_id": task_id })))
 }

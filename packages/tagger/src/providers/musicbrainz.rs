@@ -20,7 +20,6 @@ impl MusicBrainz {
     const PARTIAL_MATCH_THRESHOLD: f64 = 0.5;
 
     pub fn new() -> Self {
-
         // TODO: will be possible when musicbrainz_rs v0.12.0 is fixed (currently broken when building as dependency in this project)
         // let client = match Config::get().proxy.as_ref() {
         //     Some(proxy_config) if proxy_config.enabled => {
@@ -149,15 +148,13 @@ fn convert_to_artist(artist: &ArtistCredit) -> Artist {
         id: None,
         name: artist.artist.name.clone(),
         icon: None,
-        references: vec![
-            Reference {
-                id: None,
-                ref_type: ReferenceType::Metadata,
-                platform: Platform::MusicBrainz,
-                external_id: Some(artist.artist.id.clone()),
-                external_url: Some("https://musicbrainz.org/artist/".to_string() + &artist.artist.id),
-            }
-        ],
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Metadata,
+            platform: Platform::MusicBrainz,
+            external_id: Some(artist.artist.id.clone()),
+            external_url: Some("https://musicbrainz.org/artist/".to_string() + &artist.artist.id),
+        }],
     }
 }
 
@@ -177,15 +174,13 @@ fn convert_to_album(release: &Release) -> Album {
         album_type: AlbumType::Unknown,
         // cover: release.get_coverart().res_1200().execute().await.unwrap().
         cover: None,
-        references: vec![
-            Reference {
-                id: None,
-                ref_type: ReferenceType::Metadata,
-                platform: Platform::MusicBrainz,
-                external_id: Some(release.id.clone()),
-                external_url: Some("https://musicbrainz.org/release/".to_string() + &release.id),
-            }
-        ],
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Metadata,
+            platform: Platform::MusicBrainz,
+            external_id: Some(release.id.clone()),
+            external_url: Some("https://musicbrainz.org/release/".to_string() + &release.id),
+        }],
     }
 }
 
@@ -225,14 +220,12 @@ fn convert_to_track(recording: &Recording) -> Track {
         duration: recording.length.map(|length| length as i32 / 1000),
         label: None,
         file_path: None,
-        references: vec![
-            Reference {
-                id: None,
-                ref_type: ReferenceType::Metadata,
-                platform: Platform::MusicBrainz,
-                external_id: Some(recording.id.clone()),
-                external_url: Some("https://musicbrainz.org/recording/".to_string() + &recording.id),
-            }
-        ],
+        references: vec![Reference {
+            id: None,
+            ref_type: ReferenceType::Metadata,
+            platform: Platform::MusicBrainz,
+            external_id: Some(recording.id.clone()),
+            external_url: Some("https://musicbrainz.org/recording/".to_string() + &recording.id),
+        }],
     }
 }

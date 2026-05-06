@@ -2,23 +2,29 @@ use domain::ports::repositories::TrackRepository;
 
 use diesel::prelude::*;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use shared::{models::{Reference, Track}, types::SoundomeResult};
+use shared::{
+    models::{Reference, Track},
+    types::SoundomeResult,
+};
 
 use crate::{
-    delete_with_relations, entities::{AlbumEntity, ArtistEntity, NewTrackEntity, NewTrackRefEntity, TrackEntity, TrackRefEntity, UpdateTrackEntity}, schema
+    delete_with_relations,
+    entities::{
+        AlbumEntity, ArtistEntity, NewTrackEntity, NewTrackRefEntity, TrackEntity, TrackRefEntity,
+        UpdateTrackEntity,
+    },
+    schema,
 };
 
 pub struct DieselTrackRepository {}
 
 impl DieselTrackRepository {
     pub fn new() -> Self {
-        Self { }
+        Self {}
     }
 }
 
 impl TrackRepository for DieselTrackRepository {
-
-
     // =================================================================================
     // Custom
     // =================================================================================
@@ -29,10 +35,7 @@ impl TrackRepository for DieselTrackRepository {
             .limit(limit)
             .load(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get recent tracks: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get recent tracks: {}", err))
             })?;
 
         let mut result = Vec::new();
@@ -47,28 +50,27 @@ impl TrackRepository for DieselTrackRepository {
             };
 
             let artists: Vec<ArtistEntity> = schema::artist_tracks::table
-                .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                )
                 .filter(schema::artist_tracks::track_id.eq(track.id))
                 .select(schema::artist::all_columns)
                 .load(conn)
                 .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to get recent tracks: {}",
-                        err
-                    ))
+                    shared::errors::Error::Database(format!("Failed to get recent tracks: {}", err))
                 })?;
 
             let references: Vec<TrackRefEntity> = schema::track_ref::table
                 .filter(schema::track_ref::track_id.eq(track.id))
                 .load(conn)
                 .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to get recent tracks: {}",
-                        err
-                    ))
+                    shared::errors::Error::Database(format!("Failed to get recent tracks: {}", err))
                 })?;
 
-            result.push(TrackEntity::convert_to_domain(track, album, artists, references));
+            result.push(TrackEntity::convert_to_domain(
+                track, album, artists, references,
+            ));
         }
 
         Ok(result)
@@ -97,7 +99,10 @@ impl TrackRepository for DieselTrackRepository {
             };
 
             let artists: Vec<ArtistEntity> = schema::artist_tracks::table
-                .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                )
                 .filter(schema::artist_tracks::track_id.eq(track.id))
                 .select(schema::artist::all_columns)
                 .load(conn)
@@ -118,7 +123,9 @@ impl TrackRepository for DieselTrackRepository {
                     ))
                 })?;
 
-            result.push(TrackEntity::convert_to_domain(track, album, artists, references));
+            result.push(TrackEntity::convert_to_domain(
+                track, album, artists, references,
+            ));
         }
 
         Ok(result)
@@ -129,16 +136,18 @@ impl TrackRepository for DieselTrackRepository {
             .filter(schema::track_ref::external_url.eq(url))
             .first::<TrackRefEntity>(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by url: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by url: {}", err))
             })?;
 
         self.get_by_id(conn, track_ref.track_id)
     }
 
-    fn create_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[Reference]) -> SoundomeResult<()> {
+    fn create_references(
+        &self,
+        conn: &mut SqliteConnection,
+        track_id: i32,
+        references: &[Reference],
+    ) -> SoundomeResult<()> {
         for reference in references {
             let new_track_ref = NewTrackRefEntity::convert_from_domain(reference, track_id);
 
@@ -155,7 +164,12 @@ impl TrackRepository for DieselTrackRepository {
         Ok(())
     }
 
-    fn set_references(&self, conn: &mut SqliteConnection, track_id: i32, references: &[Reference]) -> SoundomeResult<()> {
+    fn set_references(
+        &self,
+        conn: &mut SqliteConnection,
+        track_id: i32,
+        references: &[Reference],
+    ) -> SoundomeResult<()> {
         // Semantics:
         // - Source/Provider: replace (ensure single row): delete existing of that type then insert.
         // - Metadata/Reference: merge (insert missing only), preserving existing ids.
@@ -201,7 +215,9 @@ impl TrackRepository for DieselTrackRepository {
         let existing: Vec<TrackRefEntity> = schema::track_ref::table
             .filter(schema::track_ref::track_id.eq(track_id))
             .load(conn)
-            .map_err(|err| shared::errors::Error::Database(format!("Failed to load track references: {}", err)))?;
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to load track references: {}", err))
+            })?;
 
         for reference in references {
             let ref_type = reference.ref_type.as_ref().to_string().to_lowercase();
@@ -277,55 +293,42 @@ impl TrackRepository for DieselTrackRepository {
 
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Track> {
         let (track, album): (TrackEntity, Option<AlbumEntity>) = schema::track::table
-            .left_join(schema::album::table.on(schema::album::id.nullable().eq(schema::track::album_id)))
+            .left_join(
+                schema::album::table.on(schema::album::id.nullable().eq(schema::track::album_id)),
+            )
             .filter(schema::track::id.eq(id))
             .first(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by id: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by id: {}", err))
             })?;
 
         let artists: Vec<ArtistEntity> = schema::artist_tracks::table
-            .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+            .inner_join(
+                schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+            )
             .filter(schema::artist_tracks::track_id.eq(track.id))
             .select(schema::artist::all_columns)
             .load(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by id: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by id: {}", err))
             })?;
 
         let references: Vec<TrackRefEntity> = schema::track_ref::table
             .filter(schema::track_ref::track_id.eq(track.id))
             .load(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get resource by id: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get resource by id: {}", err))
             })?;
 
         Ok(TrackEntity::convert_to_domain(
-            track,
-            album,
-            artists,
-            references,
+            track, album, artists, references,
         ))
     }
 
     fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
-        let tracks: Vec<TrackEntity> = schema::track::table
-            .load(conn)
-            .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get all resources: {}",
-                    err
-                ))
-            })?;
+        let tracks: Vec<TrackEntity> = schema::track::table.load(conn).map_err(|err| {
+            shared::errors::Error::Database(format!("Failed to get all resources: {}", err))
+        })?;
 
         let mut result = Vec::new();
         for track in tracks {
@@ -339,32 +342,26 @@ impl TrackRepository for DieselTrackRepository {
             };
 
             let artists: Vec<ArtistEntity> = schema::artist_tracks::table
-                .inner_join(schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)))
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                )
                 .filter(schema::artist_tracks::track_id.eq(track.id))
                 .select(schema::artist::all_columns)
                 .load(conn)
                 .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to get all resources: {}",
-                        err
-                    ))
+                    shared::errors::Error::Database(format!("Failed to get all resources: {}", err))
                 })?;
 
             let references: Vec<TrackRefEntity> = schema::track_ref::table
                 .filter(schema::track_ref::track_id.eq(track.id))
                 .load(conn)
                 .map_err(|err| {
-                    shared::errors::Error::Database(format!(
-                        "Failed to get all resources: {}",
-                        err
-                    ))
+                    shared::errors::Error::Database(format!("Failed to get all resources: {}", err))
                 })?;
 
             result.push(TrackEntity::convert_to_domain(
-                track,
-                album,
-                artists,
-                references,
+                track, album, artists, references,
             ));
         }
 
@@ -382,10 +379,7 @@ impl TrackRepository for DieselTrackRepository {
                     .first::<TrackEntity>(conn)
             })
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to create resource: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to create resource: {}", err))
             })?;
 
         Ok(TrackEntity::convert_to_domain(
@@ -396,7 +390,12 @@ impl TrackRepository for DieselTrackRepository {
         ))
     }
 
-    fn update(&self, conn: &mut SqliteConnection, id: i32, updated_track: &Track) -> SoundomeResult<Track> {
+    fn update(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        updated_track: &Track,
+    ) -> SoundomeResult<Track> {
         let updated_track_entity = UpdateTrackEntity::convert_from_domain(updated_track);
         let updated_track = diesel::update(schema::track::table.filter(schema::track::id.eq(id)))
             .set(&updated_track_entity)
@@ -407,10 +406,7 @@ impl TrackRepository for DieselTrackRepository {
                     .first::<TrackEntity>(conn)
             })
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to update resource: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to update resource: {}", err))
             })?;
 
         Ok(TrackEntity::convert_to_domain(
@@ -422,14 +418,25 @@ impl TrackRepository for DieselTrackRepository {
     }
 
     fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
-
         delete_with_relations!(
             conn,
             id,
             [
-                (schema::track_ref::table, schema::track_ref::track_id, "Failed to delete associated track references"),
-                (schema::artist_tracks::table, schema::artist_tracks::track_id, "Failed to delete associated artist-track relationships"),
-                (schema::track::table, schema::track::id, "Failed to delete resource"),
+                (
+                    schema::track_ref::table,
+                    schema::track_ref::track_id,
+                    "Failed to delete associated track references"
+                ),
+                (
+                    schema::artist_tracks::table,
+                    schema::artist_tracks::track_id,
+                    "Failed to delete associated artist-track relationships"
+                ),
+                (
+                    schema::track::table,
+                    schema::track::id,
+                    "Failed to delete resource"
+                ),
             ]
         )?;
         Ok(())
@@ -439,7 +446,9 @@ impl TrackRepository for DieselTrackRepository {
         schema::track::table
             .count()
             .get_result(conn)
-            .map_err(|err| shared::errors::Error::Database(format!("Failed to count tracks: {}", err)))
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to count tracks: {}", err))
+            })
     }
 
     fn count_pending_validations(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
@@ -447,7 +456,11 @@ impl TrackRepository for DieselTrackRepository {
             .filter(schema::track::needs_validation.eq(true))
             .count()
             .get_result(conn)
-            .map_err(|err| shared::errors::Error::Database(format!("Failed to count pending validations: {}", err)))
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to count pending validations: {}",
+                    err
+                ))
+            })
     }
 }
-

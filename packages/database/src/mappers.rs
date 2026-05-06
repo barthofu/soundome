@@ -2,15 +2,25 @@ use std::path::PathBuf;
 
 use shared::models::{Album, AlbumType, Platform};
 
-use crate::entities::{AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity, NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewSyncScheduleEntity, NewTaskEntity, NewTrackEntity, NewTrackRefEntity, PlaylistEntity, SyncScheduleEntity, TaskEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity};
+use crate::entities::{
+    AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity,
+    NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewSyncScheduleEntity, NewTaskEntity,
+    NewTrackEntity, NewTrackRefEntity, PlaylistEntity, SyncScheduleEntity, TaskEntity, TrackEntity,
+    TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity,
+    UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity,
+};
 
 // ================================================================================================
 // Track
 // ================================================================================================
 
 impl TrackEntity {
-
-    pub fn convert_to_domain(track_entity: TrackEntity, album: Option<AlbumEntity>, artists: Vec<ArtistEntity>, references: Vec<TrackRefEntity>) -> shared::models::Track {
+    pub fn convert_to_domain(
+        track_entity: TrackEntity,
+        album: Option<AlbumEntity>,
+        artists: Vec<ArtistEntity>,
+        references: Vec<TrackRefEntity>,
+    ) -> shared::models::Track {
         shared::models::Track {
             id: Some(track_entity.id),
             needs_validation: track_entity.needs_validation,
@@ -25,14 +35,19 @@ impl TrackEntity {
             cover: track_entity.cover,
             file_path: track_entity.file_path.map(PathBuf::from),
             album: album.map(|a| AlbumEntity::convert_to_domain(a, vec![], vec![])),
-            artists: artists.into_iter().map(|a| ArtistEntity::convert_to_domain(a, vec![])).collect(),
-            references: references.into_iter().map(TrackRefEntity::convert_to_domain).collect(),
+            artists: artists
+                .into_iter()
+                .map(|a| ArtistEntity::convert_to_domain(a, vec![]))
+                .collect(),
+            references: references
+                .into_iter()
+                .map(TrackRefEntity::convert_to_domain)
+                .collect(),
         }
     }
 }
 
 impl NewTrackEntity {
-
     pub fn convert_from_domain(track: &shared::models::Track) -> NewTrackEntity {
         NewTrackEntity {
             title: track.title.clone(),
@@ -44,7 +59,10 @@ impl NewTrackEntity {
             date: track.date.clone(),
             genre: track.genre.clone(),
             cover: track.cover.clone(),
-            file_path: track.file_path.clone().map(|p| p.to_string_lossy().to_string()),
+            file_path: track
+                .file_path
+                .clone()
+                .map(|p| p.to_string_lossy().to_string()),
             needs_validation: track.needs_validation,
             validation_reason: track.validation_reason.clone(),
         }
@@ -52,7 +70,6 @@ impl NewTrackEntity {
 }
 
 impl UpdateTrackEntity {
-
     pub fn convert_from_domain(track: &shared::models::Track) -> UpdateTrackEntity {
         UpdateTrackEntity {
             title: Some(track.title.clone()),
@@ -64,7 +81,10 @@ impl UpdateTrackEntity {
             date: track.date.clone(),
             genre: track.genre.clone(),
             cover: track.cover.clone(),
-            file_path: track.file_path.clone().map(|p| p.to_string_lossy().to_string()),
+            file_path: track
+                .file_path
+                .clone()
+                .map(|p| p.to_string_lossy().to_string()),
             needs_validation: Some(track.needs_validation),
             validation_reason: track.validation_reason.clone(),
         }
@@ -76,22 +96,30 @@ impl UpdateTrackEntity {
 // ================================================================================================
 
 impl AlbumEntity {
-
-    pub fn convert_to_domain(album_entity: AlbumEntity, artists: Vec<ArtistEntity>, references: Vec<AlbumRefEntity>) -> Album {
+    pub fn convert_to_domain(
+        album_entity: AlbumEntity,
+        artists: Vec<ArtistEntity>,
+        references: Vec<AlbumRefEntity>,
+    ) -> Album {
         Album {
             id: Some(album_entity.id),
             title: album_entity.title,
-            artists: artists.into_iter().map(|a| ArtistEntity::convert_to_domain(a, vec![])).collect(),
+            artists: artists
+                .into_iter()
+                .map(|a| ArtistEntity::convert_to_domain(a, vec![]))
+                .collect(),
             album_type: AlbumType::from_str(&album_entity.album_type),
             cover: album_entity.cover,
             date: album_entity.date,
-            references: references.into_iter().map(AlbumRefEntity::convert_to_domain).collect(),
+            references: references
+                .into_iter()
+                .map(AlbumRefEntity::convert_to_domain)
+                .collect(),
         }
     }
 }
 
 impl NewAlbumEntity {
-
     pub fn convert_from_domain(album: &shared::models::Album) -> NewAlbumEntity {
         NewAlbumEntity {
             title: album.title.clone(),
@@ -103,7 +131,6 @@ impl NewAlbumEntity {
 }
 
 impl UpdateAlbumEntity {
-
     pub fn convert_from_domain(album: &shared::models::Album) -> UpdateAlbumEntity {
         UpdateAlbumEntity {
             title: Some(album.title.clone()),
@@ -119,19 +146,23 @@ impl UpdateAlbumEntity {
 // ================================================================================================
 
 impl ArtistEntity {
-
-    pub fn convert_to_domain(artist_entity: ArtistEntity, references: Vec<ArtistRefEntity>) -> shared::models::Artist {
+    pub fn convert_to_domain(
+        artist_entity: ArtistEntity,
+        references: Vec<ArtistRefEntity>,
+    ) -> shared::models::Artist {
         shared::models::Artist {
             id: Some(artist_entity.id),
             name: artist_entity.name,
             icon: artist_entity.icon,
-            references: references.into_iter().map(ArtistRefEntity::convert_to_domain).collect(),
+            references: references
+                .into_iter()
+                .map(ArtistRefEntity::convert_to_domain)
+                .collect(),
         }
     }
 }
 
 impl NewArtistEntity {
-
     pub fn convert_from_domain(artist: &shared::models::Artist) -> NewArtistEntity {
         NewArtistEntity {
             name: artist.name.clone(),
@@ -141,7 +172,6 @@ impl NewArtistEntity {
 }
 
 impl UpdateArtistEntity {
-
     pub fn convert_from_domain(artist: &shared::models::Artist) -> UpdateArtistEntity {
         UpdateArtistEntity {
             name: Some(artist.name.clone()),
@@ -155,7 +185,6 @@ impl UpdateArtistEntity {
 // ================================================================================================
 
 impl TrackRefEntity {
-
     pub fn convert_to_domain(track_ref_entity: TrackRefEntity) -> shared::models::Reference {
         shared::models::Reference {
             id: Some(track_ref_entity.id),
@@ -168,8 +197,10 @@ impl TrackRefEntity {
 }
 
 impl NewTrackRefEntity {
-
-    pub fn convert_from_domain(track_ref: &shared::models::Reference, track_id: i32) -> NewTrackRefEntity {
+    pub fn convert_from_domain(
+        track_ref: &shared::models::Reference,
+        track_id: i32,
+    ) -> NewTrackRefEntity {
         NewTrackRefEntity {
             track_id,
             ref_type: track_ref.ref_type.as_ref().to_string().to_lowercase(),
@@ -181,7 +212,6 @@ impl NewTrackRefEntity {
 }
 
 impl UpdateTrackRefEntity {
-
     pub fn convert_from_domain(track_ref: &shared::models::Reference) -> UpdateTrackRefEntity {
         UpdateTrackRefEntity {
             track_id: track_ref.id,
@@ -194,7 +224,6 @@ impl UpdateTrackRefEntity {
 }
 
 impl AlbumRefEntity {
-
     pub fn convert_to_domain(album_ref_entity: AlbumRefEntity) -> shared::models::Reference {
         shared::models::Reference {
             id: Some(album_ref_entity.id),
@@ -207,8 +236,10 @@ impl AlbumRefEntity {
 }
 
 impl NewAlbumRefEntity {
-
-    pub fn convert_from_domain(album_ref: &shared::models::Reference, album_id: i32) -> NewAlbumRefEntity {
+    pub fn convert_from_domain(
+        album_ref: &shared::models::Reference,
+        album_id: i32,
+    ) -> NewAlbumRefEntity {
         NewAlbumRefEntity {
             album_id,
             ref_type: album_ref.ref_type.as_ref().to_string().to_lowercase(),
@@ -220,7 +251,6 @@ impl NewAlbumRefEntity {
 }
 
 impl UpdateAlbumRefEntity {
-
     pub fn convert_from_domain(album_ref: &shared::models::Reference) -> UpdateAlbumRefEntity {
         UpdateAlbumRefEntity {
             album_id: album_ref.id,
@@ -233,7 +263,6 @@ impl UpdateAlbumRefEntity {
 }
 
 impl ArtistRefEntity {
-
     pub fn convert_to_domain(artist_ref_entity: ArtistRefEntity) -> shared::models::Reference {
         shared::models::Reference {
             id: Some(artist_ref_entity.id),
@@ -246,8 +275,10 @@ impl ArtistRefEntity {
 }
 
 impl NewArtistRefEntity {
-
-    pub fn convert_from_domain(artist_ref: &shared::models::Reference, artist_id: i32) -> NewArtistRefEntity {
+    pub fn convert_from_domain(
+        artist_ref: &shared::models::Reference,
+        artist_id: i32,
+    ) -> NewArtistRefEntity {
         NewArtistRefEntity {
             artist_id,
             ref_type: artist_ref.ref_type.as_ref().to_string().to_lowercase(),
@@ -259,7 +290,6 @@ impl NewArtistRefEntity {
 }
 
 impl UpdateArtistRefEntity {
-
     pub fn convert_from_domain(artist_ref: &shared::models::Reference) -> UpdateArtistRefEntity {
         UpdateArtistRefEntity {
             artist_id: artist_ref.id,
@@ -277,7 +307,9 @@ impl UpdateArtistRefEntity {
 
 pub fn map_error(err: diesel::result::Error) -> shared::errors::Error {
     match err {
-        diesel::result::Error::NotFound => shared::errors::Error::NotFound("Database item".to_string()),
+        diesel::result::Error::NotFound => {
+            shared::errors::Error::NotFound("Database item".to_string())
+        }
         _ => shared::errors::Error::Database(format!("Database error: {}", err)),
     }
 }

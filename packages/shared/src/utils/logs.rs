@@ -1,5 +1,5 @@
 use config::Config;
-use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::{fmt, EnvFilter};
 
 /// Initialise the global tracing subscriber.
 ///
@@ -37,8 +37,7 @@ pub fn init_logger() {
 
     fmt()
         .with_env_filter(
-            EnvFilter::try_new(&filter)
-                .unwrap_or_else(|_| EnvFilter::new("warn,soundome=info"))
+            EnvFilter::try_new(&filter).unwrap_or_else(|_| EnvFilter::new("warn,soundome=info")),
         )
         .init();
 }

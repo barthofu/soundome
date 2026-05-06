@@ -27,13 +27,13 @@ pub async fn get_all(
     db.run(move |conn| services.artist_service.get_all(conn))
         .await
         .map(Json)
-        .map_err(|err|
+        .map_err(|err| {
             crate::utils::error::Error::Custom(CustomError {
                 status: Status::InternalServerError,
                 code: "Internal".to_string(),
                 message: err.to_string(),
             })
-        )
+        })
 }
 
 #[derive(Serialize, JsonSchema)]

@@ -23,7 +23,10 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
             .order(schema::sync_schedule::id.asc())
             .load::<SyncScheduleEntity>(conn)
             .map_err(map_error)?;
-        Ok(entities.into_iter().map(SyncScheduleEntity::convert_to_domain).collect())
+        Ok(entities
+            .into_iter()
+            .map(SyncScheduleEntity::convert_to_domain)
+            .collect())
     }
 
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<SyncSchedule> {
@@ -34,7 +37,11 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
         Ok(SyncScheduleEntity::convert_to_domain(entity))
     }
 
-    fn create(&self, conn: &mut SqliteConnection, schedule: &SyncSchedule) -> SoundomeResult<SyncSchedule> {
+    fn create(
+        &self,
+        conn: &mut SqliteConnection,
+        schedule: &SyncSchedule,
+    ) -> SoundomeResult<SyncSchedule> {
         let new_entity = NewSyncScheduleEntity::convert_from_domain(schedule);
         diesel::insert_into(schema::sync_schedule::table)
             .values(&new_entity)
@@ -47,7 +54,12 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
         Ok(SyncScheduleEntity::convert_to_domain(created))
     }
 
-    fn update(&self, conn: &mut SqliteConnection, id: i32, schedule: &SyncSchedule) -> SoundomeResult<SyncSchedule> {
+    fn update(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        schedule: &SyncSchedule,
+    ) -> SoundomeResult<SyncSchedule> {
         let changeset = UpdateSyncScheduleEntity {
             label: schedule.label.clone(),
             interval_seconds: Some(schedule.interval_seconds),
@@ -81,7 +93,10 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
             )
             .load::<SyncScheduleEntity>(conn)
             .map_err(map_error)?;
-        Ok(entities.into_iter().map(SyncScheduleEntity::convert_to_domain).collect())
+        Ok(entities
+            .into_iter()
+            .map(SyncScheduleEntity::convert_to_domain)
+            .collect())
     }
 
     fn mark_ran(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {

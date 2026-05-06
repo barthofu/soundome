@@ -1,6 +1,6 @@
+use rocket_okapi::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display};
-use rocket_okapi::JsonSchema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Reference {
@@ -47,7 +47,7 @@ pub enum Platform {
     YoutubeMusic,
     Youtube,
     Bandcamp,
-    Unknown
+    Unknown,
 }
 
 impl Platform {

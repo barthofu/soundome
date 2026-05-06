@@ -5,8 +5,12 @@ use std::process::Stdio;
 use tokio::{io::AsyncReadExt, process::Command};
 
 pub async fn _download_with_scdl(url: &str, base_library_dir: PathBuf) -> SoundomeResult<PathBuf> {
-    let output_path = format!("{}", base_library_dir.to_str()
-        .ok_or(Error::InvalidPath(base_library_dir.clone()))?);
+    let output_path = format!(
+        "{}",
+        base_library_dir
+            .to_str()
+            .ok_or(Error::InvalidPath(base_library_dir.clone()))?
+    );
 
     let mut child = Command::new("scdl")
         .stdout(Stdio::piped())

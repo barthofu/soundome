@@ -26,7 +26,11 @@ impl PlaylistRepository for DieselPlaylistRepository {
         Ok(PlaylistEntity::convert_to_domain(entity))
     }
 
-    fn get_by_source_url(&self, conn: &mut SqliteConnection, url: &str) -> SoundomeResult<Option<Playlist>> {
+    fn get_by_source_url(
+        &self,
+        conn: &mut SqliteConnection,
+        url: &str,
+    ) -> SoundomeResult<Option<Playlist>> {
         let entity = schema::playlist::table
             .filter(schema::playlist::source_url.eq(url))
             .first::<PlaylistEntity>(conn)
@@ -56,8 +60,18 @@ impl PlaylistRepository for DieselPlaylistRepository {
         Ok(())
     }
 
-    fn add_track(&self, conn: &mut SqliteConnection, playlist_id: i32, track_id: i32, position: Option<i32>) -> SoundomeResult<()> {
-        let entity = NewPlaylistTrackEntity { track_id, playlist_id, position };
+    fn add_track(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+        track_id: i32,
+        position: Option<i32>,
+    ) -> SoundomeResult<()> {
+        let entity = NewPlaylistTrackEntity {
+            track_id,
+            playlist_id,
+            position,
+        };
         diesel::insert_or_ignore_into(schema::playlist_tracks::table)
             .values(&entity)
             .execute(conn)

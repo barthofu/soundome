@@ -50,9 +50,15 @@ impl TrackDto {
             artists: track
                 .artists
                 .into_iter()
-                .map(|a| TrackArtistDto { id: a.id, name: a.name })
+                .map(|a| TrackArtistDto {
+                    id: a.id,
+                    name: a.name,
+                })
                 .collect(),
-            album: track.album.map(|a| TrackAlbumDto { id: a.id, title: a.title }),
+            album: track.album.map(|a| TrackAlbumDto {
+                id: a.id,
+                title: a.title,
+            }),
             date: track.date,
             genre: track.genre,
             cover: track.cover,
@@ -60,7 +66,9 @@ impl TrackDto {
             track_number: track.track_number,
             disc_number: track.disc_number,
             label: track.label,
-            file_path: track.file_path.and_then(|p| p.to_str().map(|s| s.to_string())),
+            file_path: track
+                .file_path
+                .and_then(|p| p.to_str().map(|s| s.to_string())),
             needs_validation: track.needs_validation,
         })
     }
@@ -92,12 +100,21 @@ pub async fn get_all(
     let services = Arc::clone(services);
     db.run(move |conn| services.track_service.get_all(conn))
         .await
-        .map(|tracks| Json(tracks.into_iter().filter_map(TrackDto::from_track).collect()))
-        .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "Internal".to_string(),
-            message: err.to_string(),
-        }))
+        .map(|tracks| {
+            Json(
+                tracks
+                    .into_iter()
+                    .filter_map(TrackDto::from_track)
+                    .collect(),
+            )
+        })
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }
 
 #[openapi]
@@ -115,11 +132,13 @@ pub async fn get(
                 .ok_or_else(|| shared::errors::Error::Database("Track has no id".to_string()))
         })
         .map(Json)
-        .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-            status: Status::NotFound,
-            code: "NotFound".to_string(),
-            message: err.to_string(),
-        }))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::NotFound,
+                code: "NotFound".to_string(),
+                message: err.to_string(),
+            })
+        })
 }
 
 #[openapi]
@@ -136,21 +155,38 @@ pub async fn update(
     db.run(move |conn| {
         let mut track = services.track_service.get_by_id(conn, id)?;
 
-        if let Some(title) = body.title { track.title = title; }
-        if let Some(genre) = body.genre { track.genre = Some(genre); }
-        if let Some(date) = body.date { track.date = Some(date); }
-        if let Some(tn) = body.track_number { track.track_number = Some(tn); }
-        if let Some(dn) = body.disc_number { track.disc_number = Some(dn); }
-        if let Some(label) = body.label { track.label = Some(label); }
-        if let Some(cover) = body.cover { track.cover = Some(cover); }
+        if let Some(title) = body.title {
+            track.title = title;
+        }
+        if let Some(genre) = body.genre {
+            track.genre = Some(genre);
+        }
+        if let Some(date) = body.date {
+            track.date = Some(date);
+        }
+        if let Some(tn) = body.track_number {
+            track.track_number = Some(tn);
+        }
+        if let Some(dn) = body.disc_number {
+            track.disc_number = Some(dn);
+        }
+        if let Some(label) = body.label {
+            track.label = Some(label);
+        }
+        if let Some(cover) = body.cover {
+            track.cover = Some(cover);
+        }
 
         if let Some(names) = body.artists {
-            track.artists = names.into_iter().map(|name| Artist {
-                id: None,
-                name,
-                icon: None,
-                references: vec![],
-            }).collect();
+            track.artists = names
+                .into_iter()
+                .map(|name| Artist {
+                    id: None,
+                    name,
+                    icon: None,
+                    references: vec![],
+                })
+                .collect();
         }
 
         if let Some(album_title) = body.album_title {
@@ -173,11 +209,13 @@ pub async fn update(
             .ok_or_else(|| shared::errors::Error::Database("Track has no id".to_string()))
     })
     .map(Json)
-    .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-        status: Status::InternalServerError,
-        code: "Internal".to_string(),
-        message: err.to_string(),
-    }))
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
 }
 
 #[openapi]
@@ -191,9 +229,11 @@ pub async fn delete(
     db.run(move |conn| services.track_service.delete_by_id(conn, id))
         .await
         .map(|_| Json(Success { success: true }))
-        .map_err(|err| crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "Internal".to_string(),
-            message: err.to_string(),
-        }))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }

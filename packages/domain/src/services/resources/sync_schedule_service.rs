@@ -23,7 +23,13 @@ impl SyncScheduleService {
         self.repo.get_by_id(conn, id)
     }
 
-    pub fn create(&self, conn: &mut SqliteConnection, playlist_url: String, label: Option<String>, interval_seconds: i32) -> SoundomeResult<SyncSchedule> {
+    pub fn create(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_url: String,
+        label: Option<String>,
+        interval_seconds: i32,
+    ) -> SoundomeResult<SyncSchedule> {
         let now = chrono::Utc::now().naive_utc();
         let next_run = now + Duration::seconds(interval_seconds as i64);
         let schedule = SyncSchedule {
@@ -39,7 +45,12 @@ impl SyncScheduleService {
         self.repo.create(conn, &schedule)
     }
 
-    pub fn update(&self, conn: &mut SqliteConnection, id: i32, schedule: &SyncSchedule) -> SoundomeResult<SyncSchedule> {
+    pub fn update(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        schedule: &SyncSchedule,
+    ) -> SoundomeResult<SyncSchedule> {
         self.repo.update(conn, id, schedule)
     }
 

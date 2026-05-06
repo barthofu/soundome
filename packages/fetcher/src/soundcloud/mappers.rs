@@ -1,9 +1,7 @@
 use rsoundcloud::http::StatusCode;
 use shared::{
     errors::Error,
-    models::{
-        Album, AlbumType, Artist, PlaylistTrack, Reference, ReferenceType, Track
-    },
+    models::{Album, AlbumType, Artist, PlaylistTrack, Reference, ReferenceType, Track},
 };
 
 /// Converts an rsoundcloud ClientError into a shared Error.
@@ -12,7 +10,9 @@ pub fn convert_error(err: rsoundcloud::ClientError) -> Error {
         rsoundcloud::ClientError::Http(ref http_error) => match http_error.as_ref() {
             rsoundcloud::http::HttpError::Client(err) => Error::Custom(err.to_string()),
             rsoundcloud::http::HttpError::StatusCode(response) => match response.status() {
-                StatusCode::NOT_FOUND => Error::NotFound("SoundCloud resource. Are you sure it exists and is public?".to_string()),
+                StatusCode::NOT_FOUND => Error::NotFound(
+                    "SoundCloud resource. Are you sure it exists and is public?".to_string(),
+                ),
                 _ => Error::Http(response.status().to_string(), "".to_string()),
             },
         },
@@ -33,7 +33,7 @@ pub fn convert_artist(user: &rsoundcloud::models::user::User) -> Artist {
             platform: shared::models::Platform::SoundCloud,
             external_id: Some(user.user.id.to_string()),
             external_url: Some(user.user.permalink_url.clone()),
-        }]
+        }],
     }
 }
 
@@ -49,7 +49,7 @@ pub fn convert_basic_artist(basic_user: &rsoundcloud::models::user::BasicUser) -
             platform: shared::models::Platform::SoundCloud,
             external_id: Some(basic_user.id.to_string()),
             external_url: Some(basic_user.permalink_url.clone()),
-        }]
+        }],
     }
 }
 
@@ -126,7 +126,10 @@ pub fn convert_track(
         }),
         disc_number: None,
         label: track.label_name.clone(),
-        date: track.release_date.clone().or(Some(track.display_date.clone())),
+        date: track
+            .release_date
+            .clone()
+            .or(Some(track.display_date.clone())),
         cover: track.artwork_url.clone(),
         references: vec![Reference {
             id: None,
@@ -182,7 +185,10 @@ pub fn convert_basic_track(
         track_number: None,
         disc_number: None,
         label: base_track.label_name.clone(),
-        date: base_track.release_date.clone().or(Some(base_track.display_date.clone())),
+        date: base_track
+            .release_date
+            .clone()
+            .or(Some(base_track.display_date.clone())),
         cover: base_track.artwork_url.clone(),
         references: vec![Reference {
             id: None,

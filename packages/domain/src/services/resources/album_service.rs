@@ -23,19 +23,35 @@ impl AlbumService {
 
     // CRUD
 
-    pub fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<shared::models::Album> {
+    pub fn get_by_id(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> SoundomeResult<shared::models::Album> {
         self.album_repo.get_by_id(conn, id)
     }
 
-    pub fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<shared::models::Album>> {
+    pub fn get_all(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Vec<shared::models::Album>> {
         self.album_repo.get_all(conn)
     }
 
-    pub fn create(&self, conn: &mut SqliteConnection, new_album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {
+    pub fn create(
+        &self,
+        conn: &mut SqliteConnection,
+        new_album: &shared::models::Album,
+    ) -> SoundomeResult<shared::models::Album> {
         self.album_repo.create(conn, new_album)
     }
 
-    pub fn update(&self, conn: &mut SqliteConnection, id: i32, updated_album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {
+    pub fn update(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        updated_album: &shared::models::Album,
+    ) -> SoundomeResult<shared::models::Album> {
         self.album_repo.update(conn, id, updated_album)
     }
 
@@ -45,7 +61,11 @@ impl AlbumService {
 
     // Getters
 
-    pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<shared::models::Album> {
+    pub fn get_by_url(
+        &self,
+        conn: &mut SqliteConnection,
+        url: &str,
+    ) -> Option<shared::models::Album> {
         self.album_repo.get_by_url(conn, url).ok()
     }
 
@@ -55,7 +75,11 @@ impl AlbumService {
 
     // Custom
 
-    fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &shared::models::Album) -> SoundomeResult<shared::models::Album> {
+    fn create_or_ignore(
+        &self,
+        conn: &mut SqliteConnection,
+        album: &shared::models::Album,
+    ) -> SoundomeResult<shared::models::Album> {
         // Step 1: Use create_or_ignore for the album
         let created_album = self.album_repo.create_or_ignore(conn, album)?;
         let album_id = created_album.id.unwrap();
@@ -66,11 +90,11 @@ impl AlbumService {
             let artist_id = created_artist.id.unwrap();
 
             // Create artist-album relationship
-            self.artist_repo.create_album_relationship(conn, artist_id, album_id)?;
+            self.artist_repo
+                .create_album_relationship(conn, artist_id, album_id)?;
         }
 
         // Step 3: Load the complete album with all relationships for return
         self.album_repo.get_by_id(conn, album_id)
     }
-
 }

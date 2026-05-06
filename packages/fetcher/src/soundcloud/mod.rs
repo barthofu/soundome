@@ -6,19 +6,22 @@ use config::Config;
 use fancy_regex::Regex;
 use futures::future::join_all;
 use mappers::convert_track;
+use rsoundcloud::models::track::BasicTrack;
 use rsoundcloud::{
     ClientError, CollectionParams, PlaylistsApi, ResourceId, SearchApi, SoundCloudClient,
     TracksApi, UsersApi,
 };
-use rsoundcloud::models::track::BasicTrack;
 use shared::{
-    errors::Error, http::HttpClientBuilder, models::{Album, Artist, Platform, Playlist, PlaylistTrack, SimplifiedTrack, Track}, types::SoundomeResult
+    errors::Error,
+    http::HttpClientBuilder,
+    models::{Album, Artist, Platform, Playlist, PlaylistTrack, SimplifiedTrack, Track},
+    types::SoundomeResult,
 };
 
 use crate::Source;
 
 pub struct Soundcloud {
-    client: SoundCloudClient
+    client: SoundCloudClient,
 }
 
 impl Soundcloud {
@@ -34,16 +37,15 @@ impl Soundcloud {
                 SoundCloudClient::with_http_client(http_client, None, None).await
             }
             _ => SoundCloudClient::default().await,
-        }.map_err(|e| match e {
+        }
+        .map_err(|e| match e {
             ClientError::ClientIDGenerationFailed => {
                 Error::Internal("Failed to generate Soundcloud client id".to_string())
             }
             _ => Error::Internal("Failed to create Soundcloud client".to_string()),
         })?;
 
-        Ok(Self {
-            client,
-        })
+        Ok(Self { client })
     }
 
     // =================
@@ -76,20 +78,21 @@ impl Soundcloud {
             query.insert("linked_partitioning".to_string(), "1".to_string());
 
             let result = self.client.api_get(&uri, query).await.map_err(|e| {
-                Error::Network(format!("Failed to fetch user tracks page at offset {}: {}", offset, e))
+                Error::Network(format!(
+                    "Failed to fetch user tracks page at offset {}: {}",
+                    offset, e
+                ))
             })?;
 
-            let json: serde_json::Value = serde_json::from_str(&result).map_err(|e| {
-                Error::Internal(format!("Failed to parse tracks response: {}", e))
-            })?;
+            let json: serde_json::Value = serde_json::from_str(&result)
+                .map_err(|e| Error::Internal(format!("Failed to parse tracks response: {}", e)))?;
 
             let collection = json.get("collection").and_then(|c| c.as_array());
             let page_tracks: Vec<BasicTrack> = match collection {
-                Some(items) if !items.is_empty() => {
-                    serde_json::from_value(serde_json::Value::Array(items.clone())).map_err(|e| {
-                        Error::Internal(format!("Failed to deserialize tracks: {}", e))
-                    })?
-                }
+                Some(items) if !items.is_empty() => serde_json::from_value(
+                    serde_json::Value::Array(items.clone()),
+                )
+                .map_err(|e| Error::Internal(format!("Failed to deserialize tracks: {}", e)))?,
                 _ => break,
             };
 
@@ -112,7 +115,10 @@ impl Soundcloud {
             offset += limit;
         }
 
-        tracing::info!("Fetched {} direct tracks for SoundCloud user", all_tracks.len());
+        tracing::info!(
+            "Fetched {} direct tracks for SoundCloud user",
+            all_tracks.len()
+        );
 
         // 2. Fetch tracks from the user's albums (these are not included in /tracks)
         let mut album_offset = 0u32;
@@ -125,12 +131,14 @@ impl Soundcloud {
             query.insert("linked_partitioning".to_string(), "1".to_string());
 
             let result = self.client.api_get(&uri, query).await.map_err(|e| {
-                Error::Network(format!("Failed to fetch user albums at offset {}: {}", album_offset, e))
+                Error::Network(format!(
+                    "Failed to fetch user albums at offset {}: {}",
+                    album_offset, e
+                ))
             })?;
 
-            let json: serde_json::Value = serde_json::from_str(&result).map_err(|e| {
-                Error::Internal(format!("Failed to parse albums response: {}", e))
-            })?;
+            let json: serde_json::Value = serde_json::from_str(&result)
+                .map_err(|e| Error::Internal(format!("Failed to parse albums response: {}", e)))?;
 
             let collection = json.get("collection").and_then(|c| c.as_array());
             let albums = match collection {
@@ -147,8 +155,11 @@ impl Soundcloud {
                     for track_value in tracks {
                         // Album tracks can be BasicTrack or MiniTrack (incomplete).
                         // Only include those with full info (have "title" and "permalink_url").
-                        if track_value.get("title").is_some() && track_value.get("media").is_some() {
-                            if let Ok(track) = serde_json::from_value::<BasicTrack>(track_value.clone()) {
+                        if track_value.get("title").is_some() && track_value.get("media").is_some()
+                        {
+                            if let Ok(track) =
+                                serde_json::from_value::<BasicTrack>(track_value.clone())
+                            {
                                 if seen_ids.insert(track.track.id) {
                                     all_tracks.push(track);
                                 }
@@ -170,7 +181,10 @@ impl Soundcloud {
             album_offset += limit;
         }
 
-        tracing::info!("Fetched {} total tracks for SoundCloud user (including albums)", all_tracks.len());
+        tracing::info!(
+            "Fetched {} total tracks for SoundCloud user (including albums)",
+            all_tracks.len()
+        );
         Ok(all_tracks)
     }
 
@@ -187,11 +201,13 @@ impl Soundcloud {
         convert_track(track, album)
     }
 
-    pub async fn clean_tracks_title_and_artist_name(&self, tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
+    pub async fn clean_tracks_title_and_artist_name(
+        &self,
+        tracks: &mut Vec<&mut Track>,
+    ) -> SoundomeResult<()> {
         let prompt = ai::prompts::clean_track_title_and_artist_name(false)?;
-        let ai_client = ai::AIClient::new().map_err(|e| {
-            Error::Internal(format!("Failed to initialize AI client: {}", e))
-        })?;
+        let ai_client = ai::AIClient::new()
+            .map_err(|e| Error::Internal(format!("Failed to initialize AI client: {}", e)))?;
 
         // Process in chunks to avoid token limit issues
         let chunk_size = 100;
@@ -201,31 +217,50 @@ impl Soundcloud {
             let end = usize::min(i + chunk_size, tracks.len());
             let chunk = &mut tracks[i..end];
 
-            let simplified_tracks: Vec<SimplifiedTrack> = chunk.iter().map(|track| SimplifiedTrack {
-                id: track.get_source().and_then(|track_ref| track_ref.external_id).unwrap_or_default(),
-                title: track.title.clone(),
-                artists: track.artists.iter().map(|a| a.name.clone()).collect(),
-            }).collect();
+            let simplified_tracks: Vec<SimplifiedTrack> = chunk
+                .iter()
+                .map(|track| SimplifiedTrack {
+                    id: track
+                        .get_source()
+                        .and_then(|track_ref| track_ref.external_id)
+                        .unwrap_or_default(),
+                    title: track.title.clone(),
+                    artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+                })
+                .collect();
 
             // Send to AI for processing
-            tracing::info!("Sending {} tracks to AI for processing", simplified_tracks.len());
+            tracing::info!(
+                "Sending {} tracks to AI for processing",
+                simplified_tracks.len()
+            );
             let processed_tracks = ai_client
                 .generate_with_data(&prompt, simplified_tracks)
                 .await
-                .map_err(|e| {
-                    Error::Internal(format!("AI processing failed: {}", e))
-                })?;
+                .map_err(|e| Error::Internal(format!("AI processing failed: {}", e)))?;
 
             tracing::info!("Processed tracks: {:#?}", processed_tracks);
 
             for (i, processed_track) in processed_tracks.iter().enumerate() {
                 chunk[i].title = processed_track.title.clone();
-                chunk[i].artists = processed_track.artists.iter().enumerate().map(|(j, name)| Artist {
-                    id: None,
-                    name: name.clone(),
-                    icon: chunk[i].artists.get(j).and_then(|artist| artist.icon.clone()),
-                    references: chunk[i].artists.get(j).map(|artist| artist.references.clone()).unwrap_or_default(),
-                }).collect();
+                chunk[i].artists = processed_track
+                    .artists
+                    .iter()
+                    .enumerate()
+                    .map(|(j, name)| Artist {
+                        id: None,
+                        name: name.clone(),
+                        icon: chunk[i]
+                            .artists
+                            .get(j)
+                            .and_then(|artist| artist.icon.clone()),
+                        references: chunk[i]
+                            .artists
+                            .get(j)
+                            .map(|artist| artist.references.clone())
+                            .unwrap_or_default(),
+                    })
+                    .collect();
             }
 
             i += chunk_size;
@@ -233,7 +268,6 @@ impl Soundcloud {
 
         Ok(())
     }
-
 }
 
 #[async_trait]
@@ -256,14 +290,12 @@ impl Source for Soundcloud {
             .await
             .map_err(mappers::convert_error)?;
 
-        Ok(
-            join_all(
-                tracks
-                    .iter()
-                    .map(|track| self.get_complete_track_from_music_track(track.clone())),
-            )
-        .await
+        Ok(join_all(
+            tracks
+                .iter()
+                .map(|track| self.get_complete_track_from_music_track(track.clone())),
         )
+        .await)
     }
 
     async fn get_playlist_from_url(&self, url: &str) -> SoundomeResult<Playlist> {
@@ -271,7 +303,9 @@ impl Source for Soundcloud {
             .client
             .get_playlist(ResourceId::Url(url.to_string()))
             .await
-            .map_err(|_| Error::NotFound(format!("SoundCloud playlist from {}", url).to_string()))?;
+            .map_err(|_| {
+                Error::NotFound(format!("SoundCloud playlist from {}", url).to_string())
+            })?;
 
         let cover = playlist.album_playlist.artwork_url.clone();
         Ok(Playlist {
@@ -290,19 +324,21 @@ impl Source for Soundcloud {
             .await
             .map_err(|_| Error::NotFound(format!("SoundCloud playlist tracks from {}", url)))?;
 
-        Ok(
-            join_all(tracks.into_iter().map(|track| self.get_complete_track_from_music_track(track)))
-                .await
+        Ok(join_all(
+            tracks
                 .into_iter()
-                .enumerate()
-                .map(|(i, track)| PlaylistTrack {
-                    id: None,
-                    track,
-                    added_at: None,
-                    position: Some(i as u32),
-                })
-                .collect()
+                .map(|track| self.get_complete_track_from_music_track(track)),
         )
+        .await
+        .into_iter()
+        .enumerate()
+        .map(|(i, track)| PlaylistTrack {
+            id: None,
+            track,
+            added_at: None,
+            position: Some(i as u32),
+        })
+        .collect())
     }
 
     async fn get_artist_from_url(&self, url: &str) -> Result<Artist, Error> {
@@ -366,10 +402,12 @@ impl Source for Soundcloud {
             .await
             .map_err(|_| Error::NotFound(format!("SoundCloud album tracks from {}", url)))?;
 
-        Ok(
-            join_all(tracks.into_iter().map(|track| self.get_complete_track_from_music_track(track)))
-                .await
+        Ok(join_all(
+            tracks
+                .into_iter()
+                .map(|track| self.get_complete_track_from_music_track(track)),
         )
+        .await)
     }
 
     async fn clean_track_metadata(&self, track: &mut Track) -> SoundomeResult<()> {
