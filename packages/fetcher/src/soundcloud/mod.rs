@@ -366,10 +366,7 @@ impl Source for Soundcloud {
             .await
             .map_err(mappers::convert_error)?;
 
-        Ok(users
-            .iter()
-            .map(mappers::convert_artist)
-            .collect())
+        Ok(users.iter().map(mappers::convert_artist).collect())
     }
 
     async fn get_album_from_url(&self, url: &str) -> Result<Album, Error> {
@@ -388,10 +385,7 @@ impl Source for Soundcloud {
             .await
             .map_err(mappers::convert_error)?;
 
-        Ok(albums
-            .iter()
-            .map(mappers::convert_album)
-            .collect())
+        Ok(albums.iter().map(mappers::convert_album).collect())
     }
 
     async fn get_album_tracks_from_url(&self, url: &str) -> Result<Vec<Track>, Error> {

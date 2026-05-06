@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
+use config::Config;
 use diesel::SqliteConnection;
 
 use crate::ports::repositories::PlaylistRepository;
@@ -67,6 +68,33 @@ impl PlaylistService {
         playlist_id: i32,
     ) -> shared::types::SoundomeResult<Vec<shared::models::Track>> {
         self.playlist_repo.get_tracks(conn, playlist_id)
+    }
+
+    /// Regenerate the M3U8 file for a playlist from the current DB state.
+    ///
+    /// The output directory is taken from `Config::get().playlists.m3u8_dir`; when
+    /// absent it defaults to `{base_library_dir}/Playlists/`.
+    pub fn export_m3u8(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+    ) -> shared::types::SoundomeResult<PathBuf> {
+        let playlist = self.playlist_repo.get_by_id(conn, playlist_id)?;
+        let tracks = self.playlist_repo.get_tracks(conn, playlist_id)?;
+
+        let cfg = Config::get();
+        let output_dir = Self::resolve_m3u8_dir(cfg);
+
+        organizer::playlist_writer::write_m3u8(&playlist, &tracks, &output_dir)
+    }
+
+    /// Resolve the M3U8 output directory from config, falling back to
+    /// `{base_library_dir}/Playlists/` when not explicitly configured.
+    pub fn resolve_m3u8_dir(cfg: &Config) -> PathBuf {
+        match &cfg.playlists.m3u8_dir {
+            Some(dir) => PathBuf::from(dir),
+            None => PathBuf::from(&cfg.general.base_library_dir).join("Playlists"),
+        }
     }
 
     pub fn count(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<i64> {

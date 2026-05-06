@@ -207,9 +207,7 @@ impl Track {
             .tracks()
             .iter()
             .find(|t| t.codec_params.bits_per_coded_sample.is_some())?;
-        track
-            .codec_params
-            .bits_per_coded_sample
+        track.codec_params.bits_per_coded_sample
     }
 
     /// Display a track in a user-friendly format

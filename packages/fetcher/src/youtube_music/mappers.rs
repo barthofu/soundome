@@ -9,12 +9,13 @@ use shared::{
 /// Converts an rspotify ClientError into a shared Error.
 pub fn convert_error(err: rustypipe::error::Error) -> Error {
     match err {
-        rustypipe::error::Error::HttpStatus(404, _) => Error::NotFound("Resource not found".to_string()),
+        rustypipe::error::Error::HttpStatus(404, _) => {
+            Error::NotFound("Resource not found".to_string())
+        }
         rustypipe::error::Error::HttpStatus(_, _) => Error::Unknown,
-        rustypipe::error::Error::Extraction(e) => Error::Custom(format!(
-            "Extraction error from Youtube Music: {}",
-            e
-        )),
+        rustypipe::error::Error::Extraction(e) => {
+            Error::Custom(format!("Extraction error from Youtube Music: {}", e))
+        }
         _ => Error::Unknown,
     }
 }
