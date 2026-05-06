@@ -21,6 +21,7 @@ use crate::{prompts::prompt_with_data, AIBackend};
 pub struct OpenRouterAI {
     client: OpenRouterClient<Ready>,
     model: String,
+    #[allow(dead_code)]
     provider: Option<String>,
 }
 
@@ -64,7 +65,7 @@ impl OpenRouterAI {
             })?;
 
         Ok(Self {
-            client: client,
+            client,
             model: with_default(
                 openrouter_config.model.clone(),
                 Self::DEFAULT_MODEL.to_string(),
@@ -88,7 +89,7 @@ impl OpenRouterAI {
             .with_allow_fallbacks(true)
             .with_data_collection(DataCollection::Deny) // Enable Zero Data Retention (ZDR)
             .with_require_parameters(require_parameters.unwrap_or(false))
-            .with_sort(sort.unwrap_or_else(|| ProviderSort::Throughput))
+            .with_sort(sort.unwrap_or(ProviderSort::Throughput))
 
         //     .with_order(self.provider.clone().map(|p| vec![p.clone()]).unwrap
         //         .into_iter()

@@ -19,6 +19,7 @@ pub trait AIBackend {
     ) -> SoundomeResult<T>;
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum AIBackendInstance {
     OpenRouter(OpenRouterAI),
     Ollama(OllamaAI),
@@ -110,6 +111,7 @@ impl AIBackend for AIBackendInstance {
 pub struct AIClient;
 
 impl AIClient {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> SoundomeResult<AIBackendInstance> {
         let ai_config = Config::get().ai.clone();
 

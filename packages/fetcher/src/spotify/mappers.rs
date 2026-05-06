@@ -37,7 +37,7 @@ pub fn convert_full_artist(artist: &FullArtist) -> Artist {
     Artist {
         id: None,
         name: artist.name.clone(),
-        icon: artist.images.get(0).map(|image| image.url.clone()),
+        icon: artist.images.first().map(|image| image.url.clone()),
         references: vec![Reference {
             id: None,
             ref_type: ReferenceType::Metadata,
@@ -64,7 +64,7 @@ pub fn convert_simplified_album(album: &SimplifiedAlbum) -> Album {
                 _ => AlbumType::Unknown,
             })
             .unwrap_or(AlbumType::Unknown),
-        cover: album.images.get(0).map(|image| image.url.clone()),
+        cover: album.images.first().map(|image| image.url.clone()),
         date: album.release_date.clone(),
         references: vec![Reference {
             id: None,
@@ -92,7 +92,7 @@ pub fn convert_full_album(album: &FullAlbum) -> Album {
         title: album.name.clone(),
         artists: album.artists.iter().map(convert_artist).collect(),
         album_type: convert_album_type(&album.album_type),
-        cover: album.images.get(0).map(|image| image.url.clone()),
+        cover: album.images.first().map(|image| image.url.clone()),
         date: Some(album.release_date.clone()),
         references: vec![Reference {
             id: None,
@@ -120,10 +120,10 @@ pub fn convert_track(track: &FullTrack) -> Track {
         duration: Some(track.duration.num_seconds() as i32),
         file_path: None,
         track_number: Some(track.track_number as i32),
-        disc_number: Some(track.disc_number as i32),
+        disc_number: Some(track.disc_number),
         label: None,
         date: album.release_date.clone(),
-        cover: album.images.get(0).map(|image| image.url.clone()),
+        cover: album.images.first().map(|image| image.url.clone()),
         references: vec![Reference {
             id: None,
             ref_type: ReferenceType::Source,
@@ -136,11 +136,11 @@ pub fn convert_track(track: &FullTrack) -> Track {
 
 /// Converts a Spotify playlist item to a shared PlaylistTrack.
 pub fn convert_playlist_item(item: &PlaylistItem, pos: u32) -> Option<PlaylistTrack> {
-    item.track.as_ref().and_then(|t| match t {
+    item.item.as_ref().and_then(|t| match t {
         PlayableItem::Track(track) => Some(PlaylistTrack {
             id: None,
             track: convert_track(track),
-            added_at: item.added_at.clone(),
+            added_at: item.added_at,
             position: Some(pos),
         }),
         PlayableItem::Episode(_) => None,
@@ -164,10 +164,10 @@ pub fn convert_simplified_track(track: &SimplifiedTrack, album: &SimplifiedAlbum
         duration: Some(track.duration.num_seconds() as i32),
         file_path: None,
         track_number: Some(track.track_number as i32),
-        disc_number: Some(track.disc_number as i32),
+        disc_number: Some(track.disc_number),
         label: None,
         date: album.release_date.clone(),
-        cover: album.images.get(0).map(|image| image.url.clone()),
+        cover: album.images.first().map(|image| image.url.clone()),
         references: vec![Reference {
             id: None,
             ref_type: ReferenceType::Source,

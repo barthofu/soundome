@@ -9,13 +9,11 @@ use shared::{
 /// Converts an rspotify ClientError into a shared Error.
 pub fn convert_error(err: rustypipe::error::Error) -> Error {
     match err {
-        rustypipe::error::Error::HttpStatus(status_code, _) => match status_code {
-            404 => Error::NotFound("Resource not found".to_string()),
-            _ => Error::Unknown,
-        },
+        rustypipe::error::Error::HttpStatus(404, _) => Error::NotFound("Resource not found".to_string()),
+        rustypipe::error::Error::HttpStatus(_, _) => Error::Unknown,
         rustypipe::error::Error::Extraction(e) => Error::Custom(format!(
             "Extraction error from Youtube Music: {}",
-            e.to_string()
+            e
         )),
         _ => Error::Unknown,
     }
@@ -128,7 +126,7 @@ pub fn convert_track(
         validation_reason: None,
         title: track.name.clone(),
         artists: artists.iter().map(convert_artist).collect(),
-        album: album.as_ref().map(|a| convert_album(a)),
+        album: album.as_ref().map(convert_album),
         genre: None,
         duration: track.duration.map(|d| d as i32),
         file_path: None,

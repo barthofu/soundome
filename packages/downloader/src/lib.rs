@@ -46,8 +46,7 @@ pub async fn search(track: &Track) -> SoundomeResult<Reference> {
             .providers
             .youtube
             .as_ref()
-            .map(|youtube| youtube.invidious_instance.clone())
-            .flatten(),
+            .and_then(|youtube| youtube.invidious_instance.clone()),
     );
     let youtube_music = youtube_music::YoutubeMusic::new();
 
@@ -122,11 +121,10 @@ pub async fn download(
                     .providers
                     .youtube
                     .as_ref()
-                    .map(|youtube| youtube.invidious_instance.clone())
-                    .flatten(),
+                    .and_then(|youtube| youtube.invidious_instance.clone()),
             );
 
-            youtube.download(&url, &track_title, output_dir).await
+            youtube.download(&url, track_title, output_dir).await
         }
         Platform::Youtube => {
             let mut youtube = youtube::Youtube::new(
@@ -134,18 +132,17 @@ pub async fn download(
                     .providers
                     .youtube
                     .as_ref()
-                    .map(|youtube| youtube.invidious_instance.clone())
-                    .flatten(),
+                    .and_then(|youtube| youtube.invidious_instance.clone()),
             );
-            youtube.download(&url, &track_title, output_dir).await
+            youtube.download(&url, track_title, output_dir).await
         }
         Platform::YoutubeMusic => {
             let mut youtube_music = youtube_music::YoutubeMusic::new();
-            youtube_music.download(&url, &track_title, output_dir).await
+            youtube_music.download(&url, track_title, output_dir).await
         }
         Platform::SoundCloud => {
             let mut soundcloud = soundcloud::SoundCloud::new().await?;
-            soundcloud.download(&url, &track_title, output_dir).await
+            soundcloud.download(&url, track_title, output_dir).await
         }
         _ => Err(Error::Unknown),
     }

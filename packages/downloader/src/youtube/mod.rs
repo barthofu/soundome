@@ -129,9 +129,7 @@ impl Provider for Youtube<'_> {
             .await?
             .items
             .iter()
-            .map(|item| self.convert_search_item_to_track(item.to_owned()))
-            .filter(|track| track.is_some())
-            .map(|track| track.unwrap())
+            .filter_map(|item| self.convert_search_item_to_track(item.to_owned()))
             .collect();
 
         // 3. Find the best match
@@ -153,7 +151,7 @@ impl Provider for Youtube<'_> {
         // if the url is a youtube music one, convert it to a youtube one
         // let url = url.replace("music.youtube.com", "www.youtube.com");
 
-        download_with_ytdlp(&url, file_name, base_library_dir).await
+        download_with_ytdlp(url, file_name, base_library_dir).await
     }
 
     fn is_valid_url(url: &str) -> bool {

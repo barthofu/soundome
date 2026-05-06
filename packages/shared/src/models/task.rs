@@ -28,6 +28,7 @@ pub enum TaskType {
 }
 
 impl TaskType {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "SyncPlaylist" => TaskType::SyncPlaylist,
@@ -49,6 +50,7 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "Pending" => TaskStatus::Pending,

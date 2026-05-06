@@ -7,6 +7,7 @@ use crate::ports::repositories::{AlbumRepository, ArtistRepository};
 
 pub struct AlbumService {
     album_repo: Arc<dyn AlbumRepository + Send + Sync>,
+    #[allow(dead_code)]
     artist_repo: Arc<dyn ArtistRepository + Send + Sync>,
 }
 
@@ -75,6 +76,7 @@ impl AlbumService {
 
     // Custom
 
+    #[allow(dead_code)]
     fn create_or_ignore(
         &self,
         conn: &mut SqliteConnection,

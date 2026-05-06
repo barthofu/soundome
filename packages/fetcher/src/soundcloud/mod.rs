@@ -203,7 +203,7 @@ impl Soundcloud {
 
     pub async fn clean_tracks_title_and_artist_name(
         &self,
-        tracks: &mut Vec<&mut Track>,
+        tracks: &mut [&mut Track],
     ) -> SoundomeResult<()> {
         let prompt = ai::prompts::clean_track_title_and_artist_name(false)?;
         let ai_client = ai::AIClient::new()
@@ -368,7 +368,7 @@ impl Source for Soundcloud {
 
         Ok(users
             .iter()
-            .map(|user| mappers::convert_artist(user))
+            .map(mappers::convert_artist)
             .collect())
     }
 
@@ -390,7 +390,7 @@ impl Source for Soundcloud {
 
         Ok(albums
             .iter()
-            .map(|album| mappers::convert_album(album))
+            .map(mappers::convert_album)
             .collect())
     }
 

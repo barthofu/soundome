@@ -11,6 +11,7 @@ use shared::{
 
 use crate::TagProvider;
 
+#[derive(Default)]
 pub struct MusicBrainz {
     // client: MusicBrainzClient
 }
@@ -133,7 +134,7 @@ impl TagProvider for MusicBrainz {
                 .entities
                 .iter()
                 // Map each recording to a track
-                .map(|recording| convert_to_track(recording))
+                .map(convert_to_track)
                 .collect()
         })
     }
@@ -165,14 +166,13 @@ fn convert_to_album(release: &Release) -> Album {
         artists: release
             .artist_credit
             .clone()
-            .map(|a| a.iter().map(|artist| convert_to_artist(artist)).collect())
+            .map(|a| a.iter().map(convert_to_artist).collect())
             .unwrap_or_default(),
         date: release
             .date
             .as_ref()
-            .map(|date| format_date(&date, Format::DATE)),
+            .map(|date| format_date(date, Format::DATE)),
         album_type: AlbumType::Unknown,
-        // cover: release.get_coverart().res_1200().execute().await.unwrap().
         cover: None,
         references: vec![Reference {
             id: None,
@@ -213,7 +213,7 @@ fn convert_to_track(recording: &Recording) -> Track {
         date: recording
             .first_release_date
             .as_ref()
-            .map(|date| format_date(&date, Format::DATE)),
+            .map(|date| format_date(date, Format::DATE)),
         track_number: Some(track_number),
         disc_number: None,
         cover: None,

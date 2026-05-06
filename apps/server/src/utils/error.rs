@@ -139,13 +139,11 @@ impl OpenApiResponderInner for Error {
 
 impl From<shared::errors::Error> for Error {
     fn from(err: shared::errors::Error) -> Self {
-        match err {
-            _ => Error::Custom(CustomError {
-                status: Status::InternalServerError,
-                code: "Internal".to_string(),
-                message: err.to_string(),
-            }),
-        }
+        Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
     }
 }
 impl fmt::Display for CustomError {

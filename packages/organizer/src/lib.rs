@@ -47,7 +47,6 @@ pub fn move_track_file(track: &mut Track, base_library_dir: &str) -> SoundomeRes
         .map(|_| {
             tracing::info!("File moved successfully");
             track.file_path = Some(destination_path);
-            ()
         })
         .map_err(|e| Error::Custom(format!("Failed to move file: {}", e)))
 }

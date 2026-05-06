@@ -60,7 +60,7 @@ pub fn convert_album(album_playlist: &rsoundcloud::models::playlist::AlbumPlayli
     Album {
         id: None,
         title: album.title.clone(),
-        artists: vec![convert_artist(&user)],
+        artists: vec![convert_artist(user)],
         album_type: AlbumType::Unknown,
         cover: album.artwork_url.clone(),
         date: album.release_date.clone(),
@@ -83,7 +83,7 @@ pub fn convert_basic_album(
     Album {
         id: None,
         title: album.title.clone(),
-        artists: vec![convert_basic_artist(&user)],
+        artists: vec![convert_basic_artist(user)],
         album_type: AlbumType::Unknown,
         cover: album.artwork_url.clone(),
         date: album.release_date.clone(),
@@ -109,10 +109,10 @@ pub fn convert_track(
         needs_validation: false,
         validation_reason: None,
         title: track.title.clone(),
-        artists: vec![convert_basic_artist(&user)],
-        album: album.as_ref().map(|a| convert_basic_album(&a)),
+        artists: vec![convert_basic_artist(user)],
+        album: album.as_ref().map(convert_basic_album),
         genre: track.genre.clone(), // TODO: check if this is correct instead of tag_list
-        duration: Some((track.duration / 1000) as i32),
+        duration: Some(track.duration / 1000),
         file_path: None,
         track_number: album.as_ref().and_then(|a| {
             a.album_playlist
@@ -178,9 +178,9 @@ pub fn convert_basic_track(
                 external_url: None,
             }],
         }],
-        album: album.as_ref().map(|a| convert_basic_album(a)),
+        album: album.as_ref().map(convert_basic_album),
         genre: base_track.genre.clone(),
-        duration: Some((base_track.duration / 1000) as i32),
+        duration: Some(base_track.duration / 1000),
         file_path: None,
         track_number: None,
         disc_number: None,

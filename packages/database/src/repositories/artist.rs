@@ -17,6 +17,7 @@ use crate::{
 
 use crate::diesel::Connection;
 
+#[derive(Default)]
 pub struct DieselArtistRepository {}
 
 impl DieselArtistRepository {

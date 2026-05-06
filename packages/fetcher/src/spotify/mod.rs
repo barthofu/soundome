@@ -55,7 +55,7 @@ impl Spotify {
     fn url_to_id(&self, url: &str) -> String {
         let id = url
             .split('/')
-            .last()
+            .next_back()
             // we can safely unwrap here because it won't panic even with an empty string as input
             .unwrap()
             .split('?')
@@ -127,7 +127,7 @@ impl Source for Spotify {
             .map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
 
         Ok(playlist
-            .tracks
+            .items
             .items
             .iter()
             .enumerate()
@@ -246,13 +246,14 @@ impl Source for Spotify {
             Ok(albums
                 .items
                 .iter()
-                .map(|album| mappers::convert_simplified_album(&album))
+                .map(mappers::convert_simplified_album)
                 .collect())
         } else {
             Ok(Vec::new())
         }
     }
 
+    #[allow(deprecated)]
     async fn get_album_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<Track>> {
         let id = AlbumId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;

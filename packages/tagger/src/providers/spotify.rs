@@ -194,7 +194,7 @@ fn convert_track(track: &FullTrack) -> Track {
         duration: Some(track.duration.num_seconds() as i32),
         file_path: None,
         track_number: Some(track.track_number as i32),
-        disc_number: Some(track.disc_number as i32),
+        disc_number: Some(track.disc_number),
         label: None,
         date: track.album.release_date.clone(),
         cover: track.album.images.first().map(|image| image.url.clone()),

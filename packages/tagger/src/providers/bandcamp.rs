@@ -6,6 +6,7 @@ use shared::utils::string::{string_similarity, SimilarityAlgorithm};
 
 use crate::TagProvider;
 
+#[derive(Default)]
 pub struct Bandcamp;
 
 impl Bandcamp {

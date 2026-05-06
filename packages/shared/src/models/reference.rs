@@ -24,6 +24,7 @@ pub enum ReferenceType {
 }
 
 impl ReferenceType {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "source" => ReferenceType::Source,
@@ -51,6 +52,7 @@ pub enum Platform {
 }
 
 impl Platform {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "spotify" => Platform::Spotify,

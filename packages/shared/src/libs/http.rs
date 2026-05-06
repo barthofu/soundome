@@ -32,7 +32,7 @@ impl ProxyRotator {
     pub fn new(config: Option<ProxyConfig>) -> Self {
         Self {
             counter: AtomicUsize::new(0),
-            config: config,
+            config,
         }
     }
 
@@ -216,8 +216,7 @@ impl HttpClientBuilder {
         }
 
         // Check for protocol-prefixed colon format: "socks5:host:port:user:pass"
-        if input.starts_with("socks5:") {
-            let without_protocol = &input[7..]; // Remove "socks5:"
+        if let Some(without_protocol) = input.strip_prefix("socks5:") {
             let parts: Vec<&str> = without_protocol.split(':').collect();
 
             if parts.len() == 4 {

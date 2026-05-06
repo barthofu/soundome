@@ -76,7 +76,7 @@ impl Album {
                     .artists
                     .iter()
                     .map(|a| artist.compare(a))
-                    .fold(0. / 0., f64::max); // max or NaN
+                    .fold(f64::NAN, f64::max); // max or NaN
                 total += best_match;
             }
             total / self.artists.len() as f64
@@ -148,6 +148,7 @@ pub enum AlbumType {
 }
 
 impl AlbumType {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "album" => AlbumType::Album,

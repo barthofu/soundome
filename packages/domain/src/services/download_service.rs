@@ -1,5 +1,5 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
     sync::Arc,
 };
@@ -153,7 +153,7 @@ impl DownloadService {
                 }
                 existing_count += 1;
                 if let Some(tid) = task_id {
-                    let current = (existing_count) as i32;
+                    let current = existing_count;
                     if let Err(e) =
                         self.task_service
                             .update_progress(conn, tid, current, total_tracks as i32)
@@ -218,7 +218,7 @@ impl DownloadService {
                 Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
             }
             if let Some(tid) = task_id {
-                let current = (existing_count as i32) + (i as i32) + 1;
+                let current = existing_count + (i as i32) + 1;
                 if let Err(e) =
                     self.task_service
                         .update_progress(conn, tid, current, total_tracks as i32)
@@ -282,7 +282,7 @@ impl DownloadService {
                 tracing::warn!("   -> Track already exists in DB: {}", track.display());
                 existing_count += 1;
                 if let Some(tid) = task_id {
-                    let current = existing_count as i32;
+                    let current = existing_count;
                     if let Err(e) =
                         self.task_service
                             .update_progress(conn, tid, current, total_tracks as i32)
@@ -333,7 +333,7 @@ impl DownloadService {
                 Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
             }
             if let Some(tid) = task_id {
-                let current = (existing_count as i32) + (i as i32) + 1;
+                let current = existing_count + (i as i32) + 1;
                 if let Err(e) =
                     self.task_service
                         .update_progress(conn, tid, current, total_tracks as i32)
@@ -400,7 +400,7 @@ impl DownloadService {
                 tracing::warn!("   -> Track already exists in DB: {}", track.display());
                 existing_count += 1;
                 if let Some(tid) = task_id {
-                    let current = existing_count as i32;
+                    let current = existing_count;
                     if let Err(e) =
                         self.task_service
                             .update_progress(conn, tid, current, total_tracks as i32)
@@ -451,7 +451,7 @@ impl DownloadService {
                 Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
             }
             if let Some(tid) = task_id {
-                let current = (existing_count as i32) + (i as i32) + 1;
+                let current = existing_count + (i as i32) + 1;
                 if let Err(e) =
                     self.task_service
                         .update_progress(conn, tid, current, total_tracks as i32)
@@ -624,7 +624,7 @@ impl DownloadService {
                     self.process_track_file(&mut existing_track, &file_path)
                         .await?;
                     let updated_track = self.save_track(conn, &existing_track).await?;
-                    return Ok(updated_track);
+                    Ok(updated_track)
                 } else {
                     tracing::warn!("New one has no better quality, skipping");
 
@@ -636,7 +636,7 @@ impl DownloadService {
 
                     let updated_track = self.save_track(conn, &existing_track).await?;
                     let _ = self.track_service.delete_track_file(&track)?;
-                    return Ok(updated_track);
+                    Ok(updated_track)
                 }
             }
             None => {
@@ -644,7 +644,7 @@ impl DownloadService {
                 // Final Step: Tagging, moving and saving in DB
                 self.process_track_file(&mut track, &file_path).await?;
                 let inserted_track = self.save_track(conn, &track).await?;
-                return Ok(inserted_track);
+                Ok(inserted_track)
             }
         }
     }
@@ -682,7 +682,7 @@ impl DownloadService {
         }
 
         // Get metadata from all enabled providers
-        let best_match = tagger::enricher::get_best_match_from_track(&track).await;
+        let best_match = tagger::enricher::get_best_match_from_track(track).await;
 
         // Apply best match metadata
         if let Match::Exact(matched_track) = best_match {
@@ -757,7 +757,7 @@ impl DownloadService {
     /// The staging path is stored in `track.file_path`.
     async fn download_track(&self, track: &mut Track) -> SoundomeResult<PathBuf> {
         // Get the best download URL
-        let provider_ref = downloader::search(&track).await?;
+        let provider_ref = downloader::search(track).await?;
         tracing::info!(
             "Found download URL from {:?}: {:?}",
             provider_ref.platform,
@@ -805,9 +805,9 @@ impl DownloadService {
     async fn process_track_file(
         &self,
         track: &mut Track,
-        file_path: &PathBuf,
+        file_path: &Path,
     ) -> SoundomeResult<()> {
-        tagger::file::tag_file_with_track(&file_path.clone(), &track)?;
+        tagger::file::tag_file_with_track(&file_path.to_path_buf(), track)?;
         tracing::info!("Tagged file with downloaded_track metadata");
 
         // Move the file to the correct location

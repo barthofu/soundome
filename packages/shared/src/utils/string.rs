@@ -40,8 +40,7 @@ pub fn string_similarity(s1: &str, s2: &str, similarity_algorithm: SimilarityAlg
             let dice = sorensen_dice(&normalized_s1, &normalized_s2);
 
             // Weighted average
-            let score = (0.50 * jaro) + (0.30 * damerau) + (0.20 * dice);
-            score
+            (0.50 * jaro) + (0.30 * damerau) + (0.20 * dice)
         }
         SimilarityAlgorithm::JaroWinkler => jaro_winkler(&normalized_s1, &normalized_s2),
         SimilarityAlgorithm::DamerauLevenshtein => {
@@ -80,7 +79,7 @@ pub fn normalize_string(s: &str) -> String {
  * Converts a string into a URL-friendly slug.
  */
 pub fn slugify(s: &str) -> String {
-    return slug::slugify(s);
+    slug::slugify(s)
 }
 
 /**
@@ -176,7 +175,7 @@ mod tests {
         // Test for transposition, similarity should still be reasonable
         let similarity = string_similarity(s1, s2, SimilarityAlgorithm::Smart);
         assert!(
-            similarity >= 0.5 && similarity < 0.8,
+            (0.5..0.8).contains(&similarity),
             "Strings with adjacent transpositions should have medium similarity."
         );
     }

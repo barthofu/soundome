@@ -21,6 +21,12 @@ pub struct YoutubeMusic {
     similarity_treshold: f64,
 }
 
+impl Default for YoutubeMusic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl YoutubeMusic {
     pub fn new() -> Self {
         // TODO: rustypipe probably uses reqwest internally.

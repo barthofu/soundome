@@ -14,7 +14,7 @@ pub fn get_track_from_file(file_path: &PathBuf) -> SoundomeResult<Track> {
 
     Tag::new()
         .read_from_path(file_path)
-        .map(|tag| convert_tag_to_track(&tag))
+        .map(|tag| convert_tag_to_track(&*tag))
         .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))
 }
 
@@ -37,7 +37,7 @@ pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> SoundomeResult
 fn convert_track_to_tag(tag: &mut Box<dyn AudioTag + Send + Sync>, track: &Track) {
     tag.set_title(&track.title);
     tag.set_artist(
-        &track
+        track
             .artists
             .iter()
             .map(|artist| artist.name.as_str())
@@ -45,7 +45,7 @@ fn convert_track_to_tag(tag: &mut Box<dyn AudioTag + Send + Sync>, track: &Track
             .join(";")
             .as_str(),
     );
-    track.album.as_ref().map(|album| {
+    if let Some(album) = track.album.as_ref() {
         tag.set_album_title(album.title.as_str());
         tag.set_album_artist(
             album
@@ -56,19 +56,19 @@ fn convert_track_to_tag(tag: &mut Box<dyn AudioTag + Send + Sync>, track: &Track
                 .join(", ")
                 .as_str(),
         );
-    });
-    track.genre.as_ref().map(|genre| tag.set_genre(genre));
-    track.date.as_ref().map(|date| {
-        tag.set_date(id3::Timestamp::from_str(&date).unwrap_or(id3::Timestamp::default()))
-    });
-    track
-        .track_number
-        .as_ref()
-        .map(|track_number| tag.set_track_number(*track_number as u16));
-    track
-        .disc_number
-        .as_ref()
-        .map(|disc_number| tag.set_disc_number(*disc_number as u16));
+    }
+    if let Some(genre) = track.genre.as_ref() {
+        tag.set_genre(genre);
+    }
+    if let Some(date) = track.date.as_ref() {
+        tag.set_date(id3::Timestamp::from_str(date).unwrap_or(id3::Timestamp::default()))
+    }
+    if let Some(track_number) = track.track_number.as_ref() {
+        tag.set_track_number(*track_number as u16);
+    }
+    if let Some(disc_number) = track.disc_number.as_ref() {
+        tag.set_disc_number(*disc_number as u16);
+    }
     // tag.album_cover()
 
     tag.set_comment(
@@ -87,7 +87,7 @@ fn convert_track_to_tag(tag: &mut Box<dyn AudioTag + Send + Sync>, track: &Track
     );
 }
 
-fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
+fn convert_tag_to_track(tag: &(dyn AudioTag + Send + Sync)) -> Track {
     let date = tag.date().map(|date| {
         let mut date_str = format!("{:04}", date.year);
         if let Some(month) = date.month {
@@ -143,7 +143,7 @@ fn convert_tag_to_track(tag: &Box<dyn AudioTag + Send + Sync>) -> Track {
             references: Vec::new(),
         }),
         genre: tag.genre().map(|genre| genre.to_string()),
-        date: date,
+        date,
         cover: None, // TODO
         disc_number: tag.disc_number().map(|disc_number| disc_number as i32),
         track_number: tag.track_number().map(|track_number| track_number as i32),

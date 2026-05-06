@@ -16,6 +16,7 @@ use crate::{
     schema,
 };
 
+#[derive(Default)]
 pub struct DieselTrackRepository {}
 
 impl DieselTrackRepository {

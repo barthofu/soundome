@@ -57,7 +57,7 @@ impl YoutubeMusic {
                 .music_artist(&artist.id.clone().unwrap_or("".to_string()), false)
                 .await
                 .ok();
-            artist.map(|artist| artists.push(artist));
+            if let Some(artist) = artist { artists.push(artist); }
         }
         let album = self
             .client
@@ -263,7 +263,7 @@ impl Source for YoutubeMusic {
             .items
             .items
             .iter()
-            .map(|artist| mappers::convert_artist_item(artist))
+            .map(mappers::convert_artist_item)
             .collect())
     }
 
@@ -294,7 +294,7 @@ impl Source for YoutubeMusic {
             .items
             .items
             .iter()
-            .map(|album| mappers::convert_album_item(album))
+            .map(mappers::convert_album_item)
             .collect())
     }
 

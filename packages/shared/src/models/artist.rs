@@ -57,10 +57,7 @@ impl Artist {
 
     /// Returns a normalized similarity score (between 0 and 1) of the match between two artists
     pub fn compare(&self, other: &Artist) -> f64 {
-        let name_similarity =
-            string_similarity(&self.name, &other.name, SimilarityAlgorithm::Smart);
-
-        name_similarity
+        string_similarity(&self.name, &other.name, SimilarityAlgorithm::Smart)
     }
 
     pub fn transpose_metadata(&mut self, other: &Artist) {

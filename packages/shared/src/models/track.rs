@@ -26,6 +26,7 @@ pub enum TrackSource {
 }
 
 impl TrackSource {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(source: &str) -> Self {
         match source.to_lowercase().as_str() {
             "local" => TrackSource::Local,
@@ -51,6 +52,7 @@ pub enum TrackProvider {
 }
 
 impl TrackProvider {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(provider: &str) -> Self {
         match provider.to_lowercase().as_str() {
             "youtube" => TrackProvider::Youtube,
@@ -208,7 +210,6 @@ impl Track {
         track
             .codec_params
             .bits_per_coded_sample
-            .map(|bps| bps as u32)
     }
 
     /// Display a track in a user-friendly format
@@ -308,14 +309,14 @@ impl Track {
         if let Some(val) = &other.cover {
             self.cover = Some(val.clone());
         };
-        if let Some(val) = &other.duration {
-            self.duration = Some(val.clone());
+        if let Some(val) = other.duration {
+            self.duration = Some(val);
         };
-        if let Some(val) = &other.track_number {
-            self.track_number = Some(val.clone());
+        if let Some(val) = other.track_number {
+            self.track_number = Some(val);
         };
-        if let Some(val) = &other.disc_number {
-            self.disc_number = Some(val.clone());
+        if let Some(val) = other.disc_number {
+            self.disc_number = Some(val);
         };
         if let Some(val) = &other.label {
             self.label = Some(val.clone());

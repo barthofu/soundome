@@ -9,6 +9,7 @@ use crate::{
     schema,
 };
 
+#[derive(Default)]
 pub struct DieselTaskRepository {}
 
 impl DieselTaskRepository {

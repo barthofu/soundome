@@ -1,3 +1,4 @@
+#![allow(unused_macros)]
 pub mod resource {
 
     macro_rules! get {

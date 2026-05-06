@@ -6,8 +6,9 @@ use std::time::Instant;
 
 use crate::TrackTagComment;
 
+#[allow(dead_code)]
 pub async fn file_tests() {
-    let oritingal_file_path =
+    let _oritingal_file_path =
         PathBuf::from("/home/coder/library/JEANNINE/Unknown Album/Synaptic Highway.mp3");
 
     // copy the origin file 1000 times
@@ -78,21 +79,23 @@ pub async fn file_tests() {
     // }
 }
 
+#[allow(dead_code)]
 fn set_tag_comment(file_path: &PathBuf, comment: &TrackTagComment) {
     let comment_str = serde_json::to_string(comment).expect("Failed to serialize comment to JSON");
 
-    let mut tag = Tag::new().read_from_path(&file_path).unwrap();
+    let mut tag = Tag::new().read_from_path(file_path).unwrap();
 
     tag.set_comment(comment_str);
     tag.write_to_path(file_path.display().to_string().as_str())
         .expect("Failed to write tag to file");
 }
 
+#[allow(dead_code)]
 fn get_tag_comment(file_path: &PathBuf) -> Option<TrackTagComment> {
-    let tag = Tag::new().read_from_path(&file_path).unwrap();
+    let tag = Tag::new().read_from_path(file_path).unwrap();
 
     // println!("Tag: {:#?}", tag.comment());
 
     tag.comment()
-        .and_then(|comment| serde_json::from_str(&comment).ok())
+        .and_then(|comment| serde_json::from_str(comment).ok())
 }
