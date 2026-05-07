@@ -130,6 +130,7 @@ mod tests {
             references: vec![],
             needs_validation: false,
             validation_reason: None,
+            soundome_id: None,
         }
     }
 

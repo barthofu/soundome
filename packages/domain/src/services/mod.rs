@@ -6,6 +6,7 @@ pub use resources::*;
 use crate::ports::repositories;
 
 pub mod download_service;
+pub mod scan_service;
 
 // =================================================================================
 // Service Layer
@@ -20,6 +21,7 @@ pub struct ServiceLayer {
     pub task_service: Arc<task_service::TaskService>,
 
     pub download_service: Arc<download_service::DownloadService>,
+    pub scan_service: Arc<scan_service::ScanService>,
 }
 
 impl ServiceLayer {
@@ -54,6 +56,9 @@ impl ServiceLayer {
             task_service.clone(),
         ));
 
+        let scan_service =
+            Arc::new(scan_service::ScanService::new(repositories.track.clone()));
+
         Self {
             track_service,
             album_service,
@@ -63,6 +68,7 @@ impl ServiceLayer {
             task_service,
 
             download_service,
+            scan_service,
         }
     }
 }

@@ -47,6 +47,14 @@ pub trait TrackRepository: Send + Sync {
         track_id: i32,
         references: &[shared::models::Reference],
     ) -> SoundomeResult<()>;
+    /// Look up a track by its `soundome_id` anchor UUID.
+    fn get_by_soundome_id(
+        &self,
+        conn: &mut SqliteConnection,
+        soundome_id: &str,
+    ) -> SoundomeResult<Option<Track>>;
+    /// Return all tracks that have a non-null `file_path` (i.e. finalized tracks).
+    fn get_all_finalized(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>>;
     // /// Find a track by unique fields (e.g. title + artists + album)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Option<Track>>;
 }

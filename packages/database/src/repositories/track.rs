@@ -464,4 +464,118 @@ impl TrackRepository for DieselTrackRepository {
                 ))
             })
     }
+
+    fn get_by_soundome_id(
+        &self,
+        conn: &mut SqliteConnection,
+        soundome_id: &str,
+    ) -> SoundomeResult<Option<Track>> {
+        let track: Option<TrackEntity> = schema::track::table
+            .filter(schema::track::soundome_id.eq(soundome_id))
+            .first::<TrackEntity>(conn)
+            .optional()
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get track by soundome_id: {}",
+                    err
+                ))
+            })?;
+
+        let Some(track) = track else {
+            return Ok(None);
+        };
+
+        let album = if let Some(album_id) = track.album_id {
+            schema::album::table
+                .filter(schema::album::id.eq(album_id))
+                .first::<AlbumEntity>(conn)
+                .ok()
+        } else {
+            None
+        };
+
+        let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+            .inner_join(
+                schema::artist::table
+                    .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+            )
+            .filter(schema::artist_tracks::track_id.eq(track.id))
+            .select(schema::artist::all_columns)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get artists for track by soundome_id: {}",
+                    err
+                ))
+            })?;
+
+        let references: Vec<TrackRefEntity> = schema::track_ref::table
+            .filter(schema::track_ref::track_id.eq(track.id))
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get references for track by soundome_id: {}",
+                    err
+                ))
+            })?;
+
+        Ok(Some(TrackEntity::convert_to_domain(
+            track, album, artists, references,
+        )))
+    }
+
+    fn get_all_finalized(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>> {
+        let tracks: Vec<TrackEntity> = schema::track::table
+            .filter(schema::track::file_path.is_not_null())
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to get finalized tracks: {}",
+                    err
+                ))
+            })?;
+
+        let mut result = Vec::new();
+        for track in tracks {
+            let album = if let Some(album_id) = track.album_id {
+                schema::album::table
+                    .filter(schema::album::id.eq(album_id))
+                    .first::<AlbumEntity>(conn)
+                    .ok()
+            } else {
+                None
+            };
+
+            let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                )
+                .filter(schema::artist_tracks::track_id.eq(track.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get finalized tracks: {}",
+                        err
+                    ))
+                })?;
+
+            let references: Vec<TrackRefEntity> = schema::track_ref::table
+                .filter(schema::track_ref::track_id.eq(track.id))
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to get finalized tracks: {}",
+                        err
+                    ))
+                })?;
+
+            result.push(TrackEntity::convert_to_domain(
+                track, album, artists, references,
+            ));
+        }
+
+        Ok(result)
+    }
 }

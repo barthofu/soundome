@@ -25,6 +25,7 @@ impl TrackEntity {
             id: Some(track_entity.id),
             needs_validation: track_entity.needs_validation,
             validation_reason: track_entity.validation_reason,
+            soundome_id: track_entity.soundome_id,
             title: track_entity.title,
             duration: track_entity.duration,
             track_number: track_entity.track_number,
@@ -65,6 +66,7 @@ impl NewTrackEntity {
                 .map(|p| p.to_string_lossy().to_string()),
             needs_validation: track.needs_validation,
             validation_reason: track.validation_reason.clone(),
+            soundome_id: track.soundome_id.clone(),
         }
     }
 }
@@ -87,6 +89,7 @@ impl UpdateTrackEntity {
                 .map(|p| p.to_string_lossy().to_string()),
             needs_validation: Some(track.needs_validation),
             validation_reason: track.validation_reason.clone(),
+            soundome_id: track.soundome_id.clone(),
         }
     }
 }

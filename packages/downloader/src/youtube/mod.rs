@@ -87,6 +87,7 @@ impl Youtube<'_> {
                 id: None,
                 needs_validation: false,
                 validation_reason: None,
+                soundome_id: None,
                 title: video.title,
                 artists: vec![Artist {
                     id: None,
