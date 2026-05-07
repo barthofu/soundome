@@ -134,7 +134,11 @@ impl ScanService {
         let finalized = self.track_repo.get_all_finalized(conn)?;
         let mut by_soundome_id: HashMap<String, Track> = HashMap::new();
         let mut by_path: HashMap<String, Track> = HashMap::new();
-        let mut visited_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+        // Tracks the SOUNDOME_IDs of files that were classified in Phase 1.
+        let mut visited_soundome_ids: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        // Tracks the absolute paths of files that were classified in Phase 1.
+        let mut visited_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for track in &finalized {
             if let Some(ref sid) = track.soundome_id {
@@ -169,11 +173,11 @@ impl ScanService {
             let path_str = path.to_string_lossy().to_string();
 
             // Read SOUNDOME_ID from file
-            let file_soundome_id =
-                tagger::file::read_soundome_id_from_file(&PathBuf::from(path));
+            let file_soundome_id = tagger::file::read_soundome_id_from_file(&PathBuf::from(path));
 
             if let Some(ref sid) = file_soundome_id {
-                visited_ids.insert(sid.clone());
+                visited_soundome_ids.insert(sid.clone());
+                visited_paths.insert(path_str.clone());
 
                 if let Some(db_track) = by_soundome_id.get(sid) {
                     let db_path = db_track
@@ -273,6 +277,7 @@ impl ScanService {
                     });
                 }
             } else {
+                visited_paths.insert(path_str.clone());
                 // No SOUNDOME_ID — try to match by stored path
                 if let Some(db_track) = by_path.get(&path_str) {
                     // File is known by path but lacks SOUNDOME_ID (legacy or external tag edit)
@@ -297,30 +302,31 @@ impl ScanService {
         // ── Phase 2: find DB rows whose files are missing ────────────────────────────
 
         for track in &finalized {
-            let sid = track.soundome_id.as_deref().unwrap_or("");
-            if !sid.is_empty() && visited_ids.contains(sid) {
-                continue; // already classified above
-            }
-
             let fp = match &track.file_path {
                 Some(p) => p.clone(),
                 None => continue,
             };
 
-            // Check if the file was found by path during the walk
-            if visited_ids.contains(sid) {
+            let fp_str = fp.to_string_lossy().to_string();
+
+            // Skip tracks whose file was already found (by SOUNDOME_ID or path) in Phase 1.
+            let found_by_soundome_id = track
+                .soundome_id
+                .as_deref()
+                .is_some_and(|sid| visited_soundome_ids.contains(sid));
+            let found_by_path = visited_paths.contains(&fp_str);
+
+            if found_by_soundome_id || found_by_path {
                 continue;
             }
 
-            // File not found anywhere
-            if !fp.exists() {
-                report.push(ScanEntry {
-                    category: ScanCategory::Missing,
-                    file_path: Some(fp.to_string_lossy().to_string()),
-                    track_id: track.id,
-                    title: Some(track.title.clone()),
-                });
-            }
+            // File not found anywhere during the walk.
+            report.push(ScanEntry {
+                category: ScanCategory::Missing,
+                file_path: Some(fp_str),
+                track_id: track.id,
+                title: Some(track.title.clone()),
+            });
         }
 
         tracing::info!(
@@ -343,7 +349,12 @@ impl ScanService {
 // ================================================================================================
 
 /// Returns `true` when the tags in `file_track` diverge from the DB `db_track` on
-/// key metadata fields (title, primary artist name).
+/// key metadata fields (title and primary artist name).
+///
+/// **Note**: This is a lightweight heuristic; it only compares the two most
+/// user-visible fields to avoid false positives from harmless formatting
+/// differences (e.g. track-number padding).  More fields can be added as needed
+/// once the false-positive rate is understood in practice.
 fn tags_diverge(db_track: &Track, file_track: &Track) -> bool {
     let title_differs = normalize(&db_track.title) != normalize(&file_track.title);
 
@@ -357,7 +368,8 @@ fn tags_diverge(db_track: &Track, file_track: &Track) -> bool {
         .first()
         .map(|a| normalize(&a.name))
         .unwrap_or_default();
-    let artist_differs = !db_artist.is_empty() && !file_artist.is_empty() && db_artist != file_artist;
+    let artist_differs =
+        !db_artist.is_empty() && !file_artist.is_empty() && db_artist != file_artist;
 
     title_differs || artist_differs
 }

@@ -496,8 +496,7 @@ impl TrackRepository for DieselTrackRepository {
 
         let artists: Vec<ArtistEntity> = schema::artist_tracks::table
             .inner_join(
-                schema::artist::table
-                    .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                schema::artist::table.on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
             )
             .filter(schema::artist_tracks::track_id.eq(track.id))
             .select(schema::artist::all_columns)
@@ -529,10 +528,7 @@ impl TrackRepository for DieselTrackRepository {
             .filter(schema::track::file_path.is_not_null())
             .load(conn)
             .map_err(|err| {
-                shared::errors::Error::Database(format!(
-                    "Failed to get finalized tracks: {}",
-                    err
-                ))
+                shared::errors::Error::Database(format!("Failed to get finalized tracks: {}", err))
             })?;
 
         let mut result = Vec::new();

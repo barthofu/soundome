@@ -56,8 +56,7 @@ impl ServiceLayer {
             task_service.clone(),
         ));
 
-        let scan_service =
-            Arc::new(scan_service::ScanService::new(repositories.track.clone()));
+        let scan_service = Arc::new(scan_service::ScanService::new(repositories.track.clone()));
 
         Self {
             track_service,

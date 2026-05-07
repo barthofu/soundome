@@ -107,7 +107,14 @@ pub fn read_soundome_id_from_file(file_path: &PathBuf) -> Option<String> {
 // ================================================================================================
 
 fn write_soundome_id_id3(file_path: &PathBuf, soundome_id: &str) -> SoundomeResult<()> {
-    let mut tag = id3::Tag::read_from_path(file_path).unwrap_or_default();
+    let mut tag = id3::Tag::read_from_path(file_path).unwrap_or_else(|e| {
+        tracing::warn!(
+            "Could not read existing ID3 tags from {:?}, will create new tag: {}",
+            file_path,
+            e
+        );
+        id3::Tag::default()
+    });
 
     // Remove any existing SOUNDOME_ID TXXX frame to avoid duplicates.
     tag.remove_extended_text(Some(SOUNDOME_ID_KEY), None);
@@ -157,10 +164,7 @@ fn write_soundome_id_mp4(file_path: &PathBuf, soundome_id: &str) -> SoundomeResu
 
     let fourcc = mp4ameta::FreeformIdent::new(MP4_MEAN, MP4_NAME);
     tag.remove_data_of(&fourcc);
-    tag.set_data(
-        fourcc,
-        mp4ameta::Data::Utf8(soundome_id.to_string()),
-    );
+    tag.set_data(fourcc, mp4ameta::Data::Utf8(soundome_id.to_string()));
 
     tag.write_to_path(file_path)
         .map_err(|e| Error::Custom(format!("Failed to write MP4 freeform atom: {}", e)))
@@ -297,4 +301,3 @@ fn convert_tag_to_track(tag: &(dyn AudioTag + Send + Sync)) -> Track {
         references: Vec::new(),
     }
 }
-
