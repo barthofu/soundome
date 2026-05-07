@@ -14,6 +14,13 @@ impl PlaylistService {
         Self { playlist_repo }
     }
 
+    pub fn get_all(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> shared::types::SoundomeResult<Vec<shared::models::Playlist>> {
+        self.playlist_repo.get_all(conn)
+    }
+
     pub fn get_by_id(
         &self,
         conn: &mut SqliteConnection,

@@ -3,6 +3,7 @@
   import ArtistTab from '../lib/library/ArtistTab.svelte';
   import AlbumTab from '../lib/library/AlbumTab.svelte';
   import TracksTab from '../lib/library/TracksTab.svelte';
+  import PlaylistsTab from '../lib/library/PlaylistsTab.svelte';
   import EditModal from '../lib/library/EditModal.svelte';
 
   // Load data for initial tab / drilled state
@@ -10,6 +11,7 @@
     if (lib.tab === 'tracks' && !lib.tracksLoaded) lib.loadTracks();
     if (lib.tab === 'albums' && !lib.albumsLoaded) lib.loadAlbums();
     if (lib.tab === 'artists' && !lib.artistsLoaded) lib.loadArtists();
+    if (lib.tab === 'playlists' && !lib.playlistsLoaded) lib.loadPlaylists();
   });
 
   // Load extra data when drilling
@@ -65,13 +67,14 @@
   </div>
 
   <div class="tabs">
-    {#each (['artists', 'albums', 'tracks'] as const) as t}
+    {#each (['artists', 'albums', 'tracks', 'playlists'] as const) as t}
       <button class="tab" class:active={lib.tab === t} onclick={() => lib.switchTab(t)}>
-        {t === 'artists' ? 'Artists' : t === 'albums' ? 'Albums' : 'Tracks'}
+        {t === 'artists' ? 'Artists' : t === 'albums' ? 'Albums' : t === 'tracks' ? 'Tracks' : 'Playlists'}
         {#if t === 'artists' && lib.artistsLoaded}<span class="tab-count">{lib.artists.length}</span>{/if}
         {#if t === 'albums' && lib.albumsLoaded}<span class="tab-count">{lib.albums.length}</span>{/if}
         {#if t === 'tracks' && lib.tracksLoaded}<span class="tab-count">{lib.tracks.length}</span>{/if}
         {#if t === 'tracks' && lib.pendingCount > 0}<span class="tab-badge">{lib.pendingCount}</span>{/if}
+        {#if t === 'playlists' && lib.playlistsLoaded}<span class="tab-count">{lib.playlists.length}</span>{/if}
       </button>
     {/each}
   </div>
@@ -98,12 +101,24 @@
         <span class="crumb-current muted">Loading…</span>
       {/if}
     </nav>
+  {:else if lib.drillPlaylistId != null}
+    <nav class="breadcrumb">
+      <button class="crumb-btn" onclick={() => lib.navigate('playlists')}>Playlists</button>
+      <span class="crumb-sep">›</span>
+      {#if lib.drillPlaylist}
+        <span class="crumb-current">{lib.drillPlaylist.name}</span>
+      {:else}
+        <span class="crumb-current muted">Loading…</span>
+      {/if}
+    </nav>
   {/if}
 
   {#if lib.tab === 'artists'}
     <ArtistTab />
   {:else if lib.tab === 'albums'}
     <AlbumTab />
+  {:else if lib.tab === 'playlists'}
+    <PlaylistsTab />
   {:else}
     <TracksTab />
   {/if}

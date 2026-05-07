@@ -156,6 +156,7 @@ pub trait ArtistRepository: Send + Sync {
 // ================================================================================================
 
 pub trait PlaylistRepository: Send + Sync {
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Playlist>>;
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Playlist>;
     /// Returns `None` if no playlist with this source URL exists yet.
     fn get_by_source_url(

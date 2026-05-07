@@ -253,6 +253,8 @@ fn rocket() -> _ {
                 routes::artists::update,
                 routes::artists::delete,
                 routes::artists::merge,
+                routes::playlists::get_all,
+                routes::playlists::get_tracks,
                 routes::playlists::export,
             ],
         )

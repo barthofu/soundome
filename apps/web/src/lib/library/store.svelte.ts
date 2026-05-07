@@ -3,14 +3,16 @@ import {
   getAlbums, updateAlbum, deleteAlbum,
   getArtists, updateArtist, deleteArtist, mergeArtists,
   uploadArtistImage, uploadAlbumImage, uploadTrackImage,
+  getPlaylists, getPlaylistTracks,
 } from '../api';
 import type {
   LibraryTrackDto, UpdateTrackBody,
   LibraryAlbumDto, UpdateAlbumBody,
   LibraryArtistDto, UpdateArtistBody,
+  LibraryPlaylistDto, PlaylistTrackDto,
 } from '../types';
 
-export type Tab = 'artists' | 'albums' | 'tracks';
+export type Tab = 'artists' | 'albums' | 'tracks' | 'playlists';
 export type ViewMode = 'list' | 'grid';
 export type TrackFilter = 'all' | 'ok' | 'pending';
 export type EditState =
@@ -49,12 +51,13 @@ function createLibraryStore() {
   const _initHash = (() => {
     const raw = location.hash.replace('#', '');
     const p = raw.split('/');
-    const t = (['artists', 'albums', 'tracks'] as const).find(x => x === p[0]) ?? 'artists';
+    const t = (['artists', 'albums', 'tracks', 'playlists'] as const).find(x => x === p[0]) ?? 'artists';
     const aid = t === 'artists' && p[1] ? (parseInt(p[1]) || null) : null;
     const bid =
       t === 'albums' && p[1] ? (parseInt(p[1]) || null) :
       t === 'artists' && p[2] === 'album' && p[3] ? (parseInt(p[3]) || null) : null;
-    return { tab: t, artistId: aid, albumId: bid };
+    const pid = t === 'playlists' && p[1] ? (parseInt(p[1]) || null) : null;
+    return { tab: t, artistId: aid, albumId: bid, playlistId: pid };
   })();
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -78,9 +81,20 @@ function createLibraryStore() {
   let artistsLoading = $state(false);
   let artistsError: string | null = $state(null);
 
+  let playlists: LibraryPlaylistDto[] = $state([]);
+  let playlistsLoaded = $state(false);
+  let playlistsLoading = $state(false);
+  let playlistsError: string | null = $state(null);
+
+  let drillPlaylistId: number | null = $state(_initHash.playlistId);
+  let drillPlaylistTracks: PlaylistTrackDto[] = $state([]);
+  let drillPlaylistTracksLoading = $state(false);
+  let drillPlaylistTracksError: string | null = $state(null);
+
   let trackSearch = $state('');
   let albumSearch = $state('');
   let artistSearch = $state('');
+  let playlistSearch = $state('');
   let trackFilter: TrackFilter = $state('ok');
 
   let drillArtistId: number | null = $state(_initHash.artistId);
@@ -107,6 +121,9 @@ function createLibraryStore() {
   );
   let drillAlbum = $derived(
     drillAlbumId != null ? (albums.find(a => a.id === drillAlbumId) ?? null) : null
+  );
+  let drillPlaylist = $derived(
+    drillPlaylistId != null ? (playlists.find(p => p.id === drillPlaylistId) ?? null) : null
   );
   let artistAlbums = $derived.by(() => {
     const d = drillArtist; if (!d) return [];
@@ -160,6 +177,10 @@ function createLibraryStore() {
     const q = artistSearch.trim().toLowerCase(); if (!q) return artists;
     return artists.filter(a => a.name.toLowerCase().includes(q));
   });
+  let filteredPlaylists = $derived.by(() => {
+    const q = playlistSearch.trim().toLowerCase(); if (!q) return playlists;
+    return playlists.filter(p => p.name.toLowerCase().includes(q));
+  });
   let pendingCount = $derived(tracks.filter(t => t.needs_validation).length);
   let similarArtistIds = $derived.by(() => {
     const ids = new Set<number>();
@@ -175,31 +196,38 @@ function createLibraryStore() {
   });
 
   // ── URL navigation ─────────────────────────────────────────────────────────
-  function buildHash(t: Tab, artistId?: number, albumId?: number): string {
+  function buildHash(t: Tab, artistId?: number, albumId?: number, playlistId?: number): string {
     if (t === 'artists') {
       if (artistId && albumId) return `#artists/${artistId}/album/${albumId}`;
       if (artistId) return `#artists/${artistId}`;
       return '#artists';
     }
     if (t === 'albums') { if (albumId) return `#albums/${albumId}`; return '#albums'; }
+    if (t === 'playlists') { if (playlistId) return `#playlists/${playlistId}`; return '#playlists'; }
     return '#tracks';
   }
-  function navigate(t: Tab, artistId?: number, albumId?: number) {
-    const h = buildHash(t, artistId, albumId);
+  function navigate(t: Tab, artistId?: number, albumId?: number, playlistId?: number) {
+    const h = buildHash(t, artistId, albumId, playlistId);
     if (location.hash !== h) history.pushState(null, '', h);
-    tab = t; drillArtistId = artistId ?? null; drillAlbumId = albumId ?? null; editState = null;
+    tab = t; drillArtistId = artistId ?? null; drillAlbumId = albumId ?? null;
+    drillPlaylistId = playlistId ?? null; editState = null;
   }
   function applyHash() {
     editState = null;
     const raw = location.hash.replace('#', '');
-    if (!raw) { tab = 'artists'; drillArtistId = null; drillAlbumId = null; return; }
+    if (!raw) { tab = 'artists'; drillArtistId = null; drillAlbumId = null; drillPlaylistId = null; return; }
     const p = raw.split('/');
-    const t = (['artists', 'albums', 'tracks'] as const).find(x => x === p[0]) ?? 'artists';
-    if (t === 'tracks') { tab = 'tracks'; drillArtistId = null; drillAlbumId = null; return; }
-    if (t === 'albums') { tab = 'albums'; drillArtistId = null; drillAlbumId = p[1] ? (parseInt(p[1]) || null) : null; return; }
+    const t = (['artists', 'albums', 'tracks', 'playlists'] as const).find(x => x === p[0]) ?? 'artists';
+    if (t === 'tracks') { tab = 'tracks'; drillArtistId = null; drillAlbumId = null; drillPlaylistId = null; return; }
+    if (t === 'playlists') {
+      tab = 'playlists'; drillArtistId = null; drillAlbumId = null;
+      drillPlaylistId = p[1] ? (parseInt(p[1]) || null) : null; return;
+    }
+    if (t === 'albums') { tab = 'albums'; drillArtistId = null; drillAlbumId = p[1] ? (parseInt(p[1]) || null) : null; drillPlaylistId = null; return; }
     tab = 'artists';
     drillArtistId = p[1] ? (parseInt(p[1]) || null) : null;
     drillAlbumId = (p[2] === 'album' && p[3]) ? (parseInt(p[3]) || null) : null;
+    drillPlaylistId = null;
   }
   function switchTab(t: Tab) { navigate(t); clearArtistSelection(); }
   function clearDrill() { navigate(tab); }
@@ -207,6 +235,7 @@ function createLibraryStore() {
     clearDrill();
     if (tab === 'tracks') { tracksLoaded = false; tracks = []; loadTracks(); }
     else if (tab === 'albums') { albumsLoaded = false; albums = []; loadAlbums(); }
+    else if (tab === 'playlists') { playlistsLoaded = false; playlists = []; loadPlaylists(); }
     else { artistsLoaded = false; artists = []; loadArtists(); }
   }
   function drillIntoArtist(a: LibraryArtistDto) { navigate('artists', a.id); }
@@ -235,6 +264,23 @@ function createLibraryStore() {
     try { artists = await getArtists(); artistsLoaded = true; }
     catch (e) { artistsError = e instanceof Error ? e.message : String(e); artistsLoaded = true; }
     finally { artistsLoading = false; }
+  }
+  async function loadPlaylists() {
+    playlistsLoading = true; playlistsError = null;
+    try { playlists = await getPlaylists(); playlistsLoaded = true; }
+    catch (e) { playlistsError = e instanceof Error ? e.message : String(e); playlistsLoaded = true; }
+    finally { playlistsLoading = false; }
+  }
+  async function loadDrillPlaylistTracks(id: number) {
+    drillPlaylistTracksLoading = true; drillPlaylistTracksError = null;
+    try { drillPlaylistTracks = await getPlaylistTracks(id); }
+    catch (e) { drillPlaylistTracksError = e instanceof Error ? e.message : String(e); }
+    finally { drillPlaylistTracksLoading = false; }
+  }
+  function drillIntoPlaylist(p: LibraryPlaylistDto) {
+    drillPlaylistTracks = [];
+    navigate('playlists', undefined, undefined, p.id);
+    loadDrillPlaylistTracks(p.id);
   }
 
   // ── Edit helpers ───────────────────────────────────────────────────────────
@@ -407,9 +453,21 @@ function createLibraryStore() {
     get artistsLoading() { return artistsLoading; },
     get artistsError() { return artistsError; },
 
+    get playlists() { return playlists; }, set playlists(v: LibraryPlaylistDto[]) { playlists = v; },
+    get playlistsLoaded() { return playlistsLoaded; },
+    get playlistsLoading() { return playlistsLoading; },
+    get playlistsError() { return playlistsError; },
+
+    get drillPlaylistId() { return drillPlaylistId; },
+    get drillPlaylist() { return drillPlaylist; },
+    get drillPlaylistTracks() { return drillPlaylistTracks; },
+    get drillPlaylistTracksLoading() { return drillPlaylistTracksLoading; },
+    get drillPlaylistTracksError() { return drillPlaylistTracksError; },
+
     get trackSearch() { return trackSearch; }, set trackSearch(v: string) { trackSearch = v; },
     get albumSearch() { return albumSearch; }, set albumSearch(v: string) { albumSearch = v; },
     get artistSearch() { return artistSearch; }, set artistSearch(v: string) { artistSearch = v; },
+    get playlistSearch() { return playlistSearch; }, set playlistSearch(v: string) { playlistSearch = v; },
     get trackFilter() { return trackFilter; }, set trackFilter(v: TrackFilter) { trackFilter = v; },
 
     get drillArtistId() { return drillArtistId; },
@@ -423,6 +481,7 @@ function createLibraryStore() {
     get filteredTracks() { return filteredTracks; },
     get filteredAlbums() { return filteredAlbums; },
     get filteredArtists() { return filteredArtists; },
+    get filteredPlaylists() { return filteredPlaylists; },
     get pendingCount() { return pendingCount; },
 
     get editState() { return editState; }, set editState(v: EditState) { editState = v; },
@@ -442,7 +501,8 @@ function createLibraryStore() {
 
     navigate, applyHash, switchTab, clearDrill, handleRefresh,
     drillIntoArtist, drillIntoAlbum, backToArtist, backToRoot,
-    loadTracks, loadAlbums, loadArtists,
+    drillIntoPlaylist,
+    loadTracks, loadAlbums, loadArtists, loadPlaylists,
     startEditTrack, startEditAlbum, startEditArtist,
     openEditForHovered, saveEdit, uploadImage,
     handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist,

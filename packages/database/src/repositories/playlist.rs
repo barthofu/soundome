@@ -23,6 +23,17 @@ impl DieselPlaylistRepository {
 }
 
 impl PlaylistRepository for DieselPlaylistRepository {
+    fn get_all(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Playlist>> {
+        let entities = schema::playlist::table
+            .order(schema::playlist::name.asc())
+            .load::<PlaylistEntity>(conn)
+            .map_err(map_error)?;
+        Ok(entities
+            .into_iter()
+            .map(PlaylistEntity::convert_to_domain)
+            .collect())
+    }
+
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Playlist> {
         let entity = schema::playlist::table
             .filter(schema::playlist::id.eq(id))

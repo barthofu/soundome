@@ -9,6 +9,8 @@ import type {
   UpdateAlbumBody,
   LibraryArtistDto,
   UpdateArtistBody,
+  LibraryPlaylistDto,
+  PlaylistTrackDto,
 } from './types';
 
 const BASE = '/api';
@@ -275,6 +277,22 @@ export async function uploadAlbumImage(id: number, file: File): Promise<ImageRes
 
 export async function uploadTrackImage(id: number, file: File): Promise<ImageResponse> {
   return uploadImage(`${BASE}/tracks/${id}/image`, file);
+}
+
+// ================================================================================================
+// Library — Playlists
+// ================================================================================================
+
+export async function getPlaylists(): Promise<LibraryPlaylistDto[]> {
+  const res = await fetch(`${BASE}/playlists`);
+  if (!res.ok) throw new Error(`Failed to fetch playlists: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getPlaylistTracks(id: number): Promise<PlaylistTrackDto[]> {
+  const res = await fetch(`${BASE}/playlists/${id}/tracks`);
+  if (!res.ok) throw new Error(`Failed to fetch playlist tracks: ${res.statusText}`);
+  return res.json();
 }
 
 // ================================================================================================

@@ -133,3 +133,21 @@ export interface UpdateArtistBody {
   name?: string;
   icon?: string;
 }
+
+export interface LibraryPlaylistDto {
+  id: number;
+  name: string;
+  source: string;
+  source_url: string | null;
+  cover: string | null;
+}
+
+export interface PlaylistTrackDto {
+  id: number;
+  title: string;
+  artists: { id: number | null; name: string }[];
+  album: { id: number | null; title: string } | null;
+  duration: number | null;
+  cover: string | null;
+  genre: string | null;
+}
