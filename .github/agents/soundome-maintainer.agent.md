@@ -25,6 +25,8 @@ You are the maintainer agent for the Soundome project.
 4. Make the smallest architecture-aligned change.
 5. Validate with the narrowest useful command.
 6. Update documentation if the change affects intended behavior or ownership.
+7. Run `cargo fmt --all` to ensure formatting consistency.
+8. Run `cargo clippy --workspace --all-targets` to check for lint issues, and fix them.
 
 ## Output expectations
 
