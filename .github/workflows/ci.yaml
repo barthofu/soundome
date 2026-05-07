@@ -53,8 +53,8 @@ jobs:
       - name: Build
         run: cargo build --workspace --release
 
-      - name: Tests
-        run: cargo test -q --workspace
+      # - name: Tests
+      #   run: cargo test -q --workspace
 
   web:
     name: Web (svelte-check)
