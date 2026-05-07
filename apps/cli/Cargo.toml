@@ -13,4 +13,5 @@ tracing-subscriber = { workspace = true }
 
 tokio = { version = "1.44.2", features = ["full"] }
 dotenvy = { git = "https://github.com/allan2/dotenvy", features = ["macros"] }
+clap = { version = "4", features = ["derive"] }
 

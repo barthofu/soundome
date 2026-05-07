@@ -127,6 +127,7 @@ fn search_result_to_track(item: bandcamp::SearchResultItemTrack) -> Track {
         id: None,
         needs_validation: false,
         validation_reason: None,
+        soundome_id: None,
         title: item.name,
         artists: vec![Artist {
             id: None,

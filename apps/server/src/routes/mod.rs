@@ -2,6 +2,7 @@
 pub mod download;
 pub mod errors;
 pub mod images;
+pub mod library;
 pub mod metrics;
 pub mod misc;
 pub mod sync_schedules;
