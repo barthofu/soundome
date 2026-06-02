@@ -13,10 +13,10 @@
 
 ### MVP
 
-- [ ] Add machine-readable output modes (`--format table|json|jsonl`) for scripting and CI usage.
-- [ ] Add search and filter commands for library entities (tracks, albums, artists, playlists).
-- [ ] Add playlist sync mode (`library playlist download --sync`) to download only new tracks.
-- [ ] Add export manifest output (`manifest.json`) with downloaded/skipped/failed entries.
+- [x] Add machine-readable output modes (`--format table|json|jsonl`) for scripting and CI usage.
+- [x] Add search and filter commands for library entities (tracks, albums, artists, playlists).
+- [x] Add playlist sync mode (`library playlist download --sync`) to download only new tracks.
+- [x] Add export manifest output (`manifest.json`) with downloaded/skipped/failed entries.
 
 ### Phase 2
 
