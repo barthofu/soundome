@@ -1,12 +1,38 @@
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use audiotags::Tag;
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use serde::Serialize;
 
 use crate::api::models::PlaylistDto;
 use crate::api::ApiClient;
+use crate::OutputFormat;
+
+#[derive(Debug, Serialize)]
+struct DownloadManifest {
+    playlist_id: i32,
+    playlist_name: String,
+    output_root: String,
+    total_tracks: usize,
+    downloaded: usize,
+    skipped: usize,
+    failed: usize,
+    entries: Vec<DownloadManifestEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct DownloadManifestEntry {
+    index: usize,
+    track_id: i32,
+    track_title: String,
+    artists: Vec<String>,
+    destination: String,
+    status: String,
+    message: Option<String>,
+}
 
 /// Resolve a playlist by ID (if numeric) or by name (fuzzy case-insensitive).
 async fn resolve_playlist(client: &ApiClient, id_or_name: &str) -> anyhow::Result<PlaylistDto> {
@@ -20,7 +46,6 @@ async fn resolve_playlist(client: &ApiClient, id_or_name: &str) -> anyhow::Resul
     }
 
     let needle = id_or_name.to_lowercase();
-
     let matched: Vec<_> = playlists
         .into_iter()
         .filter(|p| p.name.to_lowercase().contains(&needle))
@@ -42,29 +67,47 @@ async fn resolve_playlist(client: &ApiClient, id_or_name: &str) -> anyhow::Resul
 }
 
 /// List all playlists available in the library.
-pub async fn list(client: &ApiClient) -> anyhow::Result<()> {
+pub async fn list(client: &ApiClient, format: OutputFormat) -> anyhow::Result<()> {
     let playlists = client.get_playlists().await?;
 
-    if playlists.is_empty() {
-        println!("{}", style("No playlists found.").yellow());
-        return Ok(());
-    }
+    match format {
+        OutputFormat::Table => {
+            if playlists.is_empty() {
+                println!("{}", style("No playlists found.").yellow());
+                return Ok(());
+            }
 
-    println!(
-        "{:>4}  {:<40}  {}",
-        style("ID").bold().dim(),
-        style("Name").bold().dim(),
-        style("Source").bold().dim()
-    );
-    println!("{}", style("─".repeat(64)).dim());
+            println!(
+                "{:>4}  {:<40}  {}",
+                style("ID").bold().dim(),
+                style("Name").bold().dim(),
+                style("Source").bold().dim()
+            );
+            println!("{}", style("─".repeat(64)).dim());
 
-    for p in &playlists {
-        println!(
-            "{:>4}  {:<40}  {}",
-            style(p.id).cyan(),
-            p.name,
-            style(&p.source).dim()
-        );
+            for p in &playlists {
+                println!(
+                    "{:>4}  {:<40}  {}",
+                    style(p.id).cyan(),
+                    p.name,
+                    style(&p.source).dim()
+                );
+            }
+        }
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&playlists).context("Failed to render JSON")?
+            );
+        }
+        OutputFormat::Jsonl => {
+            for playlist in playlists {
+                println!(
+                    "{}",
+                    serde_json::to_string(&playlist).context("Failed to render JSONL row")?
+                );
+            }
+        }
     }
 
     Ok(())
@@ -76,6 +119,8 @@ pub async fn download(
     id_or_name: &str,
     output: &Path,
     flat: bool,
+    sync: bool,
+    manifest_path: Option<&Path>,
 ) -> anyhow::Result<()> {
     let playlist = resolve_playlist(client, id_or_name).await?;
     let tracks = client.get_playlist_tracks(playlist.id).await?;
@@ -91,7 +136,6 @@ pub async fn download(
     } else {
         output.join(playlist_dir_name)
     };
-
     tokio::fs::create_dir_all(&target_root).await?;
 
     let total = tracks.len() as u64;
@@ -115,6 +159,8 @@ pub async fn download(
 
     let mut downloaded = 0u64;
     let mut skipped = 0u64;
+    let mut failed = 0u64;
+    let mut manifest_entries: Vec<DownloadManifestEntry> = Vec::with_capacity(tracks.len());
 
     for (index, track) in tracks.iter().enumerate() {
         let track_number = (index + 1) as u32;
@@ -122,7 +168,6 @@ pub async fn download(
         let display = format!("{} — {}", artist_names.join(", "), track.title);
         overall.set_message(display.clone());
 
-        // Infer extension from server-side file_path when available, fallback to mp3.
         let ext = track
             .file_path
             .as_deref()
@@ -139,6 +184,27 @@ pub async fn download(
             total as u32,
         );
 
+        if sync && tokio::fs::try_exists(&dest).await.unwrap_or(false) {
+            skipped += 1;
+            overall.println(format!(
+                "  {} {} ({})",
+                style("skip").yellow(),
+                display,
+                "already exists"
+            ));
+            manifest_entries.push(DownloadManifestEntry {
+                index: index + 1,
+                track_id: track.id,
+                track_title: track.title.clone(),
+                artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+                destination: dest.display().to_string(),
+                status: "skipped".to_string(),
+                message: Some("already exists".to_string()),
+            });
+            overall.inc(1);
+            continue;
+        }
+
         byte_bar.set_length(0);
         byte_bar.set_position(0);
         byte_bar.set_message(display.clone());
@@ -152,23 +218,46 @@ pub async fn download(
         match result {
             Ok(()) => {
                 downloaded += 1;
+                let mut message = None;
+
                 if let Err(err) = set_playlist_order_metadata(&dest, track_number, total as u32) {
+                    let msg = err.to_string();
                     overall.println(format!(
                         "  {} {} ({})",
                         style("warn").yellow(),
                         display,
-                        err
+                        msg
                     ));
+                    message = Some(msg);
                 }
+
+                manifest_entries.push(DownloadManifestEntry {
+                    index: index + 1,
+                    track_id: track.id,
+                    track_title: track.title.clone(),
+                    artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+                    destination: dest.display().to_string(),
+                    status: "downloaded".to_string(),
+                    message,
+                });
             }
             Err(err) => {
+                failed += 1;
                 overall.println(format!(
                     "  {} {} ({})",
                     style("skip").yellow(),
                     display,
                     err
                 ));
-                skipped += 1;
+                manifest_entries.push(DownloadManifestEntry {
+                    index: index + 1,
+                    track_id: track.id,
+                    track_title: track.title.clone(),
+                    artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+                    destination: dest.display().to_string(),
+                    status: "failed".to_string(),
+                    message: Some(err.to_string()),
+                });
             }
         }
 
@@ -183,11 +272,46 @@ pub async fn download(
         style("✓").green().bold(),
         downloaded,
         style(target_root.display()).cyan(),
-        if skipped > 0 {
-            format!(" ({} skipped)", style(skipped).yellow())
+        if skipped > 0 || failed > 0 {
+            format!(
+                " ({} skipped, {} failed)",
+                style(skipped).yellow(),
+                style(failed).red()
+            )
         } else {
             String::new()
         }
+    );
+
+    let manifest = DownloadManifest {
+        playlist_id: playlist.id,
+        playlist_name: playlist.name,
+        output_root: target_root.display().to_string(),
+        total_tracks: total as usize,
+        downloaded: downloaded as usize,
+        skipped: skipped as usize,
+        failed: failed as usize,
+        entries: manifest_entries,
+    };
+
+    let manifest_dest = manifest_path
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| target_root.join("manifest.json"));
+
+    if let Some(parent) = manifest_dest.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(
+        &manifest_dest,
+        serde_json::to_string_pretty(&manifest).context("Failed to serialize manifest")?,
+    )
+    .await
+    .with_context(|| format!("Failed to write manifest at {}", manifest_dest.display()))?;
+
+    println!(
+        "{} manifest written to {}",
+        style("✓").green().bold(),
+        style(manifest_dest.display()).cyan()
     );
 
     Ok(())
