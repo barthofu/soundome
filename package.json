@@ -23,5 +23,9 @@
   "devDependencies": {
     "concurrently": "^9.2.1"
   },
-  "packageManager": "pnpm@10.8.0"
+  "packageManager": "pnpm@10.8.0",
+  "dependencies": {
+    "headroom-ai": "^0.1.0",
+    "openrtk": "^0.1.0"
+  }
 }
