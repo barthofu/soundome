@@ -4,13 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-shared = { path = "../../packages/shared" }
-config = { path = "../../packages/config" }
-domain = { path = "../../packages/domain" }
-database = { path = "../../packages/database" }
+clap = { version = "4", features = ["derive", "env"] }
+indicatif = "0.17"
+dialoguer = "0.11"
+console = "0.15"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+audiotags = "0.5.0"
 
 tracing-subscriber = { workspace = true }
-
 tokio = { version = "1.44.2", features = ["full"] }
 dotenvy = { git = "https://github.com/allan2/dotenvy", features = ["macros"] }
 

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use domain::services::ServiceLayer;
+use rocket::fs::NamedFile;
 use rocket::{delete, get, http::Status, patch, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
@@ -236,4 +237,45 @@ pub async fn delete(
                 message: err.to_string(),
             })
         })
+}
+
+/// Download the audio file for a track.
+#[openapi]
+#[get("/tracks/<id>/download")]
+pub async fn download_file(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<NamedFile, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    let track = db
+        .run(move |conn| services.track_service.get_by_id(conn, id))
+        .await
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: match err {
+                    shared::errors::Error::NotFound(_) => Status::NotFound,
+                    _ => Status::InternalServerError,
+                },
+                code: "NotFound".to_string(),
+                message: err.to_string(),
+            })
+        })?;
+
+    let file_path = track.file_path.ok_or_else(|| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::NotFound,
+            code: "NoFile".to_string(),
+            message: "Track has no local file".to_string(),
+        })
+    })?;
+
+    NamedFile::open(&file_path).await.map_err(|_| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::NotFound,
+            code: "FileNotFound".to_string(),
+            message: format!("Audio file not found on disk: {}", file_path.display()),
+        })
+    })
 }
