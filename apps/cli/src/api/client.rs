@@ -3,7 +3,7 @@ use std::path::Path;
 use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 
-use super::models::{PlaylistDto, PlaylistTrackDto};
+use super::models::{AlbumDto, ArtistDto, PlaylistDto, PlaylistTrackDto, TrackDto};
 
 pub struct ApiClient {
     client: Client,
@@ -26,6 +26,24 @@ impl ApiClient {
 
     pub async fn get_playlist_tracks(&self, id: i32) -> anyhow::Result<Vec<PlaylistTrackDto>> {
         let url = format!("{}/api/playlists/{}/tracks", self.base_url, id);
+        let tracks = self.client.get(&url).send().await?.json().await?;
+        Ok(tracks)
+    }
+
+    pub async fn get_artists(&self) -> anyhow::Result<Vec<ArtistDto>> {
+        let url = format!("{}/api/artists", self.base_url);
+        let artists = self.client.get(&url).send().await?.json().await?;
+        Ok(artists)
+    }
+
+    pub async fn get_albums(&self) -> anyhow::Result<Vec<AlbumDto>> {
+        let url = format!("{}/api/albums", self.base_url);
+        let albums = self.client.get(&url).send().await?.json().await?;
+        Ok(albums)
+    }
+
+    pub async fn get_tracks(&self) -> anyhow::Result<Vec<TrackDto>> {
+        let url = format!("{}/api/tracks", self.base_url);
         let tracks = self.client.get(&url).send().await?.json().await?;
         Ok(tracks)
     }
