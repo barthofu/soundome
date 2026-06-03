@@ -232,7 +232,12 @@ fn print_albums(rows: &[AlbumDto], format: OutputFormat) -> anyhow::Result<()> {
                     .map(|a| a.name.as_str())
                     .collect::<Vec<_>>()
                     .join(", ");
-                println!("{:>4}  {:<38}  {}", style(album.id).cyan(), album.title, artists);
+                println!(
+                    "{:>4}  {:<38}  {}",
+                    style(album.id).cyan(),
+                    album.title,
+                    artists
+                );
             }
             Ok(())
         }
