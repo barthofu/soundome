@@ -3,7 +3,7 @@ use std::path::Path;
 use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 
-use super::models::{AlbumDto, ArtistDto, PlaylistDto, PlaylistTrackDto, TrackDto};
+use super::models::{AlbumDto, ArtistDto, PlaylistDto, PlaylistTrackDto, ScanReport, TrackDto};
 
 pub struct ApiClient {
     client: Client,
@@ -72,5 +72,30 @@ impl ApiClient {
 
         file.flush().await?;
         Ok(())
+    }
+
+    /// Call `POST /api/library/scan` and return the `ScanReport`.
+    pub async fn scan(
+        &self,
+        library_root: Option<&str>,
+        dry_run: bool,
+    ) -> anyhow::Result<ScanReport> {
+        use serde_json::json;
+
+        let url = format!("{}/api/library/scan", self.base_url);
+        let body = json!({
+            "library_root": library_root,
+            "dry_run": dry_run,
+        });
+        let report = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(report)
     }
 }
