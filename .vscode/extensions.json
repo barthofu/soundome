@@ -6,6 +6,7 @@
         "Terrastruct.d2",
         "BarbossHack.crates-io",
         "svelte.svelte-vscode",
-        "qwtel.sqlite-viewer"
+        "qwtel.sqlite-viewer",
+        "fedaykindev.openchamber"
     ]
 }

@@ -11,5 +11,45 @@
       "enabled": true
     }
   },
-  "plugin": ["openrtk"]
+  "plugin": ["openrtk"],
+  "instructions": [
+    ".github/copilot-instructions.md",
+    ".github/instructions/rust.instructions.md",
+    ".github/instructions/project.instructions.md",
+    ".github/instructions/domain.instructions.md",
+    ".github/instructions/database-diesel.instructions.md",
+    ".github/instructions/downloader.instructions.md",
+    ".github/instructions/fetcher.instructions.md",
+    ".github/instructions/organizer.instructions.md",
+    ".github/instructions/server-rocket.instructions.md",
+    ".github/instructions/tagger-organizer.instructions.md",
+    ".github/instructions/ai.instructions.md"
+  ],
+  "agent": {
+    "soundome-maintainer": {
+      "description": "Use when: handling a broad Soundome implementation task, cross-crate change, architecture-sensitive refactor, or repository-level bug fix where no narrower skill is sufficient.",
+      "prompt": "{file:.opencode/agents/soundome-maintainer.md}",
+      "permission": {
+        "read": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "bash": "allow",
+        "task": "allow",
+        "todowrite": "allow"
+      }
+    },
+    "soundome-tester": {
+      "description": "Focused testing and validation work for Soundome. Write tests, run test suites, validate behavior without implementing features.",
+      "prompt": "You are a testing agent for Soundome. Write and run tests, validate behavior, and report results. Do not implement features or make production code changes.",
+      "permission": {
+        "read": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "bash": "allow",
+        "task": "allow"
+      }
+    }
+  }
 }
