@@ -17,6 +17,7 @@
         defaultPackage = naersk-lib.buildPackage ./.;
         devShell = with pkgs; mkShell {
           buildInputs = [
+            # languages
             cargo
             rustc
             rustfmt
@@ -24,6 +25,7 @@
             rustPackages.clippy
             rust-analyzer
 
+            # tools
             pkg-config
             sqlite
             openssl
@@ -32,10 +34,15 @@
             ffmpeg
             pkgs-master.yt-dlp
 
+            # utilities
             id3v2
             glibcLocales
-
             git-cliff
+
+            # ai
+            pkgs-master.opencode
+            pkgs-master.rtk
+
           ];
 
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
@@ -54,6 +61,8 @@
                 diesel migration run
               fi
             fi
+
+            export PATH="/home/coder/.local/bin:$PATH"
 
             # Been moved to .zshrc
             # ssh -C -N -D 1080 vps.public || true &

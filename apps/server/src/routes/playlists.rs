@@ -42,6 +42,7 @@ pub struct PlaylistTrackDto {
     pub duration: Option<i32>,
     pub cover: Option<String>,
     pub genre: Option<String>,
+    pub file_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -124,6 +125,7 @@ pub async fn get_tracks(
                             duration: t.duration,
                             cover: t.cover,
                             genre: t.genre,
+                            file_path: t.file_path.and_then(|p| p.to_str().map(|s| s.to_string())),
                         })
                     })
                     .collect(),

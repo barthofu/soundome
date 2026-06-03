@@ -25,9 +25,14 @@ pub struct Soundcloud {
 }
 
 impl Soundcloud {
-    const TRACK_REGEX: &str = r"^(https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)(?:[a-z0-9\-_]{1,25}))\/(?:(?:(?!sets|playlist|stats|settings|logout|notifications|you|messages)(?:[a-z0-9\-_]{1,100}))(?:\/s\-[a-zA-Z0-9\-_]{1,10})?))(?:[a-z0-9\-\?=\/]*)$";
-    const PLAYLIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/sets\/[a-z0-9\-_]{1,100}(?:[a-z0-9\-\?=\/]*)$";
+    const TRACK_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)(?:[a-z0-9\-_]{1,25}))\/(?:(?:(?!sets|playlist|stats|settings|logout|notifications|you|messages)(?:[a-z0-9\-_]{1,100}))(?:\/s\-[a-zA-Z0-9\-_]{1,10})?)(?:\?.*)?$";
+    const PLAYLIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/sets\/[a-z0-9\-_]{1,100}(?:\?.*)?$";
     const ARTIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/?(?:\?.*)?$";
+
+    /// Strip query parameters and fragments from a SoundCloud URL for cleaner processing
+    fn sanitize_url(url: &str) -> String {
+        url.split('?').next().unwrap_or(url).to_string()
+    }
 
     pub async fn new() -> SoundomeResult<Self> {
         let client = match Config::get().proxy.as_ref() {
@@ -414,27 +419,80 @@ impl Source for Soundcloud {
     }
 
     fn is_valid_track_url(url: &str) -> bool {
+        let sanitized = Self::sanitize_url(url);
         let re = Regex::new(Self::TRACK_REGEX).unwrap(); // safe unwrap
-        re.is_match(url).unwrap_or(false)
+        re.is_match(&sanitized).unwrap_or(false)
     }
 
     fn is_valid_playlist_url(url: &str) -> bool {
+        let sanitized = Self::sanitize_url(url);
         let re = Regex::new(Self::PLAYLIST_REGEX).unwrap(); // safe unwrap
-        re.is_match(url).unwrap_or(false)
+        re.is_match(&sanitized).unwrap_or(false)
     }
 
     fn is_valid_artist_url(url: &str) -> bool {
+        let sanitized = Self::sanitize_url(url);
         // Artist URL must not match track or playlist patterns
-        if Self::is_valid_track_url(url) || Self::is_valid_playlist_url(url) {
+        if Self::is_valid_track_url(&sanitized) || Self::is_valid_playlist_url(&sanitized) {
             return false;
         }
         let re = Regex::new(Self::ARTIST_REGEX).unwrap(); // safe unwrap
-        re.is_match(url).unwrap_or(false)
+        re.is_match(&sanitized).unwrap_or(false)
     }
 
     fn is_valid_album_url(_url: &str) -> bool {
         // SoundCloud albums use the same /sets/ URL pattern as playlists,
         // so album URLs are handled through the playlist path.
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_playlist_with_utm_params() {
+        let url = "https://soundcloud.com/barthohm/sets/euphoria-part-5?si=e466651555934986ae7e0846301c5894&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing";
+        assert!(
+            Soundcloud::is_valid_playlist_url(url),
+            "Should accept playlist URL with UTM params"
+        );
+    }
+
+    #[test]
+    fn test_valid_playlist_without_params() {
+        let url = "https://soundcloud.com/barthohm/sets/euphoria-part-5";
+        assert!(
+            Soundcloud::is_valid_playlist_url(url),
+            "Should accept playlist URL without params"
+        );
+    }
+
+    #[test]
+    fn test_valid_track_with_utm_params() {
+        let url = "https://soundcloud.com/artist/track-name?si=12345&utm_source=clipboard";
+        assert!(
+            Soundcloud::is_valid_track_url(url),
+            "Should accept track URL with UTM params"
+        );
+    }
+
+    #[test]
+    fn test_valid_artist_url() {
+        let url = "https://soundcloud.com/barthohm";
+        assert!(
+            Soundcloud::is_valid_artist_url(url),
+            "Should accept artist URL"
+        );
+    }
+
+    #[test]
+    fn test_valid_artist_url_with_trailing_slash_and_params() {
+        let url = "https://soundcloud.com/barthohm/?param=value";
+        assert!(
+            Soundcloud::is_valid_artist_url(url),
+            "Should accept artist URL with trailing slash and params"
+        );
     }
 }

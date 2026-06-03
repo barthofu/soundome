@@ -1,12 +1,4 @@
 {
     "rust-analyzer.server.path": "rust-analyzer",
-    "github.copilot.enable": {
-        "*": true,
-        "plaintext": true,
-        "markdown": true,
-        "scminput": false,
-        "yaml": true,
-        "mdx": true
-    },
     "discord.enabled": true
 }

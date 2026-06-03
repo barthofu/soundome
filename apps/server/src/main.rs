@@ -244,6 +244,7 @@ fn rocket() -> _ {
                 routes::tracks::get,
                 routes::tracks::update,
                 routes::tracks::delete,
+                routes::tracks::download_file,
                 routes::albums::get_all,
                 routes::albums::get,
                 routes::albums::update,
