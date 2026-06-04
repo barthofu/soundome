@@ -87,3 +87,39 @@ pub struct TrackDto {
     pub file_path: Option<String>,
     pub needs_validation: bool,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ScanCategory {
+    Ok,
+    PathChanged,
+    TagConflict,
+    Missing,
+    Orphan,
+    LegacyMatch,
+    Unmanaged,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ScanEntry {
+    pub category: ScanCategory,
+    pub file_path: Option<String>,
+    pub track_id: Option<i32>,
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ScanReport {
+    pub dry_run: bool,
+    pub library_root: String,
+    pub entries: Vec<ScanEntry>,
+    pub ok: usize,
+    pub path_changed: usize,
+    pub tag_conflict: usize,
+    pub missing: usize,
+    pub orphan: usize,
+    pub legacy_match: usize,
+    pub unmanaged: usize,
+    pub paths_updated: usize,
+    pub conflicts_flagged: usize,
+}

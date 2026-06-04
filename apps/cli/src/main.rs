@@ -28,6 +28,17 @@ enum Commands {
         #[command(subcommand)]
         command: LibraryCommands,
     },
+
+    /// Walk the library directory and reconcile the filesystem against the database.
+    Scan {
+        /// Override the library root to scan. Defaults to `general.base_library_dir` in config.
+        #[arg(long)]
+        library_root: Option<String>,
+
+        /// Report only — do not apply any mutations to the database.
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -175,6 +186,12 @@ async fn main() -> anyhow::Result<()> {
                 }
             },
         },
+        Commands::Scan {
+            library_root,
+            dry_run,
+        } => {
+            commands::scan::scan(&client, library_root.as_deref(), dry_run).await?;
+        }
     }
 
     Ok(())

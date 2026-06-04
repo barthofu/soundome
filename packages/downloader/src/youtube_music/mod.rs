@@ -66,6 +66,7 @@ impl YoutubeMusic {
             id: None,
             needs_validation: false,
             validation_reason: None,
+            soundome_id: None,
             title: search_item.name,
             artists: search_item
                 .artists

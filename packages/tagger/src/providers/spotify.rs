@@ -187,6 +187,7 @@ fn convert_track(track: &FullTrack) -> Track {
         id: None,
         needs_validation: false,
         validation_reason: None,
+        soundome_id: None,
         title: track.name.clone(),
         artists: track.artists.iter().map(convert_artist).collect(),
         album: Some(convert_simplified_album(&track.album)),

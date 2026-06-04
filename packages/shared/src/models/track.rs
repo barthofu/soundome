@@ -79,6 +79,9 @@ pub struct Track {
     pub needs_validation: bool,
     pub validation_reason: Option<String>,
 
+    // Bidirectional filesystem anchor — written as a custom tag at finalization
+    pub soundome_id: Option<String>,
+
     // Audio metadata
     pub title: String,
     pub artists: Vec<Artist>,

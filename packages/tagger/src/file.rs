@@ -1,4 +1,5 @@
 use audiotags::{AudioTag, Tag};
+use id3::TagLike;
 use shared::{
     errors::Error,
     models::{Album, Artist, Track},
@@ -6,20 +7,38 @@ use shared::{
 };
 use std::{path::PathBuf, str::FromStr};
 
+// ================================================================================================
+// SOUNDOME_ID custom-tag constants
+// ================================================================================================
+
+const SOUNDOME_ID_KEY: &str = "SOUNDOME_ID";
+const MP4_MEAN: &str = "com.soundome";
+const MP4_NAME: &str = "ID";
+
+// ================================================================================================
+// Public API
+// ================================================================================================
+
 /**
  * Reads the tag from a file and returns a converted Track object.
  */
 pub fn get_track_from_file(file_path: &PathBuf) -> SoundomeResult<Track> {
     tracing::info!("Reading tag from file: {:?}", file_path);
 
-    Tag::new()
+    let mut track = Tag::new()
         .read_from_path(file_path)
         .map(|tag| convert_tag_to_track(&*tag))
-        .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))
+        .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))?;
+
+    // Best-effort: read the SOUNDOME_ID custom tag
+    track.soundome_id = read_soundome_id_from_file(file_path);
+
+    Ok(track)
 }
 
 /**
  * Tag an audio file with the provided track information.
+ * Also writes the SOUNDOME_ID custom tag when `track.soundome_id` is set.
  */
 pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> SoundomeResult<()> {
     let mut tag = Tag::new()
@@ -27,7 +46,135 @@ pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> SoundomeResult
         .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))?;
     convert_track_to_tag(&mut tag, track);
     tag.write_to_path(file_path.display().to_string().as_str())
-        .map_err(|e| Error::Custom(format!("Error writing audio tags: {:?}", e)))
+        .map_err(|e| Error::Custom(format!("Error writing audio tags: {:?}", e)))?;
+
+    // Write the SOUNDOME_ID custom tag if present
+    if let Some(ref sid) = track.soundome_id {
+        write_soundome_id_tag(file_path, sid)?;
+    }
+
+    Ok(())
+}
+
+/// Write `SOUNDOME_ID` as a custom tag frame into the file.
+///
+/// | Format    | Tag frame              |
+/// |-----------|------------------------|
+/// | MP3 / ID3 | `TXXX:SOUNDOME_ID`     |
+/// | FLAC      | Vorbis comment         |
+/// | MP4 / M4A | `----:com.soundome:ID` |
+pub fn write_soundome_id_tag(file_path: &PathBuf, soundome_id: &str) -> SoundomeResult<()> {
+    let ext = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
+
+    match ext.as_str() {
+        "mp3" => write_soundome_id_id3(file_path, soundome_id),
+        "flac" => write_soundome_id_flac(file_path, soundome_id),
+        "m4a" | "mp4" | "aac" => write_soundome_id_mp4(file_path, soundome_id),
+        // For unknown / unsupported formats log a warning and continue.
+        other => {
+            tracing::warn!(
+                "Cannot write SOUNDOME_ID: unsupported extension {:?} for {:?}",
+                other,
+                file_path
+            );
+            Ok(())
+        }
+    }
+}
+
+/// Read `SOUNDOME_ID` from the custom tag of an audio file.
+/// Returns `None` if the tag is absent or the format is unsupported.
+pub fn read_soundome_id_from_file(file_path: &PathBuf) -> Option<String> {
+    let ext = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase())?;
+
+    match ext.as_str() {
+        "mp3" => read_soundome_id_id3(file_path),
+        "flac" => read_soundome_id_flac(file_path),
+        "m4a" | "mp4" | "aac" => read_soundome_id_mp4(file_path),
+        _ => None,
+    }
+}
+
+// ================================================================================================
+// Format-specific helpers
+// ================================================================================================
+
+fn write_soundome_id_id3(file_path: &PathBuf, soundome_id: &str) -> SoundomeResult<()> {
+    let mut tag = id3::Tag::read_from_path(file_path).unwrap_or_else(|e| {
+        tracing::warn!(
+            "Could not read existing ID3 tags from {:?}, will create new tag: {}",
+            file_path,
+            e
+        );
+        id3::Tag::default()
+    });
+
+    // Remove any existing SOUNDOME_ID TXXX frame to avoid duplicates.
+    tag.remove_extended_text(Some(SOUNDOME_ID_KEY), None);
+
+    tag.add_frame(id3::frame::ExtendedText {
+        description: SOUNDOME_ID_KEY.to_string(),
+        value: soundome_id.to_string(),
+    });
+
+    tag.write_to_path(file_path, id3::Version::Id3v24)
+        .map_err(|e| Error::Custom(format!("Failed to write ID3 TXXX frame: {}", e)))
+}
+
+fn read_soundome_id_id3(file_path: &PathBuf) -> Option<String> {
+    let tag = id3::Tag::read_from_path(file_path).ok()?;
+    let value = tag
+        .extended_texts()
+        .find(|t| t.description == SOUNDOME_ID_KEY)
+        .map(|t| t.value.clone());
+    value
+}
+
+fn write_soundome_id_flac(file_path: &PathBuf, soundome_id: &str) -> SoundomeResult<()> {
+    let mut tag = metaflac::Tag::read_from_path(file_path)
+        .map_err(|e| Error::Custom(format!("Failed to read FLAC tags: {}", e)))?;
+
+    let comments = tag.vorbis_comments_mut();
+    // Replace any existing entry
+    comments.remove(SOUNDOME_ID_KEY);
+    comments.set(SOUNDOME_ID_KEY, vec![soundome_id.to_string()]);
+
+    tag.write_to_path(file_path)
+        .map_err(|e| Error::Custom(format!("Failed to write FLAC Vorbis comment: {}", e)))
+}
+
+fn read_soundome_id_flac(file_path: &PathBuf) -> Option<String> {
+    let tag = metaflac::Tag::read_from_path(file_path).ok()?;
+    tag.vorbis_comments()
+        .and_then(|vc| vc.get(SOUNDOME_ID_KEY))
+        .and_then(|v| v.first())
+        .cloned()
+}
+
+fn write_soundome_id_mp4(file_path: &PathBuf, soundome_id: &str) -> SoundomeResult<()> {
+    let mut tag = mp4ameta::Tag::read_from_path(file_path)
+        .map_err(|e| Error::Custom(format!("Failed to read MP4 tags: {}", e)))?;
+
+    let fourcc = mp4ameta::FreeformIdent::new(MP4_MEAN, MP4_NAME);
+    tag.remove_data_of(&fourcc);
+    tag.set_data(fourcc, mp4ameta::Data::Utf8(soundome_id.to_string()));
+
+    tag.write_to_path(file_path)
+        .map_err(|e| Error::Custom(format!("Failed to write MP4 freeform atom: {}", e)))
+}
+
+fn read_soundome_id_mp4(file_path: &PathBuf) -> Option<String> {
+    let tag = mp4ameta::Tag::read_from_path(file_path).ok()?;
+    let fourcc = mp4ameta::FreeformIdent::new(MP4_MEAN, MP4_NAME);
+    let value = tag.strings_of(&fourcc).next().map(|s| s.to_string());
+    value
 }
 
 // ================================================================================================
@@ -103,6 +250,7 @@ fn convert_tag_to_track(tag: &(dyn AudioTag + Send + Sync)) -> Track {
         id: None,
         needs_validation: false,
         validation_reason: None,
+        soundome_id: None,
         title: tag
             .title()
             .map_or("Unknown".to_string(), |title| title.to_string()),

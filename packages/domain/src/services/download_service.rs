@@ -14,6 +14,7 @@ use shared::{
     types::SoundomeResult,
     utils::enums::Match,
 };
+use uuid::Uuid;
 
 pub use tagger::enricher::MatchCandidate;
 
@@ -806,6 +807,12 @@ impl DownloadService {
 
     /// Tag the downloaded file with the track metadata, then move it to the correct location
     async fn process_track_file(&self, track: &mut Track, file_path: &Path) -> SoundomeResult<()> {
+        // Assign a SOUNDOME_ID if the track does not already have one.
+        if track.soundome_id.is_none() {
+            track.soundome_id = Some(Uuid::new_v4().to_string());
+            tracing::debug!("Assigned SOUNDOME_ID: {:?}", track.soundome_id);
+        }
+
         tagger::file::tag_file_with_track(&file_path.to_path_buf(), track)?;
         tracing::info!("Tagged file with downloaded_track metadata");
 

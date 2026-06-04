@@ -1029,11 +1029,15 @@ dependencies = [
  "downloader",
  "fetcher",
  "organizer",
+ "schemars 0.8.22",
+ "serde",
  "serde_json",
  "shared",
  "tagger",
  "tokio",
  "tracing",
+ "uuid",
+ "walkdir",
 ]
 
 [[package]]
@@ -4969,6 +4973,8 @@ dependencies = [
  "chrono",
  "config 0.1.0",
  "id3",
+ "metaflac",
+ "mp4ameta",
  "musicbrainz_rs",
  "rspotify",
  "shared",

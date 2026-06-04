@@ -108,6 +108,7 @@ pub fn convert_track(
         id: None,
         needs_validation: false,
         validation_reason: None,
+        soundome_id: None,
         title: track.title.clone(),
         artists: vec![convert_basic_artist(user)],
         album: album.as_ref().map(convert_basic_album),
@@ -165,6 +166,7 @@ pub fn convert_basic_track(
         id: None,
         needs_validation: false,
         validation_reason: None,
+        soundome_id: None,
         title: base_track.title.clone(),
         artists: vec![Artist {
             id: None,

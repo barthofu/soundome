@@ -125,6 +125,7 @@ diesel::table! {
         file_path -> Nullable<Text>,
         needs_validation -> Bool,
         validation_reason -> Nullable<Text>,
+        soundome_id -> Nullable<Text>,
     }
 }
 
