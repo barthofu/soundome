@@ -16,6 +16,8 @@ You are the maintainer agent for the Soundome project.
 - Treat the `DownloadService` workflow as the main source of truth: dedup, enrich, download, tag, move, persist.
 - When you hit a WIP or deprecated area, prefer a minimal implementation plus an explicit TODO.
 - Do not default to testing-only work when a narrower testing agent is more appropriate.
+- **CRITICAL: Do NOT execute `cargo build`, `cargo test`, `cargo clippy`, `cargo fmt`, or any other validation commands. Only propose them to the user.**
+- **Do NOT analyze cargo output or run build/test suites.**
 
 ## Approach
 
