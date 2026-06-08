@@ -35,6 +35,13 @@ fn rocket() -> _ {
 
     tracing::info!("Starting server...");
 
+    // Initialize database and run migrations
+    let db_url = Config::get().database.url.clone();
+    if let Err(e) = database::init_database(&db_url) {
+        tracing::error!("Failed to initialize database: {}", e);
+        std::process::exit(1);
+    }
+
     let track_repo = Arc::new(repositories::track::DieselTrackRepository::new());
     let album_repo = Arc::new(repositories::album::DieselAlbumRepository::new());
     let artist_repo = Arc::new(repositories::artist::DieselArtistRepository::new());
