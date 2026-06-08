@@ -8,7 +8,7 @@ A fully annotated starting point is available at [`config.example.toml`](../../c
 
 | File | Purpose |
 |---|---|
-| `config.toml` | Application settings: library paths, providers, logs, AI, and proxy. |
+| `config.toml` | Application settings: library paths, providers, logs, AI, and proxy. **Optional** — omit to use environment variables and defaults only. |
 | `Rocket.toml` | Rocket server address, port, and database pool. |
 | `.env` | Required by the server and CLI boot paths via `dotenvy`. |
 
@@ -204,7 +204,9 @@ See [../operations/playlist-m3u8-export.md](../operations/playlist-m3u8-export.m
 
 ## Practical guidance
 
-- Copy `config.example.toml` to `config.toml` and fill in your values before first run.
+- The application can start with **environment variables only** if `config.toml` is not present. Each configuration section has sensible defaults; override any key via `SOUNDOME__*` environment variables.
+- To use environment-only configuration, simply omit `config.toml` entirely and provide all required values (e.g., `SOUNDOME__DATABASE__URL`, `SOUNDOME__PROVIDERS__SPOTIFY__CLIENT_ID`) as environment variables.
+- Alternatively, copy `config.example.toml` to `config.toml` and fill in your values before first run.
 - Keep `base_library_dir`, `temp_download_dir`, and the Rocket database path local to your machine.
 - Do not commit secrets such as Spotify credentials or OpenRouter API keys.
 - Prefer environment variable overrides (e.g. in `.env`) for secrets in containerized or CI environments.
