@@ -19,18 +19,15 @@ You are the maintainer agent for the Soundome project.
 
 ## Approach
 
-1. Read the relevant documentation to understand the intended behavior and architecture.
-2. Route the task to the owning crate and abstraction.
-3. Use the narrowest relevant instruction or skill rather than widening scope immediately.
+1. Read relevant documentation to understand the architecture.
+2. Route to the owning crate and abstraction.
+3. Use the narrowest skill rather than widening scope immediately.
 4. Make the smallest architecture-aligned change.
-5. Validate with the narrowest useful command.
-6. Update documentation if the change affects intended behavior or ownership.
-7. Run `cargo fmt --all` to ensure formatting consistency.
-8. Run `cargo clippy --workspace --all-targets` to check for lint issues, and fix them.
+5. Update docs if behavior or ownership changes.
 
 ## Output expectations
 
 When proposing a change, include:
 - touched files
-- verification commands such as `cargo test`, `cargo clippy`, or Diesel migrations
+- relevant verification commands (user runs these)
 - risks and assumptions
