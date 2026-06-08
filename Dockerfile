@@ -86,6 +86,9 @@ FROM base AS runner
     # copy the frontend assets (served by Rocket's FileServer at data/web)
     COPY --from=web-builder /app/data/web ./data/web
 
+    # copy Diesel migrations (required for diesel migration run at startup)
+    COPY packages/database/migrations ./packages/database/migrations
+
     # copy external tools from the libs stage (cached independently from the Rust build)
     COPY --from=libs /yt-dlp /usr/local/bin/yt-dlp
     COPY --from=libs /ffmpeg /usr/local/bin/ffmpeg
