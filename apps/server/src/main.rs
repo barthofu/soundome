@@ -203,19 +203,28 @@ fn rocket() -> _ {
         });
     }
 
-    // let artist_service = Arc::new(ArtistService::new(artist_repo.clone()));
-
     // Rocket — build a figment from the standard Rocket.toml / ROCKET_* sources,
     // then layer any SOUNDOME__SERVER__* overrides on top.
     let figment = {
         let soundome_cfg = Config::get();
         let mut f = rocket::Config::figment();
+        // host
         if let Some(host) = &soundome_cfg.server.host {
             f = f.merge(("address", host.as_str()));
         }
+        // port
         if let Some(port) = soundome_cfg.server.port {
             f = f.merge(("port", port));
         }
+        // rocket database 
+        // let db: rocket::figment::value::Map<_, rocket::figment::value::Value>  = rocket::figment::util::map! {
+        //     "url" => soundome_cfg.database.url.as_str().into(),
+        //     "pool_size" => 10.into(),
+        //     "timeout" => 5.into(),
+        // };
+        // f = f.merge(("databases.sqlite", db));
+        f = f.merge(("databases.sqlite.url", soundome_cfg.database.url.as_str()));
+        
         f
     };
 

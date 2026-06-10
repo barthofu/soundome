@@ -7,6 +7,6 @@ file = "10 MiB"
 form = "10 MiB"
 
 [global.databases.sqlite]
-url = "data/soundome.db"
+# url = "data/soundome.db"
 pool_size = 10
 timeout = 5
