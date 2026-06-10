@@ -10,6 +10,7 @@ domain = { path = "../domain" }
 tracing = { workspace = true }
 
 diesel = { version = "2.2.7", features = ["sqlite", "r2d2", "chrono"] }
+diesel_migrations = { version = "2.2.0", features = ["sqlite"] }
 libsqlite3-sys = { version = "0.31.0", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 rocket = { version = "0.5.1", features = ["json"] }

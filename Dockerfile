@@ -93,6 +93,12 @@ FROM base AS runner
     COPY --from=libs /yt-dlp /usr/local/bin/yt-dlp
     COPY --from=libs /ffmpeg /usr/local/bin/ffmpeg
 
+    # ensure runtime directories exist and belong to the app user.
+    # note: when bind-mounted from the host, the host directory permissions take
+    # precedence — make sure the host dirs are writable by uid 1000 (e.g. chown -R 1000:1000).
+    RUN mkdir -p /app/data /app/library /app/temp \
+        && chown -R soundome:soundome /app
+
     USER soundome
 
     EXPOSE 8000

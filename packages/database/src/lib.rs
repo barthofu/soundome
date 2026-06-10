@@ -4,6 +4,7 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
     Connection, SqliteConnection,
 };
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 #[macro_use]
 extern crate diesel;
@@ -14,8 +15,10 @@ pub mod mappers;
 pub mod repositories;
 pub mod schema;
 
+const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
 /// Initialize the SQLite database at the given URL.
-/// Creates the file if it doesn't exist, and runs all pending migrations.
+/// Creates the file and parent directories if they don't exist, then runs all pending migrations.
 pub fn init_database(database_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Extract the file path from the URL (sqlite URLs are file paths)
     let file_path = if let Some(path) = database_url.strip_prefix("sqlite://") {
@@ -27,52 +30,34 @@ pub fn init_database(database_url: &str) -> Result<(), Box<dyn std::error::Error
     // Ensure the parent directory exists
     if let Some(parent) = Path::new(file_path).parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                format!(
+                    "Failed to create database directory '{}': {}",
+                    parent.display(),
+                    e
+                )
+            })?;
         }
     }
 
     // Create the database file if it doesn't exist
     if !Path::new(file_path).exists() {
         tracing::info!("Creating SQLite database at: {}", file_path);
-        std::fs::File::create(file_path)?;
+        std::fs::File::create(file_path).map_err(|e| {
+            format!("Failed to create database file '{}': {}", file_path, e)
+        })?;
     }
 
-    // Verify database connectivity and run migrations
+    // Run pending migrations using the embedded migrations compiled into the binary
     tracing::info!("Running database migrations...");
-    run_migrations_via_cli(database_url)?;
+    let mut conn = SqliteConnection::establish(database_url)
+        .map_err(|e| format!("Failed to connect to database '{}': {}", database_url, e))?;
 
+    conn.run_pending_migrations(MIGRATIONS)
+        .map_err(|e| format!("Failed to run database migrations: {}", e))?;
+
+    tracing::info!("Database migrations completed successfully");
     Ok(())
-}
-
-fn run_migrations_via_cli(database_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // Set DATABASE_URL environment variable for diesel CLI
-    std::env::set_var("DATABASE_URL", database_url);
-
-    // Try to run diesel migration run command
-    let output = std::process::Command::new("diesel")
-        .args(["migration", "run"])
-        .output();
-
-    match output {
-        Ok(output) => {
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("diesel migration run failed: {}", stderr).into());
-            }
-            tracing::info!("Migrations completed successfully");
-            Ok(())
-        }
-        Err(e) => {
-            // If diesel CLI is not available, log a warning but continue
-            // This is acceptable in production where migrations might be run separately
-            tracing::warn!(
-                "diesel CLI not found or failed to run: {}. \
-                 Make sure migrations are run with: diesel migration run",
-                e
-            );
-            Ok(())
-        }
-    }
 }
 
 pub fn init_connection(database_url: &str) -> SqliteConnection {
