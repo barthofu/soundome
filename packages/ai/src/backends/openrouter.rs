@@ -26,8 +26,7 @@ pub struct OpenRouterAI {
 }
 
 impl OpenRouterAI {
-    // const DEFAULT_MODEL: &str = "google/gemini-flash-1.5-8b";
-    const DEFAULT_MODEL: &str = "google/gemini-2.5-flash-lite";
+    const DEFAULT_MODEL: &str = "google/gemini-2.5-flash";
 
     pub fn new(openrouter_config: &OpenRouterConfig) -> SoundomeResult<Self> {
         let base_url = with_default(
