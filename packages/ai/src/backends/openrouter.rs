@@ -44,7 +44,7 @@ impl OpenRouterAI {
             })?
             .with_timeout(Duration::from_secs(with_default(
                 openrouter_config.timeout,
-                60,
+                180,
             )))
             .with_http_referer("")
             .with_site_title("Soudome");
@@ -183,21 +183,59 @@ impl AIBackend for OpenRouterAI {
         //     }),
         // };
 
-        self.client
-            .structured()
-            .map_err(|err| {
-                Error::Network(format!(
-                    "Failed to initiate OpenRouter structured generation on model {}: {}",
-                    self.model, err
-                ))
-            })?
-            .generate(&self.model, messages, schema)
-            .await
-            .map_err(|err| {
-                Error::Network(format!(
-                    "Failed to get OpenRouter structured response on model {}: {}",
-                    self.model, err
-                ))
-            })
+        // Retry logic with exponential backoff
+        let max_retries = 3;
+        let mut retry_count = 0;
+        let mut last_error = None;
+
+        while retry_count < max_retries {
+            let result = self
+                .client
+                .structured()
+                .map_err(|err| {
+                    Error::Network(format!(
+                        "Failed to initiate OpenRouter structured generation on model {}: {}",
+                        self.model, err
+                    ))
+                })?
+                .generate(&self.model, messages.clone(), schema.clone())
+                .await;
+
+            match result {
+                Ok(response) => return Ok(response),
+                Err(err) => {
+                    let err_string = err.to_string();
+                    let is_timeout = err_string.contains("timeout")
+                        || err_string.contains("timed out")
+                        || err_string.contains("operation timed out");
+
+                    if is_timeout && retry_count < max_retries - 1 {
+                        retry_count += 1;
+                        let backoff_seconds = 2u64.pow(retry_count);
+                        tracing::warn!(
+                            "OpenRouter request timed out (attempt {}/{}), retrying in {} seconds...",
+                            retry_count,
+                            max_retries,
+                            backoff_seconds
+                        );
+                        tokio::time::sleep(Duration::from_secs(backoff_seconds)).await;
+                        last_error = Some(err);
+                    } else {
+                        return Err(Error::Network(format!(
+                            "Failed to get OpenRouter structured response on model {}: {}",
+                            self.model, err
+                        )));
+                    }
+                }
+            }
+        }
+
+        // If we exhausted all retries
+        Err(Error::Network(format!(
+            "Failed to get OpenRouter structured response on model {} after {} retries: {}",
+            self.model,
+            max_retries,
+            last_error.map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string())
+        )))
     }
 }

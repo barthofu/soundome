@@ -26,3 +26,6 @@ tmp/
 /core
 rustypipe_cache.json
 rustypipe_reports/
+
+# logs
+out

@@ -16,6 +16,7 @@ ollama-rs = "0.3.4"
 schemars-v1 = { package = "schemars", version = "1" }
 
 tracing = { workspace = true }
+tokio = { version = "1.44.2", features = ["time"] }
 
 async-trait = "0.1.88"
 serde = { version = "1.0.219", features = ["derive"] }

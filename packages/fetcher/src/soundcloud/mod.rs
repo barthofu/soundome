@@ -214,8 +214,8 @@ impl Soundcloud {
         let ai_client = ai::AIClient::new()
             .map_err(|e| Error::Internal(format!("Failed to initialize AI client: {}", e)))?;
 
-        // Process in chunks to avoid token limit issues
-        let chunk_size = 100;
+        // Process in chunks to avoid token limit issues and reduce timeout risk
+        let chunk_size = 50;
         let mut i = 0;
 
         while i < tracks.len() {
