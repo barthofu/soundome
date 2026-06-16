@@ -104,7 +104,7 @@ pub async fn get_best_match_from_track(track: &Track) -> Match<Track> {
 /// Query all enabled metadata providers and return all candidates with their scores.
 /// Used by the validation UI to let the user pick the correct match.
 pub async fn get_candidates_for_track(track: &Track) -> Vec<MatchCandidate> {
-    const MIN_SCORE_THRESHOLD: f64 = 0.4; // Filter out very low matches
+    const MIN_SCORE_THRESHOLD: f64 = 0.5; // Filter out very low matches
     const MAX_CANDIDATES: usize = 20; // Limit to prevent overwhelming UI
 
     let providers = build_providers();

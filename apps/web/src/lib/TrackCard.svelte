@@ -308,34 +308,39 @@
           <p class="matches-status">No candidates found</p>
         {:else}
           <p class="matches-count">{matchCandidates.length} candidate{matchCandidates.length > 1 ? 's' : ''} found</p>
-          <ul class="matches-list">
-            {#each matchCandidates as candidate, i}
-              <li class="match-item">
-                <div class="match-info">
-                  <div class="match-main">
-                    <span class="match-title">{candidate.title}</span>
-                    <span class="match-artists">{candidate.artists.map(a => a.name).join(', ')}</span>
-                  </div>
-                  <div class="match-meta">
-                    {#if candidate.album}
-                      <span class="chip">💿 {candidate.album.title}</span>
-                    {/if}
-                    {#if candidate.date}
-                      <span class="chip">📅 {candidate.date}</span>
-                    {/if}
-                    {#if candidate.duration}
-                      <span class="chip">⏱ {formatDuration(candidate.duration)}</span>
-                    {/if}
-                    <span class="chip match-score">{formatScore(candidate.score)}</span>
-                    <span class="chip match-provider">{candidate.provider}</span>
-                  </div>
-                </div>
-                <button class="btn-select" onclick={() => selectCandidate(candidate)} disabled={busy}>
-                  Select
-                </button>
-              </li>
-            {/each}
-          </ul>
+           <ul class="matches-list">
+             {#each matchCandidates as candidate, i}
+               <li class="match-item">
+                 <div class="match-info">
+                   <div class="match-main">
+                     {#if candidate.references && candidate.references.some(r => r.external_url)}
+                       {@const providerUrl = candidate.references.find(r => r.external_url)?.external_url}
+                       <a class="match-title" href={providerUrl} target="_blank" rel="noopener noreferrer">{candidate.title}</a>
+                     {:else}
+                       <span class="match-title">{candidate.title}</span>
+                     {/if}
+                     <span class="match-artists">{candidate.artists.map(a => a.name).join(', ')}</span>
+                   </div>
+                   <div class="match-meta">
+                     {#if candidate.album}
+                       <span class="chip">💿 {candidate.album.title}</span>
+                     {/if}
+                     {#if candidate.date}
+                       <span class="chip">📅 {candidate.date}</span>
+                     {/if}
+                     {#if candidate.duration}
+                       <span class="chip">⏱ {formatDuration(candidate.duration)}</span>
+                     {/if}
+                     <span class="chip match-score">{formatScore(candidate.score)}</span>
+                     <span class="chip match-provider">{candidate.provider}</span>
+                   </div>
+                 </div>
+                 <button class="btn-select" onclick={() => selectCandidate(candidate)} disabled={busy}>
+                   Select
+                 </button>
+               </li>
+             {/each}
+           </ul>
         {/if}
       </div>
     {/if}
@@ -639,6 +644,16 @@
   .match-title {
     font-weight: 600;
     font-size: 0.875rem;
+  }
+
+  a.match-title {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a.match-title:hover {
+    color: var(--accent);
+    text-decoration: underline;
   }
 
   .match-artists {
