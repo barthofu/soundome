@@ -202,7 +202,7 @@ impl Soundcloud {
             .get_track_albums(ResourceId::Id(track.track.id))
             .await
             .ok()
-            .and_then(|albums| albums.into_iter().next());
+            .and_then(|albums| albums.into_iter().find(|a| a.album_playlist.is_album));
         convert_track(track, album)
     }
 
