@@ -736,11 +736,12 @@ impl DownloadService {
             Ok((false, None)) // no need to validate
         } else if let Match::Partial(matched_track) = best_match {
             // Partial match: keep current (source) metadata, but attach MusicBrainz IDs/URLs for later review.
+            // Do NOT transpose album data from partial match to avoid introducing incorrect album info.
             tracing::warn!(
                 "Partial match found from metadata providers - will mark for validation"
             );
 
-            track.transpose_refs(&matched_track);
+            track.transpose_refs_without_album(&matched_track);
             track.needs_validation = true;
             track.validation_reason = Some("metadata_partial_match".to_string());
 
