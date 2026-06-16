@@ -52,7 +52,10 @@ mod tests {
 
         let config = result.unwrap();
         // Verify that defaults are applied when values are missing
-        assert!(!config.database.url.is_empty(), "Database URL should have a default");
+        assert!(
+            !config.database.url.is_empty(),
+            "Database URL should have a default"
+        );
         assert!(
             !config.general.base_library_dir.is_empty(),
             "Base library dir should have a default"

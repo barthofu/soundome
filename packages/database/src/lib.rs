@@ -43,9 +43,8 @@ pub fn init_database(database_url: &str) -> Result<(), Box<dyn std::error::Error
     // Create the database file if it doesn't exist
     if !Path::new(file_path).exists() {
         tracing::info!("Creating SQLite database at: {}", file_path);
-        std::fs::File::create(file_path).map_err(|e| {
-            format!("Failed to create database file '{}': {}", file_path, e)
-        })?;
+        std::fs::File::create(file_path)
+            .map_err(|e| format!("Failed to create database file '{}': {}", file_path, e))?;
     }
 
     // Run pending migrations using the embedded migrations compiled into the binary

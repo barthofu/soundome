@@ -216,7 +216,7 @@ fn rocket() -> _ {
         if let Some(port) = soundome_cfg.server.port {
             f = f.merge(("port", port));
         }
-        // rocket database 
+        // rocket database
         // let db: rocket::figment::value::Map<_, rocket::figment::value::Value>  = rocket::figment::util::map! {
         //     "url" => soundome_cfg.database.url.as_str().into(),
         //     "pool_size" => 10.into(),
@@ -224,7 +224,7 @@ fn rocket() -> _ {
         // };
         // f = f.merge(("databases.sqlite", db));
         f = f.merge(("databases.sqlite.url", soundome_cfg.database.url.as_str()));
-        
+
         f
     };
 

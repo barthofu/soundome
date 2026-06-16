@@ -235,7 +235,9 @@ impl AIBackend for OpenRouterAI {
             "Failed to get OpenRouter structured response on model {} after {} retries: {}",
             self.model,
             max_retries,
-            last_error.map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string())
+            last_error
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "Unknown error".to_string())
         )))
     }
 }

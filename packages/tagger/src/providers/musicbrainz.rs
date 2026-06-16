@@ -123,19 +123,50 @@ impl TagProvider for MusicBrainz {
     }
 
     async fn get_matches_from_query(&self, query: &str) -> Vec<Track> {
-        // Execute the query
-        let query_result = Recording::search(format!("query={}", query))
-            .execute()
-            .await;
+        // Parse query to extract artist and title
+        // Expected format: "Artist Title" or "Artist - Title"
+        let parts: Vec<&str> = if query.contains(" - ") {
+            query.splitn(2, " - ").collect()
+        } else {
+            // Split on first space and treat rest as title
+            let mut parts = query.splitn(2, ' ').collect::<Vec<&str>>();
+            if parts.len() == 1 {
+                parts.push(""); // No artist found
+            }
+            parts
+        };
 
-        // Process the results to find the best match
+        let artist = parts[0].trim();
+        let title = parts.get(1).map(|s| s.trim()).unwrap_or("");
+
+        // Build structured query for better precision
+        let mut query_builder = RecordingSearchQuery::query_builder();
+
+        if !title.is_empty() {
+            query_builder.recording(title);
+            if !artist.is_empty() {
+                query_builder.and().artist(artist);
+            }
+        } else if !artist.is_empty() {
+            // Fallback to artist-only search if no title found
+            query_builder.artist(artist);
+        } else {
+            // Fallback to free-text search as last resort
+            let query_result = Recording::search(format!("query={}", query))
+                .execute()
+                .await;
+
+            return query_result.map_or(Vec::new(), |query_result| {
+                query_result.entities.iter().map(convert_to_track).collect()
+            });
+        }
+
+        // Execute the structured query
+        let query_result = Recording::search(query_builder.build()).execute().await;
+
+        // Process the results
         query_result.map_or(Vec::new(), |query_result| {
-            query_result
-                .entities
-                .iter()
-                // Map each recording to a track
-                .map(convert_to_track)
-                .collect()
+            query_result.entities.iter().map(convert_to_track).collect()
         })
     }
 }
