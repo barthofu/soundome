@@ -32,6 +32,22 @@ SOUNDOME_CONFIG_PATH=/path/to/config.toml
 
 ---
 
+## `[server]` (optional)
+
+Overrides for the Rocket HTTP server binding. When omitted, the values from `Rocket.toml` are used. These keys take priority over `Rocket.toml` but are still overridden by Rocket's own native env vars (`ROCKET_ADDRESS`, `ROCKET_PORT`).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `host` | string | `"127.0.0.1"` | IP address or hostname to bind. Use `"0.0.0.0"` to listen on all interfaces. |
+| `port` | integer | `8000` | TCP port the server listens on. |
+
+| Key | Environment variable |
+|---|---|
+| `server.host` | `SOUNDOME__SERVER__HOST` |
+| `server.port` | `SOUNDOME__SERVER__PORT` |
+
+---
+
 ## `[general]`
 
 Core filesystem paths.
@@ -116,17 +132,37 @@ When this section is omitted, the default YouTube / YouTube Music integration is
 
 ## `[ai]`
 
-AI-assisted metadata cleanup via OpenRouter (`packages/ai`). Set `enabled = false` to skip all AI enrichment steps without removing the section.
+AI-assisted metadata cleanup via `packages/ai`. Set `enabled = false` to skip all AI enrichment steps without removing the section.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | bool | `false` | Master switch for AI-powered metadata enrichment. |
+| `provider_order` | string array | `["openrouter"]` | Ordered list of AI backends to try. First successful response wins. Supported values: `"ollama"`, `"openrouter"`. |
 
 | Key | Environment variable |
 |---|---|
 | `ai.enabled` | `SOUNDOME__AI__ENABLED` |
+| `ai.provider_order` | `SOUNDOME__AI__PROVIDER_ORDER` |
 
-### `[ai.openrouter]` (required when `ai.enabled = true`)
+### `[ai.ollama]` (optional)
+
+Local or self-hosted LLM. Useful as a fast, free primary provider. Requires Ollama 0.5.0+ for structured JSON output. See <https://ollama.com>.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `host` | string | `"http://localhost"` | Base URL of the Ollama instance (without port). |
+| `port` | integer | `11434` | Port of the Ollama instance. |
+| `model` | string | — | Model to use, e.g. `"llama3.2"`, `"qwen2.5:7b"`. |
+| `timeout` | integer | — | HTTP request timeout in seconds. |
+
+| Key | Environment variable |
+|---|---|
+| `ai.ollama.host` | `SOUNDOME__AI__OLLAMA__HOST` |
+| `ai.ollama.port` | `SOUNDOME__AI__OLLAMA__PORT` |
+| `ai.ollama.model` | `SOUNDOME__AI__OLLAMA__MODEL` |
+| `ai.ollama.timeout` | `SOUNDOME__AI__OLLAMA__TIMEOUT` |
+
+### `[ai.openrouter]` (required when using OpenRouter)
 
 Obtain an API key at <https://openrouter.ai>.
 
@@ -211,3 +247,4 @@ See [../operations/playlist-m3u8-export.md](../operations/playlist-m3u8-export.m
 - Do not commit secrets such as Spotify credentials or OpenRouter API keys.
 - Prefer environment variable overrides (e.g. in `.env`) for secrets in containerized or CI environments.
 - If proxy behavior looks inconsistent, verify both `config.toml` and the environment variables visible to the process.
+

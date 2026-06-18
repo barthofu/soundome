@@ -6,12 +6,14 @@
   import Tasks from './pages/Tasks.svelte';
   import Library from './pages/Library.svelte';
   import SyncSchedules from './pages/SyncSchedules.svelte';
+  import HelpModal from './lib/HelpModal.svelte';
 
   type Page = 'home' | 'validations' | 'tasks' | 'library' | 'sync';
 
   let page: Page = $state('home');
   let pendingCount = $state(0);
   let activeTasksCount = $state(0);
+  let helpOpen = $state(false);
 
   async function refreshCounts() {
     try {
@@ -29,7 +31,21 @@
   onMount(() => {
     refreshCounts();
     const interval = setInterval(refreshCounts, 5_000);
-    return () => clearInterval(interval);
+
+    function onKeydown(e: KeyboardEvent) {
+      const tgt = e.target as HTMLElement;
+      if (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.tagName === 'SELECT') return;
+      if (e.key === '?') {
+        e.preventDefault();
+        helpOpen = !helpOpen;
+      }
+    }
+    document.addEventListener('keydown', onKeydown);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('keydown', onKeydown);
+    };
   });
 
   function navigate(to: Page) {
@@ -86,6 +102,14 @@
     >
       Sync
     </button>
+    <button
+      class="nav-link nav-help"
+      onclick={() => (helpOpen = true)}
+      title="Help (press ?)"
+      aria-label="Help"
+    >
+      ?
+    </button>
   </div>
 </nav>
 
@@ -102,6 +126,8 @@
     <Tasks />
   {/if}
 </main>
+
+<HelpModal open={helpOpen} onClose={() => (helpOpen = false)} />
 
 <style>
   nav {
@@ -155,6 +181,18 @@
   .nav-link.active {
     color: var(--text);
     background: var(--surface-2);
+  }
+
+  .nav-help {
+    font-weight: 700;
+    font-size: 1rem;
+    min-width: 28px;
+    justify-content: center;
+    opacity: 0.55;
+  }
+
+  .nav-help:hover {
+    opacity: 1;
   }
 
   .badge {

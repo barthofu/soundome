@@ -4,6 +4,64 @@ Soundome is a Rust monorepo for building and maintaining a personal music librar
 
 The project is still work in progress. Some surfaces are production-shaped, while others are scaffolds or partial implementations. The documentation in this repository is therefore organized around what is already wired in code versus what is still planned.
 
+## Quick start
+
+### 1 — Create the config file
+
+```bash
+curl -o config.toml https://raw.githubusercontent.com/barthofu/soundome/main/config.example.toml
+```
+
+Open `config.toml` and fill in your Spotify credentials — the only required secret:
+
+```toml
+[providers.spotify]
+client_id     = "your_spotify_client_id"
+client_secret = "your_spotify_client_secret"
+```
+
+Everything else has safe defaults. AI enrichment and proxy are disabled by default.
+
+### 2 — Create the `.env` file
+
+```dotenv
+DATABASE_URL=data/soundome.db
+SOUNDOME__DATABASE__URL=data/soundome.db
+```
+
+### 3 — Create the `docker-compose.yml`
+
+```yaml
+services:
+  soundome:
+    image: ghcr.io/barthofu/soundome:latest
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - SOUNDOME__GENERAL__BASE_LIBRARY_DIR=/library
+      - SOUNDOME__GENERAL__TEMP_DOWNLOAD_DIR=/temp
+      - SOUNDOME__DATABASE__URL=/data/soundome.db
+    volumes:
+      - ./data:/data
+      - ./library:/library
+      - ./temp:/temp
+      - ./config.toml:/app/config.toml:ro
+    restart: unless-stopped
+```
+
+### 4 — Run
+
+```bash
+docker compose up -d
+```
+
+UI available at <http://localhost:8000>. Paste a Spotify, YouTube, SoundCloud, or YouTube Music URL in the **Download** tab.
+
+---
+
+> Full configuration reference and operational docs: [docs/README.md](docs/README.md)
+
 ## Current scope
 
 - Import tracks and playlists from supported source URLs.
