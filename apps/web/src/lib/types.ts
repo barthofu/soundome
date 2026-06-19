@@ -64,6 +64,19 @@ export interface MatchCandidateDto {
 export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Cancelled' | 'Cancelling';
 export type TaskType = 'SyncPlaylist' | 'SyncArtist' | 'SyncAlbum' | 'DownloadTrack';
 
+export interface TaskTrackErrorDto {
+  track: string;
+  reason: string;
+  provider_url: string | null;
+}
+
+export interface TaskStatsDto {
+  downloaded: number;
+  to_validate: number;
+  skipped: number;
+  errors: TaskTrackErrorDto[];
+}
+
 export interface TaskDto {
   id: number;
   task_type: TaskType;
@@ -72,6 +85,7 @@ export interface TaskDto {
   progress: number;
   total: number | null;
   error: string | null;
+  stats: TaskStatsDto | null;
   created_at: string | null;
   updated_at: string | null;
 }

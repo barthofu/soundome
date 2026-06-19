@@ -107,6 +107,7 @@ diesel::table! {
         error -> Nullable<Text>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        stats -> Nullable<Text>,
     }
 }
 

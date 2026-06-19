@@ -122,13 +122,20 @@ impl DownloadService {
             playlist_id
         );
 
+        // Update task label to the actual playlist name as soon as it is known.
+        if let Some(tid) = task_id {
+            if let Err(e) = self.task_service.update_label(conn, tid, &playlist.name) {
+                tracing::warn!("Failed to update task label to playlist name: {}", e);
+            }
+        }
+
         let playlist_tracks = fetcher.get_playlist_tracks_from_url(url).await?;
         let total_tracks = playlist_tracks.len();
         tracing::info!("Found {} tracks in playlist", total_tracks);
 
         // Filter out existing tracks (link them to the playlist anyway) and collect new ones
         let mut new_tracks: Vec<(Option<i32>, Track)> = Vec::new();
-        let mut existing_count = 0;
+        let mut stats = shared::models::TaskStats::default();
         for pt in &playlist_tracks {
             let track = &pt.track;
             let track_url = track
@@ -152,14 +159,17 @@ impl DownloadService {
                         e
                     );
                 }
-                existing_count += 1;
+                stats.skipped += 1;
                 if let Some(tid) = task_id {
-                    let current = existing_count;
+                    let current = stats.skipped;
                     if let Err(e) =
                         self.task_service
                             .update_progress(conn, tid, current, total_tracks as i32)
                     {
                         tracing::warn!("Failed to update task progress: {}", e);
+                    }
+                    if let Err(e) = self.task_service.update_stats(conn, tid, &stats) {
+                        tracing::warn!("Failed to update task stats: {}", e);
                     }
                 }
             } else {
@@ -202,6 +212,11 @@ impl DownloadService {
             match self.orchestrator_workflow(conn, track.clone()).await {
                 Ok(t) => {
                     tracing::info!("Successfully processed track: {}", t.display());
+                    if t.needs_validation {
+                        stats.to_validate += 1;
+                    } else {
+                        stats.downloaded += 1;
+                    }
                     if let Some(track_id) = t.id {
                         if let Err(e) =
                             self.playlist_service
@@ -216,25 +231,38 @@ impl DownloadService {
                     }
                     new_processed_tracks.push(t);
                 }
-                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
+                Err(e) => {
+                    stats.errors.push(shared::models::TaskTrackError {
+                        track: track.display(),
+                        reason: e.to_string(),
+                        track_id: None,
+                        provider_url: track.get_provider().and_then(|p| p.external_url.clone()),
+                    });
+                    tracing::error!("Error downloading track {}: {:?}", track.display(), e);
+                }
             }
             if let Some(tid) = task_id {
-                let current = existing_count + (i as i32) + 1;
+                let current = stats.skipped + (i as i32) + 1;
                 if let Err(e) =
                     self.task_service
                         .update_progress(conn, tid, current, total_tracks as i32)
                 {
                     tracing::warn!("Failed to update task progress: {}", e);
                 }
+                if let Err(e) = self.task_service.update_stats(conn, tid, &stats) {
+                    tracing::warn!("Failed to update task stats: {}", e);
+                }
             }
         }
 
         tracing::info!(
-            "Downloaded {}/{} tracks from playlist, {} existing tracks and {} errors",
-            new_processed_tracks.len(),
+            "Playlist \"{}\": {} downloaded, {} to validate, {} skipped, {} errors (total {})",
+            playlist.name,
+            stats.downloaded,
+            stats.to_validate,
+            stats.skipped,
+            stats.errors.len(),
             total_tracks,
-            existing_count,
-            new_tracks.len() - new_processed_tracks.len(),
         );
 
         // Best-effort: export updated playlist as an M3U8 file.
@@ -269,6 +297,13 @@ impl DownloadService {
             artist_id
         );
 
+        // Update task label to the artist name.
+        if let Some(tid) = task_id {
+            if let Err(e) = self.task_service.update_label(conn, tid, &artist.name) {
+                tracing::warn!("Failed to update task label to artist name: {}", e);
+            }
+        }
+
         // Fetch all tracks from this artist
         let artist_tracks = fetcher.get_artist_tracks_from_url(url).await?;
         let total_tracks = artist_tracks.len();
@@ -276,7 +311,7 @@ impl DownloadService {
 
         // Filter out existing tracks and collect new ones
         let mut new_tracks: Vec<Track> = Vec::new();
-        let mut existing_count = 0;
+        let mut stats = shared::models::TaskStats::default();
         for track in &artist_tracks {
             let track_url = track
                 .get_source()
@@ -284,14 +319,17 @@ impl DownloadService {
                 .unwrap_or_else(|| "unknown".to_string());
             if self.track_service.get_by_url(conn, &track_url).is_some() {
                 tracing::warn!("   -> Track already exists in DB: {}", track.display());
-                existing_count += 1;
+                stats.skipped += 1;
                 if let Some(tid) = task_id {
-                    let current = existing_count;
+                    let current = stats.skipped;
                     if let Err(e) =
                         self.task_service
                             .update_progress(conn, tid, current, total_tracks as i32)
                     {
                         tracing::warn!("Failed to update task progress: {}", e);
+                    }
+                    if let Err(e) = self.task_service.update_stats(conn, tid, &stats) {
+                        tracing::warn!("Failed to update task stats: {}", e);
                     }
                 }
             } else {
@@ -332,27 +370,45 @@ impl DownloadService {
             match self.orchestrator_workflow(conn, track.clone()).await {
                 Ok(t) => {
                     tracing::info!("Successfully processed track: {}", t.display());
+                    if t.needs_validation {
+                        stats.to_validate += 1;
+                    } else {
+                        stats.downloaded += 1;
+                    }
                     new_processed_tracks.push(t);
                 }
-                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
+                Err(e) => {
+                    stats.errors.push(shared::models::TaskTrackError {
+                        track: track.display(),
+                        reason: e.to_string(),
+                        track_id: None,
+                        provider_url: track.get_provider().and_then(|p| p.external_url.clone()),
+                    });
+                    tracing::error!("Error downloading track {}: {:?}", track.display(), e);
+                }
             }
             if let Some(tid) = task_id {
-                let current = existing_count + (i as i32) + 1;
+                let current = stats.skipped + (i as i32) + 1;
                 if let Err(e) =
                     self.task_service
                         .update_progress(conn, tid, current, total_tracks as i32)
                 {
                     tracing::warn!("Failed to update task progress: {}", e);
                 }
+                if let Err(e) = self.task_service.update_stats(conn, tid, &stats) {
+                    tracing::warn!("Failed to update task stats: {}", e);
+                }
             }
         }
 
         tracing::info!(
-            "Downloaded {}/{} tracks for artist, {} existing tracks and {} errors",
-            new_processed_tracks.len(),
+            "Artist \"{}\": {} downloaded, {} to validate, {} skipped, {} errors (total {})",
+            artist.name,
+            stats.downloaded,
+            stats.to_validate,
+            stats.skipped,
+            stats.errors.len(),
             total_tracks,
-            existing_count,
-            new_tracks.len() - new_processed_tracks.len(),
         );
 
         Ok(new_processed_tracks)
@@ -387,6 +443,13 @@ impl DownloadService {
                 .join(", ")
         );
 
+        // Update task label to the album title.
+        if let Some(tid) = task_id {
+            if let Err(e) = self.task_service.update_label(conn, tid, &album_meta.title) {
+                tracing::warn!("Failed to update task label to album title: {}", e);
+            }
+        }
+
         // Fetch all tracks from this album
         let album_tracks = fetcher.get_album_tracks_from_url(url).await?;
         let total_tracks = album_tracks.len();
@@ -394,7 +457,7 @@ impl DownloadService {
 
         // Filter out existing tracks and collect new ones
         let mut new_tracks: Vec<Track> = Vec::new();
-        let mut existing_count = 0;
+        let mut stats = shared::models::TaskStats::default();
         for track in &album_tracks {
             let track_url = track
                 .get_source()
@@ -402,14 +465,17 @@ impl DownloadService {
                 .unwrap_or_else(|| "unknown".to_string());
             if self.track_service.get_by_url(conn, &track_url).is_some() {
                 tracing::warn!("   -> Track already exists in DB: {}", track.display());
-                existing_count += 1;
+                stats.skipped += 1;
                 if let Some(tid) = task_id {
-                    let current = existing_count;
+                    let current = stats.skipped;
                     if let Err(e) =
                         self.task_service
                             .update_progress(conn, tid, current, total_tracks as i32)
                     {
                         tracing::warn!("Failed to update task progress: {}", e);
+                    }
+                    if let Err(e) = self.task_service.update_stats(conn, tid, &stats) {
+                        tracing::warn!("Failed to update task stats: {}", e);
                     }
                 }
             } else {
@@ -450,27 +516,45 @@ impl DownloadService {
             match self.orchestrator_workflow(conn, track.clone()).await {
                 Ok(t) => {
                     tracing::info!("Successfully processed track: {}", t.display());
+                    if t.needs_validation {
+                        stats.to_validate += 1;
+                    } else {
+                        stats.downloaded += 1;
+                    }
                     new_processed_tracks.push(t);
                 }
-                Err(e) => tracing::error!("Error downloading track {}: {:?}", track.display(), e),
+                Err(e) => {
+                    stats.errors.push(shared::models::TaskTrackError {
+                        track: track.display(),
+                        reason: e.to_string(),
+                        track_id: None,
+                        provider_url: track.get_provider().and_then(|p| p.external_url.clone()),
+                    });
+                    tracing::error!("Error downloading track {}: {:?}", track.display(), e);
+                }
             }
             if let Some(tid) = task_id {
-                let current = existing_count + (i as i32) + 1;
+                let current = stats.skipped + (i as i32) + 1;
                 if let Err(e) =
                     self.task_service
                         .update_progress(conn, tid, current, total_tracks as i32)
                 {
                     tracing::warn!("Failed to update task progress: {}", e);
                 }
+                if let Err(e) = self.task_service.update_stats(conn, tid, &stats) {
+                    tracing::warn!("Failed to update task stats: {}", e);
+                }
             }
         }
 
         tracing::info!(
-            "Downloaded {}/{} tracks from album, {} existing tracks and {} errors",
-            new_processed_tracks.len(),
+            "Album \"{}\": {} downloaded, {} to validate, {} skipped, {} errors (total {})",
+            album_meta.title,
+            stats.downloaded,
+            stats.to_validate,
+            stats.skipped,
+            stats.errors.len(),
             total_tracks,
-            existing_count,
-            new_tracks.len() - new_processed_tracks.len(),
         );
 
         Ok(new_processed_tracks)

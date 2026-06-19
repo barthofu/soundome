@@ -15,8 +15,36 @@ pub struct Task {
     /// Total number of items, if known.
     pub total: Option<i32>,
     pub error: Option<String>,
+    /// Per-category breakdown updated live during sync.
+    pub stats: Option<TaskStats>,
     pub created_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
+}
+
+/// Live per-category counters persisted as JSON in the `stats` column.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TaskStats {
+    /// Tracks fully downloaded and moved to library.
+    pub downloaded: i32,
+    /// Tracks saved as "needs_validation" (staged, awaiting approval).
+    pub to_validate: i32,
+    /// Tracks already in library — linked to playlist/artist but not re-downloaded.
+    pub skipped: i32,
+    /// Per-track failures that did not abort the whole sync.
+    pub errors: Vec<TaskTrackError>,
+}
+
+/// One entry per track that failed during a sync.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskTrackError {
+    /// Human-readable display name of the track (e.g. "Artist - Title").
+    pub track: String,
+    /// Error message returned by the orchestrator workflow.
+    pub reason: String,
+    /// Track ID if available, for linking to the library.
+    pub track_id: Option<i32>,
+    /// Provider URL (audio source) for external link if track failed before DB save.
+    pub provider_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, AsRefStr)]

@@ -1,0 +1,2 @@
+-- SQLite does not support DROP COLUMN reliably before version 3.35.0.
+-- stats column is nullable and backward-compatible; leave in place on rollback.

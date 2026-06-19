@@ -143,6 +143,7 @@ impl TaskRepository for DieselTaskRepository {
                 schema::task::status.eq("Pending"),
                 schema::task::progress.eq(0),
                 schema::task::error.eq(None::<String>),
+                schema::task::stats.eq(None::<String>),
                 schema::task::updated_at.eq(chrono::Utc::now().naive_utc()),
             ))
             .execute(conn)
@@ -156,5 +157,39 @@ impl TaskRepository for DieselTaskRepository {
             .count()
             .get_result(conn)
             .map_err(map_error)
+    }
+
+    fn update_label(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        label: &str,
+    ) -> SoundomeResult<()> {
+        diesel::update(schema::task::table.filter(schema::task::id.eq(id)))
+            .set((
+                schema::task::label.eq(Some(label)),
+                schema::task::updated_at.eq(chrono::Utc::now().naive_utc()),
+            ))
+            .execute(conn)
+            .map_err(map_error)?;
+        Ok(())
+    }
+
+    fn update_stats(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        stats: &shared::models::TaskStats,
+    ) -> SoundomeResult<()> {
+        let json = serde_json::to_string(stats)
+            .map_err(|e| shared::errors::Error::Custom(e.to_string()))?;
+        diesel::update(schema::task::table.filter(schema::task::id.eq(id)))
+            .set((
+                schema::task::stats.eq(Some(json)),
+                schema::task::updated_at.eq(chrono::Utc::now().naive_utc()),
+            ))
+            .execute(conn)
+            .map_err(map_error)?;
+        Ok(())
     }
 }

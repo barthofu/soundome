@@ -16,6 +16,7 @@ pub struct TaskEntity {
     pub error: Option<String>,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
+    pub stats: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize)]

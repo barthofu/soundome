@@ -33,6 +33,7 @@
             inkscape
             ffmpeg
             pkgs-master.yt-dlp
+            pkgs-master.scdl
 
             # utilities
             id3v2

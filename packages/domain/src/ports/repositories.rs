@@ -212,6 +212,16 @@ pub trait TaskRepository: Send + Sync {
         -> SoundomeResult<Vec<Task>>;
     fn reset_for_retry(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     fn count_by_status(&self, conn: &mut SqliteConnection, status: &str) -> SoundomeResult<i64>;
+    /// Update the task label in-place (e.g. to the fetched playlist/artist/album name).
+    fn update_label(&self, conn: &mut SqliteConnection, id: i32, label: &str)
+        -> SoundomeResult<()>;
+    /// Persist the live per-category stats (downloaded / to_validate / skipped / errors).
+    fn update_stats(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        stats: &shared::models::TaskStats,
+    ) -> SoundomeResult<()>;
 }
 
 // ================================================================================================

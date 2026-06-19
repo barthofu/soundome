@@ -14,6 +14,25 @@ use crate::utils::{cancellation::CancellationRegistry, database::Db, error::Cust
 // ================================================================================================
 
 #[derive(Debug, Serialize, JsonSchema)]
+pub struct TaskTrackErrorDto {
+    pub track: String,
+    pub reason: String,
+    pub provider_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct TaskStatsDto {
+    /// Tracks fully downloaded and moved to library.
+    pub downloaded: i32,
+    /// Tracks saved as "needs_validation" (staged, awaiting approval).
+    pub to_validate: i32,
+    /// Tracks already in library — linked but not re-downloaded.
+    pub skipped: i32,
+    /// Per-track failures that did not abort the whole sync.
+    pub errors: Vec<TaskTrackErrorDto>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct TaskDto {
     pub id: i32,
     pub task_type: String,
@@ -22,12 +41,27 @@ pub struct TaskDto {
     pub progress: i32,
     pub total: Option<i32>,
     pub error: Option<String>,
+    pub stats: Option<TaskStatsDto>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
 
 impl TaskDto {
     fn from_task(task: Task) -> Option<Self> {
+        let stats = task.stats.map(|s| TaskStatsDto {
+            downloaded: s.downloaded,
+            to_validate: s.to_validate,
+            skipped: s.skipped,
+            errors: s
+                .errors
+                .into_iter()
+                .map(|e| TaskTrackErrorDto {
+                    track: e.track,
+                    reason: e.reason,
+                    provider_url: e.provider_url,
+                })
+                .collect(),
+        });
         Some(Self {
             id: task.id?,
             task_type: task.task_type.as_ref().to_string(),
@@ -36,6 +70,7 @@ impl TaskDto {
             progress: task.progress,
             total: task.total,
             error: task.error,
+            stats,
             created_at: task.created_at.map(|t| t.to_string()),
             updated_at: task.updated_at.map(|t| t.to_string()),
         })

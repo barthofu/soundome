@@ -7,6 +7,8 @@
   let loading = $state(true);
   let retrying: Set<number> = $state(new Set());
   let cancelling: Set<number> = $state(new Set());
+  // Track which task error lists are expanded
+  let expandedErrors: Set<number> = $state(new Set());
   let interval: ReturnType<typeof setInterval>;
 
   async function refresh() {
@@ -33,9 +35,9 @@
     try {
       await retryTask(task.id);
       await refresh();
-    } catch (e) {
-      alert(`Échec du retry : ${e instanceof Error ? e.message : e}`);
-    } finally {
+     } catch (e) {
+       alert(`Retry failed: ${e instanceof Error ? e.message : e}`);
+     } finally {
       retrying = new Set([...retrying].filter((id) => id !== task.id));
     }
   }
@@ -45,11 +47,19 @@
     try {
       await cancelTask(task.id);
       await refresh();
-    } catch (e) {
-      alert(`Échec de l'annulation : ${e instanceof Error ? e.message : e}`);
-      cancelling = new Set([...cancelling].filter((id) => id !== task.id));
+     } catch (e) {
+       alert(`Cancel failed: ${e instanceof Error ? e.message : e}`);
+       cancelling = new Set([...cancelling].filter((id) => id !== task.id));
     }
     // Keep in cancelling state until task status reflects cancellation (handled in refresh)
+  }
+
+  function toggleErrors(taskId: number) {
+    if (expandedErrors.has(taskId)) {
+      expandedErrors = new Set([...expandedErrors].filter((id) => id !== taskId));
+    } else {
+      expandedErrors = new Set([...expandedErrors, taskId]);
+    }
   }
 
   onMount(() => {
@@ -60,7 +70,7 @@
   onDestroy(() => clearInterval(interval));
 
   function statusLabel(status: TaskDto['status']) {
-    return { Pending: 'En attente', Running: 'En cours', Completed: 'Terminé', Failed: 'Échec', Cancelled: 'Annulé', Cancelling: 'Annulation…' }[status] ?? status;
+    return { Pending: 'Pending', Running: 'Running', Completed: 'Completed', Failed: 'Failed', Cancelled: 'Cancelled', Cancelling: 'Cancelling…' }[status] ?? status;
   }
 
   function statusClass(status: TaskDto['status']) {
@@ -74,10 +84,10 @@
 
   function taskLabel(task: TaskDto) {
     if (task.label) return task.label;
-    if (task.task_type === 'SyncPlaylist') return 'Synchronisation de playlist';
-    if (task.task_type === 'SyncArtist') return 'Synchronisation d\'artiste';
-    if (task.task_type === 'SyncAlbum') return 'Synchronisation d\'album';
-    return 'Téléchargement';
+    if (task.task_type === 'SyncPlaylist') return 'Sync playlist';
+    if (task.task_type === 'SyncArtist') return 'Sync artist';
+    if (task.task_type === 'SyncAlbum') return 'Sync album';
+    return 'Download track';
   }
 
   function canRetry(status: TaskDto['status']) {
@@ -86,6 +96,15 @@
 
   function canCancel(status: TaskDto['status']) {
     return status === 'Running' || status === 'Pending';
+  }
+
+  function hasStats(task: TaskDto) {
+    return task.stats != null && (
+      task.stats.downloaded > 0 ||
+      task.stats.to_validate > 0 ||
+      task.stats.skipped > 0 ||
+      task.stats.errors.length > 0
+    );
   }
 </script>
 
@@ -110,9 +129,9 @@
                   onclick={() => handleCancel(task)}
                 >
                   {#if cancelling.has(task.id)}
-                    <span class="spinner"></span> Annulation…
+                    <span class="spinner"></span> Cancelling…
                   {:else}
-                    Annuler
+                    Cancel
                   {/if}
                 </button>
               {/if}
@@ -122,14 +141,14 @@
                   disabled={retrying.has(task.id)}
                   onclick={() => handleRetry(task)}
                 >
-                  {retrying.has(task.id) ? '…' : 'Relancer'}
+                  {retrying.has(task.id) ? '…' : 'Retry'}
                 </button>
               {/if}
               <span class="status-badge {statusClass(task.status)}">{statusLabel(task.status)}</span>
             </div>
           </div>
 
-          {#if task.status === 'Running' || task.status === 'Completed'}
+          {#if task.status === 'Running' || task.status === 'Completed' || task.status === 'Cancelled'}
             <div class="progress-row">
               <div class="progress-bar">
                 <div
@@ -143,8 +162,50 @@
             </div>
           {/if}
 
+          {#if hasStats(task)}
+            <div class="stats-row">
+              {#if task.stats!.downloaded > 0}
+                <span class="stat-chip downloaded">✓ {task.stats!.downloaded} downloaded</span>
+              {/if}
+              {#if task.stats!.to_validate > 0}
+                <span class="stat-chip to-validate">⚠ {task.stats!.to_validate} pending validation</span>
+              {/if}
+              {#if task.stats!.skipped > 0}
+                <span class="stat-chip skipped">↩ {task.stats!.skipped} skipped</span>
+              {/if}
+              {#if task.stats!.errors.length > 0}
+                <button
+                  class="stat-chip errors"
+                  onclick={() => toggleErrors(task.id)}
+                  title="View error details"
+                >
+                  ✕ {task.stats!.errors.length} error{task.stats!.errors.length > 1 ? 's' : ''}
+                  <span class="chevron">{expandedErrors.has(task.id) ? '▲' : '▼'}</span>
+                </button>
+              {/if}
+            </div>
+
+            {#if task.stats!.errors.length > 0 && expandedErrors.has(task.id)}
+              <ul class="error-list">
+                {#each task.stats!.errors as err}
+                  <li class="error-item">
+                    {#if err.provider_url}
+                      <a href={err.provider_url} target="_blank" rel="noopener noreferrer" class="error-track-link">
+                        {err.track}
+                        <span class="external-icon">↗</span>
+                      </a>
+                    {:else}
+                      <span class="error-track">{err.track}</span>
+                    {/if}
+                    <span class="error-reason">{err.reason}</span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          {/if}
+
           {#if task.error}
-            <p class="task-error">{task.error}</p>
+            <p class="task-error">⚠ {task.error}</p>
           {/if}
 
           {#if task.updated_at}
@@ -262,11 +323,11 @@
     border-radius: 99px;
     flex-shrink: 0;
   }
-  .status-badge.pending  { background: #3b3b3b; color: #aaa; }
-  .status-badge.running  { background: #1e3a5f; color: #60a5fa; }
-  .status-badge.completed { background: #1a3326; color: #4ade80; }
-  .status-badge.failed   { background: #3b1a1a; color: #f87171; }
-  .status-badge.cancelled { background: #3b2a1a; color: #fb923c; }
+  .status-badge.pending    { background: #3b3b3b; color: #aaa; }
+  .status-badge.running    { background: #1e3a5f; color: #60a5fa; }
+  .status-badge.completed  { background: #1a3326; color: #4ade80; }
+  .status-badge.failed     { background: #3b1a1a; color: #f87171; }
+  .status-badge.cancelled  { background: #3b2a1a; color: #fb923c; }
   .status-badge.cancelling { background: #3b2a1a; color: #fbbf24; }
 
   .progress-row {
@@ -288,8 +349,9 @@
     border-radius: 3px;
     transition: width 0.4s ease;
   }
-  .progress-fill.running   { background: #60a5fa; }
-  .progress-fill.completed { background: #4ade80; }
+  .progress-fill.running    { background: #60a5fa; }
+  .progress-fill.completed  { background: #4ade80; }
+  .progress-fill.cancelled  { background: #fb923c; }
 
   .progress-text {
     font-size: 0.75rem;
@@ -297,6 +359,94 @@
     white-space: nowrap;
     min-width: 50px;
     text-align: right;
+  }
+
+  /* ── Stats chips ── */
+  .stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.1rem;
+  }
+
+  .stat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+
+  .stat-chip.downloaded { background: #1a3326; color: #4ade80; }
+  .stat-chip.to-validate { background: #3b3000; color: #fbbf24; }
+  .stat-chip.skipped    { background: #2a2a2a; color: #9ca3af; }
+  .stat-chip.errors     {
+    background: #3b1a1a;
+    color: #f87171;
+    border: none;
+    cursor: pointer;
+  }
+  .stat-chip.errors:hover { background: #4a2020; }
+
+  .chevron {
+    font-size: 0.6rem;
+    opacity: 0.7;
+  }
+
+  /* ── Error detail list ── */
+  .error-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-left: 2px solid #5a2020;
+    padding-left: 0.75rem;
+  }
+
+  .error-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .error-track {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #f87171;
+  }
+
+  .error-track-link {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #f87171;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-bottom: 1px solid #f8717166;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .error-track-link:hover {
+    color: #fb8181;
+    border-bottom-color: #f87171;
+  }
+
+  .external-icon {
+    font-size: 0.6rem;
+    opacity: 0.7;
+  }
+
+  .error-reason {
+    font-size: 0.72rem;
+    color: #9ca3af;
+    word-break: break-word;
   }
 
   .task-error {

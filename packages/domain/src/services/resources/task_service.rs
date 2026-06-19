@@ -42,6 +42,7 @@ impl TaskService {
             progress: 0,
             total: None,
             error: None,
+            stats: None,
             created_at: None,
             updated_at: None,
         };
@@ -64,6 +65,7 @@ impl TaskService {
             progress: 0,
             total: None,
             error: None,
+            stats: None,
             created_at: None,
             updated_at: None,
         };
@@ -86,6 +88,7 @@ impl TaskService {
             progress: 0,
             total: None,
             error: None,
+            stats: None,
             created_at: None,
             updated_at: None,
         };
@@ -161,5 +164,25 @@ impl TaskService {
         status: &str,
     ) -> shared::types::SoundomeResult<i64> {
         self.task_repo.count_by_status(conn, status)
+    }
+
+    /// Update the task label in-place (e.g. set to the fetched playlist/album/artist name).
+    pub fn update_label(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        label: &str,
+    ) -> shared::types::SoundomeResult<()> {
+        self.task_repo.update_label(conn, id, label)
+    }
+
+    /// Persist live per-category stats (downloaded / to_validate / skipped / per-track errors).
+    pub fn update_stats(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        stats: &shared::models::TaskStats,
+    ) -> shared::types::SoundomeResult<()> {
+        self.task_repo.update_stats(conn, id, stats)
     }
 }

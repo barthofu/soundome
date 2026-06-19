@@ -360,6 +360,10 @@ impl TaskEntity {
             progress: entity.progress,
             total: entity.total,
             error: entity.error,
+            stats: entity
+                .stats
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok()),
             created_at: Some(entity.created_at),
             updated_at: Some(entity.updated_at),
         }
