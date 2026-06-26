@@ -272,6 +272,6 @@ pub struct ServerConfig {
 pub struct PlaylistsConfig {
     /// Directory where `.m3u8` playlist files are written.
     /// May be relative (to the working directory) or absolute.
-    /// Defaults to `{base_library_dir}/Playlists/` when absent.
+    /// Defaults to `{base_library_dir}/.playlists/` when absent.
     pub m3u8_dir: Option<String>,
 }

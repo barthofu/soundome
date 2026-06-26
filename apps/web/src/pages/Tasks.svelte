@@ -3,12 +3,18 @@
   import { getTasks, retryTask, cancelTask } from '../lib/api';
   import type { TaskDto } from '../lib/types';
 
+  interface Props {
+    onNavigateValidations?: () => void;
+  }
+  let { onNavigateValidations }: Props = $props();
+
   let tasks: TaskDto[] = $state([]);
   let loading = $state(true);
   let retrying: Set<number> = $state(new Set());
   let cancelling: Set<number> = $state(new Set());
   // Track which task error lists are expanded
   let expandedErrors: Set<number> = $state(new Set());
+  let expandedValidations: Set<number> = $state(new Set());
   let interval: ReturnType<typeof setInterval>;
 
   async function refresh() {
@@ -62,6 +68,14 @@
     }
   }
 
+  function toggleValidations(taskId: number) {
+    if (expandedValidations.has(taskId)) {
+      expandedValidations = new Set([...expandedValidations].filter((id) => id !== taskId));
+    } else {
+      expandedValidations = new Set([...expandedValidations, taskId]);
+    }
+  }
+
   onMount(() => {
     refresh();
     interval = setInterval(refresh, 3_000);
@@ -105,6 +119,13 @@
       task.stats.skipped > 0 ||
       task.stats.errors.length > 0
     );
+  }
+
+  function reasonLabel(reason: string | null): string {
+    if (reason === 'soundcloud_drm_protected') return 'DRM protected';
+    if (reason === 'metadata_partial_match') return 'partial metadata match';
+    if (reason === 'metadata_no_match') return 'no metadata match';
+    return reason ?? 'needs review';
   }
 </script>
 
@@ -168,7 +189,24 @@
                 <span class="stat-chip downloaded">✓ {task.stats!.downloaded} downloaded</span>
               {/if}
               {#if task.stats!.to_validate > 0}
-                <span class="stat-chip to-validate">⚠ {task.stats!.to_validate} pending validation</span>
+                {#if task.stats!.to_validate_tracks && task.stats!.to_validate_tracks.length > 0}
+                  <button
+                    class="stat-chip to-validate"
+                    onclick={() => toggleValidations(task.id)}
+                    title="View tracks pending validation"
+                  >
+                    ⚠ {task.stats!.to_validate} pending validation
+                    <span class="chevron">{expandedValidations.has(task.id) ? '▲' : '▼'}</span>
+                  </button>
+                {:else}
+                  <button
+                    class="stat-chip to-validate"
+                    onclick={() => onNavigateValidations?.()}
+                    title="Go to Validations"
+                  >
+                    ⚠ {task.stats!.to_validate} pending validation
+                  </button>
+                {/if}
               {/if}
               {#if task.stats!.skipped > 0}
                 <span class="stat-chip skipped">↩ {task.stats!.skipped} skipped</span>
@@ -200,6 +238,22 @@
                     <span class="error-reason">{err.reason}</span>
                   </li>
                 {/each}
+              </ul>
+            {/if}
+
+            {#if task.stats!.to_validate_tracks && task.stats!.to_validate_tracks.length > 0 && expandedValidations.has(task.id)}
+              <ul class="validation-list">
+                {#each task.stats!.to_validate_tracks as item}
+                  <li class="validation-item">
+                    <span class="validation-track">{item.track}</span>
+                    <span class="validation-reason">{reasonLabel(item.reason)}</span>
+                  </li>
+                {/each}
+                <li class="validation-item validation-action">
+                  <button class="go-validate-btn" onclick={() => onNavigateValidations?.()}>
+                    Review in Validations →
+                  </button>
+                </li>
               </ul>
             {/if}
           {/if}
@@ -381,7 +435,14 @@
   }
 
   .stat-chip.downloaded { background: #1a3326; color: #4ade80; }
-  .stat-chip.to-validate { background: #3b3000; color: #fbbf24; }
+  .stat-chip.to-validate {
+    background: #3b3000;
+    color: #fbbf24;
+    border: none;
+    cursor: pointer;
+  }
+  .stat-chip.to-validate:hover { background: #4a3d00; }
+
   .stat-chip.skipped    { background: #2a2a2a; color: #9ca3af; }
   .stat-chip.errors     {
     background: #3b1a1a;
@@ -447,6 +508,53 @@
     font-size: 0.72rem;
     color: #9ca3af;
     word-break: break-word;
+  }
+
+  /* ── Validation detail list ── */
+  .validation-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-left: 2px solid #78520a;
+    padding-left: 0.75rem;
+  }
+
+  .validation-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .validation-track {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fbbf24;
+  }
+
+  .validation-reason {
+    font-size: 0.72rem;
+    color: #9ca3af;
+  }
+
+  .validation-action {
+    margin-top: 0.2rem;
+  }
+
+  .go-validate-btn {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 99px;
+    border: 1px solid #fbbf24;
+    background: transparent;
+    color: #fbbf24;
+    cursor: pointer;
+  }
+  .go-validate-btn:hover {
+    background: #3b3000;
   }
 
   .task-error {

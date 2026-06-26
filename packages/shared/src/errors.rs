@@ -88,6 +88,9 @@ pub enum Error {
     Cancelled,
     #[error("process error")]
     ExitCode { code: i32, stderr: String },
+
+    #[error("SoundCloud track is DRM protected and cannot be downloaded directly: {0}")]
+    SoundCloudDrmProtected(String),
 }
 
 #[cfg(feature = "diesel_integration")]

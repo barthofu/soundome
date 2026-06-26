@@ -22,6 +22,9 @@ pub struct ValidationPatch {
     pub track_number: Option<i32>,
     pub disc_number: Option<i32>,
     pub label: Option<String>,
+    /// YouTube or YouTube Music URL to download from.
+    /// Required when the track has no staged file (e.g. SoundCloud DRM protection).
+    pub provider_url: Option<String>,
 }
 
 pub struct TrackService {

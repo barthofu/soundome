@@ -123,7 +123,7 @@
   {:else if page === 'sync'}
     <SyncSchedules />
   {:else}
-    <Tasks />
+    <Tasks onNavigateValidations={() => navigate('validations')} />
   {/if}
 </main>
 

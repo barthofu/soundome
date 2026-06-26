@@ -141,9 +141,56 @@ pub async fn download(
             youtube_music.download(&url, track_title, output_dir).await
         }
         Platform::SoundCloud => {
-            let mut soundcloud = soundcloud::SoundCloud::new().await?;
-            soundcloud.download(&url, track_title, output_dir).await
+            // DRM fallback: if the provider resolved to YouTube/YTMusic, use that downloader.
+            match provider.platform {
+                Platform::Youtube => {
+                    let mut youtube = youtube::Youtube::new(
+                        Config::get()
+                            .providers
+                            .youtube
+                            .as_ref()
+                            .and_then(|youtube| youtube.invidious_instance.clone()),
+                    );
+                    youtube.download(&url, track_title, output_dir).await
+                }
+                Platform::YoutubeMusic => {
+                    let mut youtube_music = youtube_music::YoutubeMusic::new();
+                    youtube_music.download(&url, track_title, output_dir).await
+                }
+                _ => {
+                    let mut soundcloud = soundcloud::SoundCloud::new().await?;
+                    soundcloud.download(&url, track_title, output_dir).await
+                }
+            }
         }
         _ => Err(Error::Unknown),
     }
+}
+
+/// Search YouTube Music and YouTube for all candidates matching the track.
+/// Returns raw results without similarity filtering so the user can pick manually.
+/// Results from YouTube Music are listed first.
+pub async fn search_youtube_candidates(track: &Track) -> SoundomeResult<Vec<Track>> {
+    let youtube = youtube::Youtube::new(
+        Config::get()
+            .providers
+            .youtube
+            .as_ref()
+            .and_then(|y| y.invidious_instance.clone()),
+    );
+    let youtube_music = youtube_music::YoutubeMusic::new();
+
+    let mut all: Vec<Track> = Vec::new();
+
+    match youtube_music.search_all(track).await {
+        Ok(results) => all.extend(results),
+        Err(e) => tracing::warn!("YouTube Music candidate search failed: {}", e),
+    }
+
+    match youtube.search_all(track).await {
+        Ok(results) => all.extend(results),
+        Err(e) => tracing::warn!("YouTube candidate search failed: {}", e),
+    }
+
+    Ok(all)
 }

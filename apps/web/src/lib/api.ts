@@ -59,6 +59,15 @@ export async function getMatchCandidates(id: number): Promise<MatchCandidateDto[
   return res.json();
 }
 
+export async function getYoutubeCandidates(id: number): Promise<MatchCandidateDto[]> {
+  const res = await fetch(`${BASE}/validations/${id}/youtube-candidates`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(body.message ?? res.statusText);
+  }
+  return res.json();
+}
+
 export type DownloadResultTrack = {
   type: 'track';
   title: string;

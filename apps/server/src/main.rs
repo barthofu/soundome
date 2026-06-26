@@ -245,6 +245,7 @@ fn rocket() -> _ {
                 routes::validations::approve_validation,
                 routes::validations::reject_validation,
                 routes::validations::get_match_candidates,
+                routes::validations::get_youtube_provider_candidates,
                 routes::download::download,
                 routes::tasks::get_all,
                 routes::tasks::get_by_id,

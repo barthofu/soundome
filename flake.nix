@@ -63,7 +63,7 @@
               fi
             fi
 
-            export PATH="/home/coder/.local/bin:$PATH"
+            # export PATH="/home/coder/.local/bin:$PATH"
 
             # Been moved to .zshrc
             # ssh -C -N -D 1080 vps.public || true &

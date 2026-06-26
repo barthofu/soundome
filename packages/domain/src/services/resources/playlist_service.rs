@@ -80,7 +80,7 @@ impl PlaylistService {
     /// Regenerate the M3U8 file for a playlist from the current DB state.
     ///
     /// The output directory is taken from `Config::get().playlists.m3u8_dir`; when
-    /// absent it defaults to `{base_library_dir}/Playlists/`.
+    /// absent it defaults to `{base_library_dir}/.playlists/`.
     pub fn export_m3u8(
         &self,
         conn: &mut SqliteConnection,
@@ -96,11 +96,11 @@ impl PlaylistService {
     }
 
     /// Resolve the M3U8 output directory from config, falling back to
-    /// `{base_library_dir}/Playlists/` when not explicitly configured.
+    /// `{base_library_dir}/.playlists/` when not explicitly configured.
     pub fn resolve_m3u8_dir(cfg: &Config) -> PathBuf {
         match &cfg.playlists.m3u8_dir {
             Some(dir) => PathBuf::from(dir),
-            None => PathBuf::from(&cfg.general.base_library_dir).join("Playlists"),
+            None => PathBuf::from(&cfg.general.base_library_dir).join(".playlists"),
         }
     }
 

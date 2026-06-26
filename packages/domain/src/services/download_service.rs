@@ -10,7 +10,7 @@ use fetcher::{Fetcher, Source};
 use shared::models::ReferenceType;
 use shared::{
     errors::Error,
-    models::{Album, AlbumType, Artist, Playlist, Track},
+    models::{Album, AlbumType, Artist, Platform, Playlist, Reference, TaskTrackValidation, Track},
     types::SoundomeResult,
     utils::enums::Match,
 };
@@ -214,6 +214,11 @@ impl DownloadService {
                     tracing::info!("Successfully processed track: {}", t.display());
                     if t.needs_validation {
                         stats.to_validate += 1;
+                        stats.to_validate_tracks.push(TaskTrackValidation {
+                            track: t.display(),
+                            track_id: t.id,
+                            reason: t.validation_reason.clone(),
+                        });
                     } else {
                         stats.downloaded += 1;
                     }
@@ -372,6 +377,11 @@ impl DownloadService {
                     tracing::info!("Successfully processed track: {}", t.display());
                     if t.needs_validation {
                         stats.to_validate += 1;
+                        stats.to_validate_tracks.push(TaskTrackValidation {
+                            track: t.display(),
+                            track_id: t.id,
+                            reason: t.validation_reason.clone(),
+                        });
                     } else {
                         stats.downloaded += 1;
                     }
@@ -518,6 +528,11 @@ impl DownloadService {
                     tracing::info!("Successfully processed track: {}", t.display());
                     if t.needs_validation {
                         stats.to_validate += 1;
+                        stats.to_validate_tracks.push(TaskTrackValidation {
+                            track: t.display(),
+                            track_id: t.id,
+                            reason: t.validation_reason.clone(),
+                        });
                     } else {
                         stats.downloaded += 1;
                     }
@@ -642,10 +657,47 @@ impl DownloadService {
             }
         }
 
-        // 3. Tag the staged file and move to library (file was downloaded at fetch time)
-        let file_path = track.file_path.clone().ok_or_else(|| {
-            Error::Custom(format!("track {} has no staged file — cannot finalize", id))
-        })?;
+        // 3. Resolve the audio file path: use the staged file if present, otherwise
+        //    download from the provider URL supplied by the user (DRM fallback).
+        let file_path = if let Some(staged) = track.file_path.clone() {
+            staged
+        } else {
+            let provider_url = patch.provider_url.as_ref().ok_or_else(|| {
+                Error::Custom(format!(
+                    "track {} has no staged file and no provider_url was provided",
+                    id
+                ))
+            })?;
+
+            tracing::info!(
+                "No staged file for track {} — downloading from provider: {}",
+                id,
+                provider_url
+            );
+
+            let provider_platform = if provider_url.contains("music.youtube.com") {
+                Platform::YoutubeMusic
+            } else {
+                Platform::Youtube
+            };
+
+            let provider_ref = Reference {
+                id: None,
+                ref_type: ReferenceType::Provider,
+                platform: provider_platform,
+                external_id: None,
+                external_url: Some(provider_url.clone()),
+            };
+            track.references.push(provider_ref.clone());
+
+            let source_ref = track.get_source().ok_or_else(|| {
+                Error::Custom(format!("track {} has no source reference", id))
+            })?;
+
+            let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
+            downloader::download(&source_ref, &provider_ref, &track.title, staging_dir).await?
+        };
+        track.file_path = Some(file_path.clone());
         self.process_track_file(&mut track, &file_path).await?;
 
         // 4. Clear validation flag and persist
@@ -659,6 +711,43 @@ impl DownloadService {
     // == Sub private and utils methods (internal)
     // ============================================================================================
 
+    /// Search YouTube and YouTube Music for provider candidates matching a pending track.
+    /// Returns all results unfiltered so the user can select the correct video manually.
+    /// Intended for DRM-protected SoundCloud tracks that could not be auto-downloaded.
+    pub async fn get_youtube_provider_candidates(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> SoundomeResult<Vec<tagger::enricher::MatchCandidate>> {
+        let track = self.track_service.get_by_id(conn, id)?;
+        let results = downloader::search_youtube_candidates(&track).await?;
+
+        let candidates = results
+            .into_iter()
+            .map(|t| {
+                let provider = t
+                    .get_provider()
+                    .and_then(|r| r.external_url.clone())
+                    .map(|u| {
+                        if u.contains("music.youtube.com") {
+                            "youtube_music"
+                        } else {
+                            "youtube"
+                        }
+                    })
+                    .unwrap_or("youtube")
+                    .to_string();
+                tagger::enricher::MatchCandidate {
+                    track: t,
+                    score: 1.0,
+                    provider,
+                }
+            })
+            .collect();
+
+        Ok(candidates)
+    }
+
     async fn orchestrator_workflow(
         &self,
         conn: &mut SqliteConnection,
@@ -670,17 +759,34 @@ impl DownloadService {
         tracing::info!("Getting metadata via tagger providers");
         let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track).await?;
 
-        // Step 2: Always download to staging so the file is ready whenever validation happens
+        // Step 2: Try to download to staging.
+        // SoundCloud DRM-protected tracks will return SoundCloudDrmProtected instead of a hard error.
         tracing::info!("Searching and downloading track from provider (staging)");
-        let file_path = self.download_track(&mut track).await?;
+        let file_path_opt = match self.download_track(&mut track).await {
+            Ok(path) => Some(path),
+            Err(Error::SoundCloudDrmProtected(_)) => {
+                tracing::warn!(
+                    "SoundCloud track is DRM protected — marking for manual YouTube selection"
+                );
+                if !track.needs_validation {
+                    track.needs_validation = true;
+                    track.validation_reason = Some("soundcloud_drm_protected".to_string());
+                }
+                None
+            }
+            Err(e) => return Err(e),
+        };
 
-        if should_validate {
+        if should_validate || file_path_opt.is_none() {
             tracing::warn!(
-                "Track marked for validation — saved with staging file_path, skipping tag/organize"
+                "Track saved for manual validation — reason={:?}",
+                track.validation_reason
             );
             let saved_track = self.save_track(conn, &track).await?;
             return Ok(saved_track);
         }
+
+        let file_path = file_path_opt.expect("checked is_none above");
 
         // Step 3: Deduplication
         if existing_track.is_none() {

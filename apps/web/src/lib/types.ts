@@ -43,6 +43,8 @@ export interface PatchValidationBody {
   track_number?: number;
   disc_number?: number;
   label?: string;
+  /** YouTube or YouTube Music URL to download from (required for DRM-protected SoundCloud tracks). */
+  provider_url?: string;
 }
 
 export interface MatchCandidateDto {
@@ -70,11 +72,18 @@ export interface TaskTrackErrorDto {
   provider_url: string | null;
 }
 
+export interface TaskTrackValidationDto {
+  track: string;
+  track_id: number | null;
+  reason: string | null;
+}
+
 export interface TaskStatsDto {
   downloaded: number;
   to_validate: number;
   skipped: number;
   errors: TaskTrackErrorDto[];
+  to_validate_tracks: TaskTrackValidationDto[];
 }
 
 export interface TaskDto {
