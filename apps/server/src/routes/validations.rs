@@ -121,6 +121,9 @@ pub struct ApproveValidationBody {
     pub track_number: Option<i32>,
     pub disc_number: Option<i32>,
     pub label: Option<String>,
+    /// YouTube or YouTube Music URL to download from when the track has no staged file.
+    /// Required for SoundCloud DRM-protected tracks.
+    pub provider_url: Option<String>,
 }
 
 // ================================================================================================
@@ -175,6 +178,7 @@ pub async fn approve_validation(
             track_number: body.track_number,
             disc_number: body.disc_number,
             label: body.label,
+            provider_url: body.provider_url,
         };
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(
@@ -346,4 +350,44 @@ pub async fn get_recent(
                 message: err.to_string(),
             })
         })
+}
+
+// ================================================================================================
+// YouTube provider candidates (for DRM-protected SoundCloud tracks)
+// ================================================================================================
+
+#[openapi]
+#[get("/validations/<id>/youtube-candidates")]
+pub async fn get_youtube_provider_candidates(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<MatchCandidateDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    db.run(move |conn| {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(
+                services
+                    .download_service
+                    .get_youtube_provider_candidates(conn, id),
+            )
+        })
+    })
+    .await
+    .map(|candidates| {
+        Json(
+            candidates
+                .into_iter()
+                .map(MatchCandidateDto::from_candidate)
+                .collect(),
+        )
+    })
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
 }

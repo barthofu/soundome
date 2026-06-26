@@ -32,6 +32,20 @@ pub struct TaskStats {
     pub skipped: i32,
     /// Per-track failures that did not abort the whole sync.
     pub errors: Vec<TaskTrackError>,
+    /// Tracks saved as needs_validation, with details for display and navigation.
+    #[serde(default)]
+    pub to_validate_tracks: Vec<TaskTrackValidation>,
+}
+
+/// One entry per track saved as "needs_validation" during a sync.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskTrackValidation {
+    /// Human-readable display name of the track (e.g. "Artist - Title").
+    pub track: String,
+    /// DB id of the saved track, for linking to the Validations page.
+    pub track_id: Option<i32>,
+    /// Reason the track needs validation (e.g. "soundcloud_drm_protected").
+    pub reason: Option<String>,
 }
 
 /// One entry per track that failed during a sync.

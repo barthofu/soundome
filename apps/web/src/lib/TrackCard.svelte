@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getMatchCandidates } from './api';
+  import { getMatchCandidates, getYoutubeCandidates } from './api';
   import type { PendingValidationDto, PatchValidationBody, MatchCandidateDto } from './types';
 
   interface Props {
@@ -126,7 +126,11 @@
     matchesLoading = true;
     matchesError = null;
     try {
-      matchCandidates = await getMatchCandidates(track.id);
+      if (isDrmProtected) {
+        matchCandidates = await getYoutubeCandidates(track.id);
+      } else {
+        matchCandidates = await getMatchCandidates(track.id);
+      }
     } catch (e: unknown) {
       matchesError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -138,16 +142,27 @@
     if (!onApprove) return;
     busy = true;
     try {
-      const patch: PatchValidationBody = {
-        title: candidate.title,
-        artists: candidate.artists.map((a) => a.name),
-        album_title: candidate.album?.title ?? undefined,
-        genre: candidate.genre ?? undefined,
-        date: candidate.date ?? undefined,
-        track_number: candidate.track_number ?? undefined,
-        disc_number: candidate.disc_number ?? undefined,
-        label: candidate.label ?? undefined,
-      };
+      const patch: PatchValidationBody = {};
+
+      if (isDrmProtected) {
+        // DRM track: only supply the provider URL for download — keep existing SoundCloud metadata.
+        const providerRef = candidate.references.find(
+          (r) => r.ref_type === 'Provider' && r.external_url,
+        );
+        if (!providerRef?.external_url) return;
+        patch.provider_url = providerRef.external_url;
+      } else {
+        // Metadata candidate: apply full metadata from the match.
+        patch.title = candidate.title;
+        patch.artists = candidate.artists.map((a) => a.name);
+        patch.album_title = candidate.album?.title ?? undefined;
+        patch.genre = candidate.genre ?? undefined;
+        patch.date = candidate.date ?? undefined;
+        patch.track_number = candidate.track_number ?? undefined;
+        patch.disc_number = candidate.disc_number ?? undefined;
+        patch.label = candidate.label ?? undefined;
+      }
+
       await onApprove(track.id, patch);
     } finally {
       busy = false;
@@ -174,6 +189,16 @@
   );
 
   let isPartialMatch = $derived(track.validation_reason === 'metadata_partial_match');
+  let isDrmProtected = $derived(track.validation_reason === 'soundcloud_drm_protected');
+
+  function reasonLabel(reason: string | null): string {
+    switch (reason) {
+      case 'metadata_partial_match':   return 'Partial metadata match — confirm or pick a candidate';
+      case 'metadata_no_match':        return 'No metadata match found — edit manually before approving';
+      case 'soundcloud_drm_protected': return 'SoundCloud DRM — select a YouTube source to download';
+      default:                         return reason ?? '';
+    }
+  }
 </script>
 
 <article class="track-card" class:editing bind:this={cardEl}
@@ -253,7 +278,7 @@
 
         {#if track.validation_reason}
           <div class="reason">
-            ⚠️ <code>{track.validation_reason}</code>
+            ⚠️ {reasonLabel(track.validation_reason)}
           </div>
         {/if}
 
@@ -281,6 +306,11 @@
                 {showMatches ? 'Hide matches' : 'Show matches'}
               </button>
             {/if}
+            {#if isDrmProtected}
+              <button class="btn-ghost btn-youtube" onclick={toggleMatches} disabled={busy}>
+                {showMatches ? 'Hide YouTube results' : 'Find on YouTube'}
+              </button>
+            {/if}
           {/if}
         </div>
         <div class="actions-right">
@@ -301,7 +331,7 @@
     {#if showMatches}
       <div class="matches-panel">
         {#if matchesLoading}
-          <p class="matches-status">Searching metadata providers…</p>
+          <p class="matches-status">{isDrmProtected ? 'Searching YouTube…' : 'Searching metadata providers…'}</p>
         {:else if matchesError}
           <p class="matches-status matches-error">{matchesError}</p>
         {:else if matchCandidates.length === 0}
@@ -571,6 +601,16 @@
 
   .btn-matches:hover:not(:disabled) {
     background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-youtube {
+    border-color: #dc2626;
+    color: #dc2626;
+  }
+
+  .btn-youtube:hover:not(:disabled) {
+    background: #dc2626;
     color: #fff;
   }
 

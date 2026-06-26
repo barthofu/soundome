@@ -38,6 +38,20 @@ impl SoundCloud {
     }
 }
 
+/// Returns true when yt-dlp stderr indicates the track is DRM/subscription-protected.
+/// SoundCloud DRM manifests in several ways — including a 404 on the JSON metadata endpoint
+/// when yt-dlp tries to fetch the stream manifest for a go+ / DRM-gated track.
+fn is_drm_error(stderr: &str) -> bool {
+    let s = stderr.to_lowercase();
+    s.contains("drm")
+        || s.contains("subscription")
+        || s.contains("premium")
+        || s.contains("go+")
+        || s.contains("requires purchase")
+        || s.contains("not available in your country")
+        || s.contains("unable to download json metadata")
+}
+
 #[async_trait]
 impl Provider for SoundCloud {
     async fn search(&self, track: &Track) -> SoundomeResult<Reference> {
@@ -63,7 +77,18 @@ impl Provider for SoundCloud {
         file_name: &str,
         base_library_dir: PathBuf,
     ) -> Result<PathBuf, Error> {
-        download_with_ytdlp(url, file_name, base_library_dir).await
+        match download_with_ytdlp(url, file_name, base_library_dir).await {
+            Err(Error::ExitCode { code, ref stderr }) if is_drm_error(stderr) => {
+                tracing::warn!(
+                    "SoundCloud DRM protection detected (exit {}) for {}: {}",
+                    code,
+                    url,
+                    stderr
+                );
+                Err(Error::SoundCloudDrmProtected(url.to_string()))
+            }
+            other => other,
+        }
     }
 
     fn is_valid_url(url: &str) -> bool {

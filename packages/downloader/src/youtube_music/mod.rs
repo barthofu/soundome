@@ -53,6 +53,18 @@ impl YoutubeMusic {
         format!("{} {}", artist, track.title)
     }
 
+    /// Returns all search results without similarity filtering, for manual user selection.
+    pub async fn search_all(&self, track: &Track) -> SoundomeResult<Vec<Track>> {
+        let query = self.create_search_query(track.clone());
+        let results = self.get_results(&query).await?;
+        Ok(results
+            .items
+            .items
+            .iter()
+            .map(|item| self.convert_search_item_to_track(item.clone()))
+            .collect())
+    }
+
     async fn get_results(&self, query: &str) -> SoundomeResult<MusicSearchResult<TrackItem>> {
         self.client
             .query()
