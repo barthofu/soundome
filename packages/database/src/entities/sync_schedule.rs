@@ -9,7 +9,8 @@ pub struct SyncScheduleEntity {
     pub id: i32,
     pub playlist_url: String,
     pub label: Option<String>,
-    pub interval_seconds: i32,
+    pub interval_seconds: Option<i32>,
+    pub cron_expression: Option<String>,
     pub enabled: i32,
     pub last_run: Option<chrono::NaiveDateTime>,
     pub next_run: Option<chrono::NaiveDateTime>,
@@ -21,7 +22,8 @@ pub struct SyncScheduleEntity {
 pub struct NewSyncScheduleEntity {
     pub playlist_url: String,
     pub label: Option<String>,
-    pub interval_seconds: i32,
+    pub interval_seconds: Option<i32>,
+    pub cron_expression: Option<String>,
     pub enabled: i32,
     pub last_run: Option<chrono::NaiveDateTime>,
     pub next_run: Option<chrono::NaiveDateTime>,
@@ -32,6 +34,7 @@ pub struct NewSyncScheduleEntity {
 pub struct UpdateSyncScheduleEntity {
     pub label: Option<String>,
     pub interval_seconds: Option<i32>,
+    pub cron_expression: Option<String>,
     pub enabled: Option<i32>,
     pub last_run: Option<chrono::NaiveDateTime>,
     pub next_run: Option<chrono::NaiveDateTime>,

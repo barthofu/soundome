@@ -16,7 +16,9 @@
   // Create form
   let newUrl = $state('');
   let newLabel = $state('');
-  let newIntervalMinutes = $state(60);
+  let newScheduleType = $state<'interval' | 'cron'>('interval');
+  let newIntervalHours = $state(1);
+  let newCronExpression = $state('0 12 * * *');
   let creating = $state(false);
   let createError: string | null = $state(null);
 
@@ -44,10 +46,23 @@
     creating = true;
     createError = null;
     try {
-      await createSyncSchedule(newUrl.trim(), newLabel.trim() || null, newIntervalMinutes * 60);
+      const body: any = {
+        playlist_url: newUrl.trim(),
+        label: newLabel.trim() || null,
+      };
+      
+      if (newScheduleType === 'interval') {
+        body.interval_hours = newIntervalHours;
+      } else {
+        body.cron_expression = newCronExpression;
+      }
+      
+      await createSyncSchedule(body);
       newUrl = '';
       newLabel = '';
-      newIntervalMinutes = 60;
+      newIntervalHours = 1;
+      newCronExpression = '0 12 * * *';
+      newScheduleType = 'interval';
       await load();
     } catch (e: unknown) {
       createError = e instanceof Error ? e.message : String(e);
@@ -102,11 +117,22 @@
     const d = new Date(dt.replace(' ', 'T'));
     return d.toLocaleString();
   }
+
+  function formatSchedule(schedule: SyncScheduleDto): string {
+    if (schedule.interval_hours !== null && schedule.interval_hours !== undefined) {
+      const h = schedule.interval_hours;
+      if (h < 1) return `every ${Math.round(h * 60)}m`;
+      if (h === 1) return 'every hour';
+      if (h === Math.floor(h)) return `every ${Math.floor(h)}h`;
+      return `every ${h}h`;
+    }
+    return `cron: ${schedule.cron_expression || '?'}`;
+  }
 </script>
 
 <div class="sync-page">
   <h2>Sync Schedules</h2>
-  <p class="subtitle">Define playlists to synchronize automatically at a fixed interval.</p>
+  <p class="subtitle">Define playlists to synchronize automatically using intervals or cron expressions.</p>
 
   <!-- Create form -->
   <section class="create-section">
@@ -128,20 +154,58 @@
           bind:value={newLabel}
           disabled={creating}
         />
-        <div class="interval-group">
+        <div class="schedule-type-toggle">
+          <button
+            type="button"
+            class="toggle-btn"
+            class:active={newScheduleType === 'interval'}
+            disabled={creating}
+            onclick={() => (newScheduleType = 'interval')}
+          >
+            Interval
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            class:active={newScheduleType === 'cron'}
+            disabled={creating}
+            onclick={() => (newScheduleType = 'cron')}
+          >
+            Cron
+          </button>
+        </div>
+      </div>
+
+      {#if newScheduleType === 'interval'}
+        <div class="form-row form-row--split">
+          <div class="interval-group">
+            <input
+              type="number"
+              min="0.25"
+              step="0.25"
+              bind:value={newIntervalHours}
+              disabled={creating}
+            />
+            <span class="interval-hint">hours</span>
+          </div>
+          <button type="submit" disabled={creating || !newUrl.trim()}>
+            {#if creating}<span class="spinner"></span> Adding…{:else}Add{/if}
+          </button>
+        </div>
+      {:else}
+        <div class="form-row form-row--split">
           <input
-            type="number"
-            min="1"
-            step="1"
-            bind:value={newIntervalMinutes}
+            type="text"
+            placeholder="Cron expression (e.g. '0 12 * * *' for daily at noon)"
+            bind:value={newCronExpression}
             disabled={creating}
           />
-          <span class="interval-hint">min ({formatInterval(newIntervalMinutes * 60)})</span>
+          <button type="submit" disabled={creating || !newUrl.trim()}>
+            {#if creating}<span class="spinner"></span> Adding…{:else}Add{/if}
+          </button>
         </div>
-        <button type="submit" disabled={creating || !newUrl.trim()}>
-          {#if creating}<span class="spinner"></span> Adding…{:else}Add{/if}
-        </button>
-      </div>
+      {/if}
+
       {#if createError}
         <p class="feedback error">{createError}</p>
       {/if}
@@ -173,7 +237,7 @@
               {/if}
             </div>
             <div class="schedule-meta">
-              <span class="interval-badge">every {formatInterval(schedule.interval_seconds)}</span>
+              <span class="interval-badge">{formatSchedule(schedule)}</span>
               <span class="status-badge" class:enabled={schedule.enabled} class:paused={!schedule.enabled}>
                 {schedule.enabled ? 'Active' : 'Paused'}
               </span>
@@ -272,6 +336,40 @@
 
   .form-row input:disabled {
     opacity: 0.5;
+  }
+
+  .schedule-type-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .toggle-btn {
+    flex: 1;
+    padding: 0.55rem 0.75rem;
+    border: none;
+    background: var(--surface);
+    color: var(--color-muted, #888);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-btn:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+
+  .toggle-btn.active {
+    background: var(--color-accent, #7c6af7);
+    color: #fff;
+  }
+
+  .toggle-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .interval-group {

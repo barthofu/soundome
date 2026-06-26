@@ -312,7 +312,8 @@ export interface SyncScheduleDto {
   id: number;
   playlist_url: string;
   label: string | null;
-  interval_seconds: number;
+  interval_hours: number | null;
+  cron_expression: string | null;
   enabled: boolean;
   last_run: string | null;
   next_run: string | null;
@@ -326,14 +327,17 @@ export async function getSyncSchedules(): Promise<SyncScheduleDto[]> {
 }
 
 export async function createSyncSchedule(
-  playlist_url: string,
-  label: string | null,
-  interval_seconds: number,
+  body: {
+    playlist_url: string;
+    label?: string | null;
+    interval_hours?: number;
+    cron_expression?: string;
+  },
 ): Promise<SyncScheduleDto> {
   const res = await fetch(`${BASE}/sync-schedules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playlist_url, label: label || null, interval_seconds }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
@@ -344,7 +348,7 @@ export async function createSyncSchedule(
 
 export async function updateSyncSchedule(
   id: number,
-  patch: { label?: string; interval_seconds?: number; enabled?: boolean },
+  patch: { label?: string; interval_hours?: number; cron_expression?: string; enabled?: boolean },
 ): Promise<SyncScheduleDto> {
   const res = await fetch(`${BASE}/sync-schedules/${id}`, {
     method: 'PATCH',

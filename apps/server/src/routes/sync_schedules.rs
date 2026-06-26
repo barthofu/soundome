@@ -19,7 +19,8 @@ pub struct SyncScheduleDto {
     pub id: i32,
     pub playlist_url: String,
     pub label: Option<String>,
-    pub interval_seconds: i32,
+    pub interval_hours: Option<f64>,
+    pub cron_expression: Option<String>,
     pub enabled: bool,
     pub last_run: Option<String>,
     pub next_run: Option<String>,
@@ -32,7 +33,9 @@ impl SyncScheduleDto {
             id: s.id?,
             playlist_url: s.playlist_url,
             label: s.label,
-            interval_seconds: s.interval_seconds,
+            // Convert seconds to hours for display
+            interval_hours: s.interval_seconds.map(|sec| sec as f64 / 3600.0),
+            cron_expression: s.cron_expression,
             enabled: s.enabled,
             last_run: s.last_run.map(|t| t.to_string()),
             next_run: s.next_run.map(|t| t.to_string()),
@@ -45,14 +48,20 @@ impl SyncScheduleDto {
 pub struct CreateSyncScheduleBody {
     pub playlist_url: String,
     pub label: Option<String>,
-    /// Interval in seconds. Defaults to 3600 (1 hour) if omitted.
-    pub interval_seconds: Option<i32>,
+    /// Interval in hours (optional, mutually exclusive with cron_expression).
+    /// Defaults to 1 hour if neither interval_hours nor cron_expression is provided.
+    pub interval_hours: Option<f64>,
+    /// Cron expression for scheduling (optional, mutually exclusive with interval_hours).
+    pub cron_expression: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateSyncScheduleBody {
     pub label: Option<String>,
-    pub interval_seconds: Option<i32>,
+    /// Interval in hours (optional, mutually exclusive with cron_expression).
+    pub interval_hours: Option<f64>,
+    /// Cron expression for scheduling (optional, mutually exclusive with interval_hours).
+    pub cron_expression: Option<String>,
     pub enabled: Option<bool>,
 }
 
@@ -126,12 +135,33 @@ pub async fn create(
 ) -> Result<Json<SyncScheduleDto>, crate::utils::error::Error> {
     let services = Arc::clone(services);
     let body = body.into_inner();
-    let interval = body.interval_seconds.unwrap_or(3600);
+
+    // Validate that at least one of interval_hours or cron_expression is provided
+    if body.interval_hours.is_none() && body.cron_expression.is_none() {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BAD_REQUEST".to_string(),
+            message: "Either interval_hours or cron_expression must be provided".to_string(),
+        }));
+    }
+
+    // Validate that both are not provided
+    if body.interval_hours.is_some() && body.cron_expression.is_some() {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BAD_REQUEST".to_string(),
+            message: "Cannot provide both interval_hours and cron_expression".to_string(),
+        }));
+    }
+
+    // Convert hours to seconds
+    let interval_seconds = body.interval_hours.map(|hours| (hours * 3600.0) as i32);
+
     let schedule = db
         .run(move |conn| {
             services
                 .sync_schedule_service
-                .create(conn, body.playlist_url, body.label, interval)
+                .create(conn, body.playlist_url, body.label, interval_seconds, body.cron_expression)
         })
         .await
         .map_err(|e| {
@@ -152,7 +182,7 @@ pub async fn create(
         })
 }
 
-/// Update a sync schedule (label, interval, or enabled flag).
+/// Update a sync schedule (label, interval, cron, or enabled flag).
 #[openapi]
 #[patch("/sync-schedules/<id>", format = "json", data = "<body>")]
 pub async fn update(
@@ -164,14 +194,28 @@ pub async fn update(
     let services = Arc::clone(services);
     let body = body.into_inner();
 
+    // Validate that both interval_hours and cron_expression are not provided together
+    if body.interval_hours.is_some() && body.cron_expression.is_some() {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BAD_REQUEST".to_string(),
+            message: "Cannot provide both interval_hours and cron_expression".to_string(),
+        }));
+    }
+
     let schedule = db
         .run(move |conn| {
             let mut existing = services.sync_schedule_service.get_by_id(conn, id)?;
             if let Some(label) = body.label {
                 existing.label = Some(label);
             }
-            if let Some(interval) = body.interval_seconds {
-                existing.interval_seconds = interval;
+            if let Some(hours) = body.interval_hours {
+                existing.interval_seconds = Some((hours * 3600.0) as i32);
+                existing.cron_expression = None;
+            }
+            if let Some(cron) = body.cron_expression {
+                existing.cron_expression = Some(cron);
+                existing.interval_seconds = None;
             }
             if let Some(enabled) = body.enabled {
                 existing.enabled = enabled;

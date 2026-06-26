@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use chrono::Duration;
 use diesel::SqliteConnection;
 use shared::{models::SyncSchedule, types::SoundomeResult};
 
-use crate::ports::repositories::SyncScheduleRepository;
+use crate::{ports::repositories::SyncScheduleRepository, schedule::calculate_next_run};
 
 pub struct SyncScheduleService {
     repo: Arc<dyn SyncScheduleRepository + Send + Sync>,
@@ -28,15 +27,17 @@ impl SyncScheduleService {
         conn: &mut SqliteConnection,
         playlist_url: String,
         label: Option<String>,
-        interval_seconds: i32,
+        interval_seconds: Option<i32>,
+        cron_expression: Option<String>,
     ) -> SoundomeResult<SyncSchedule> {
         let now = chrono::Utc::now().naive_utc();
-        let next_run = now + Duration::seconds(interval_seconds as i64);
+        let next_run = calculate_next_run(now, interval_seconds, cron_expression.as_deref())?;
         let schedule = SyncSchedule {
             id: None,
             playlist_url,
             label,
             interval_seconds,
+            cron_expression,
             enabled: true,
             last_run: None,
             next_run: Some(next_run),

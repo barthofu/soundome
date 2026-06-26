@@ -1,4 +1,5 @@
 use domain::ports::repositories::SyncScheduleRepository;
+use domain::schedule::calculate_next_run;
 
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::{models::SyncSchedule, types::SoundomeResult};
@@ -63,7 +64,8 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
     ) -> SoundomeResult<SyncSchedule> {
         let changeset = UpdateSyncScheduleEntity {
             label: schedule.label.clone(),
-            interval_seconds: Some(schedule.interval_seconds),
+            interval_seconds: schedule.interval_seconds,
+            cron_expression: schedule.cron_expression.clone(),
             enabled: Some(if schedule.enabled { 1 } else { 0 }),
             last_run: schedule.last_run,
             next_run: schedule.next_run,
@@ -101,15 +103,11 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
     }
 
     fn mark_ran(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
-        // Fetch the interval to compute next_run
-        let interval: i32 = schema::sync_schedule::table
-            .filter(schema::sync_schedule::id.eq(id))
-            .select(schema::sync_schedule::interval_seconds)
-            .first(conn)
-            .map_err(map_error)?;
+        // Fetch schedule to get interval_seconds and cron_expression
+        let schedule = self.get_by_id(conn, id)?;
 
         let now = chrono::Utc::now().naive_utc();
-        let next = now + chrono::Duration::seconds(interval as i64);
+        let next = calculate_next_run(now, schedule.interval_seconds, schedule.cron_expression.as_deref())?;
 
         diesel::update(schema::sync_schedule::table.filter(schema::sync_schedule::id.eq(id)))
             .set((
