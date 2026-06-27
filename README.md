@@ -10,42 +10,25 @@ The project is still work in progress. Some surfaces are production-shaped, whil
 
 ## Quick start
 
-### 1. Create the config file
+You can use the prebuilt Docker image to get started quickly. The following steps assume you have Docker and Docker Compose installed.
 
-```bash
-curl -o config.toml https://raw.githubusercontent.com/barthofu/soundome/main/config.example.toml
-```
-
-Open `config.toml` and fill in your Spotify credentials — the only required secret:
-
-```toml
-[providers.spotify]
-client_id     = "your_spotify_client_id"
-client_secret = "your_spotify_client_secret"
-```
-
-Everything else has safe defaults. AI enrichment and proxy are disabled by default.
-
-### 2. Create the `.env` file
-
-```dotenv
-DATABASE_URL=data/soundome.db
-SOUNDOME__DATABASE__URL=data/soundome.db
-```
-
-### 3. Create the `docker-compose.yml`
+### 1. Create the `docker-compose.yml`
 
 ```yaml
 services:
+
   soundome:
     image: ghcr.io/barthofu/soundome:latest
     ports:
-      - "8000:8000"
-    env_file: .env
+      - 8000:8000
     environment:
+      - SOUNDOME__SERVER__HOST=0.0.0.0
+      - SOUNDOME__SERVER__PORT=8000
+      - SOUNDOME__DATABASE__URL=/data/soundome.db
       - SOUNDOME__GENERAL__BASE_LIBRARY_DIR=/library
       - SOUNDOME__GENERAL__TEMP_DOWNLOAD_DIR=/temp
-      - SOUNDOME__DATABASE__URL=/data/soundome.db
+      - SOUNDOME__GENERAL__INGEST_DIR=/ingest
+      - SOUNDOME__LOGS__LEVEL=info
     volumes:
       - ./data:/data
       - ./library:/library
@@ -54,13 +37,13 @@ services:
     restart: unless-stopped
 ```
 
-### 4. Run
+### 2. Run
 
 ```bash
 docker compose up -d
 ```
 
-UI available at <http://localhost:8000>. Paste a Spotify, YouTube, SoundCloud, or YouTube Music URL in the **Download** tab.
+UI available at <http://localhost:8000>. Paste a YouTube, SoundCloud, or YouTube Music URL in the **Download** tab.
 
 ---
 
@@ -101,15 +84,30 @@ soundome/
 
 Start with [docs/README.md](docs/README.md).
 
+**Getting started**
+- [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md): first run, paste a URL, understand the result.
 - [docs/getting-started/development-setup.md](docs/getting-started/development-setup.md): local setup and daily development commands.
 - [docs/getting-started/configuration.md](docs/getting-started/configuration.md): config sections, runtime expectations, and environment overrides.
+
+**Guides**
+- [docs/guides/spotify.md](docs/guides/spotify.md): activate Spotify, obtain credentials, what Spotify unlocks.
+- [docs/guides/soundcloud.md](docs/guides/soundcloud.md): SoundCloud specifics — noisy metadata, DRM tracks, AI cleanup.
+- [docs/guides/ai-metadata.md](docs/guides/ai-metadata.md): configure Ollama or OpenRouter to clean SoundCloud metadata automatically.
+- [docs/guides/playlists.md](docs/guides/playlists.md): sync playlists, schedule automatic updates, export M3U8 files.
+- [docs/guides/local-ingest.md](docs/guides/local-ingest.md): import audio files you already own.
+- [docs/guides/validation.md](docs/guides/validation.md): understand and resolve tracks flagged for manual review.
+
+**Architecture & workflows**
 - [docs/product/specs.md](docs/product/specs.md): product scope, goals, constraints, and non-goals.
 - [docs/architecture/design.md](docs/architecture/design.md): architecture, workflow ownership, and runtime design.
 - [docs/architecture/repository-map.md](docs/architecture/repository-map.md): crate map and important code entry points.
 - [docs/workflows/download.md](docs/workflows/download.md): step-by-step import scenarios.
 - [docs/workflows/web-admin.md](docs/workflows/web-admin.md): web interface and validation workflow.
+
+**Operations**
+- [docs/operations/cli.md](docs/operations/cli.md): CLI reference, commands, and configuration.
 - [docs/operations/proxy-configuration.md](docs/operations/proxy-configuration.md): proxy support and limitations.
-- [docs/operations/proxy-usage-example.md](docs/operations/proxy-usage-example.md): code-level proxy usage patterns.
+- [docs/operations/playlist-m3u8-export.md](docs/operations/playlist-m3u8-export.md): M3U8 export behavior and configuration.
 
 ## Development
 

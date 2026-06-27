@@ -5,17 +5,29 @@ This directory is the main documentation hub for the repository. The content is 
 ## Suggested reading order
 
 1. [getting-started/README.md](getting-started/README.md)
-2. [product/specs.md](product/specs.md)
-3. [architecture/design.md](architecture/design.md)
-4. [workflows/download.md](workflows/download.md)
+2. [getting-started/quickstart.md](getting-started/quickstart.md)
+3. [product/specs.md](product/specs.md)
+4. [architecture/design.md](architecture/design.md)
+5. [workflows/download.md](workflows/download.md)
 
 ## Categories
 
 ### Getting started
 
 - [getting-started/README.md](getting-started/README.md): quick orientation and reading path.
+- [getting-started/quickstart.md](getting-started/quickstart.md): first run, paste a URL, understand the result.
 - [getting-started/development-setup.md](getting-started/development-setup.md): local setup, commands, and development workflow.
 - [getting-started/configuration.md](getting-started/configuration.md): config sections, environment expectations, and runtime paths.
+
+### Guides
+
+- [guides/README.md](guides/README.md): guide index.
+- [guides/spotify.md](guides/spotify.md): activate Spotify, obtain credentials, what Spotify unlocks.
+- [guides/soundcloud.md](guides/soundcloud.md): SoundCloud specifics — noisy metadata, DRM tracks, AI cleanup.
+- [guides/ai-metadata.md](guides/ai-metadata.md): configure Ollama or OpenRouter to clean SoundCloud metadata automatically.
+- [guides/playlists.md](guides/playlists.md): sync playlists, schedule automatic updates, export M3U8 files.
+- [guides/local-ingest.md](guides/local-ingest.md): import audio files you already own.
+- [guides/validation.md](guides/validation.md): understand and resolve tracks flagged for manual review.
 
 ### Product
 
