@@ -379,3 +379,26 @@ export async function triggerSyncSchedule(id: number): Promise<{ task_id: number
   return res.json();
 }
 
+// ================================================================================================
+// Storage Stats
+// ================================================================================================
+
+export interface ArtistStorageDto {
+  id: number;
+  name: string;
+  bytes: number;
+  percent: number;
+}
+
+export interface StorageStatsDto {
+  total_bytes: number;
+  total_formatted: string;
+  artists: ArtistStorageDto[];
+}
+
+export async function getStorageStats(): Promise<StorageStatsDto> {
+  const res = await fetch(`${BASE}/library/storage-stats`);
+  if (!res.ok) throw new Error(`Failed to fetch storage stats: ${res.statusText}`);
+  return res.json();
+}
+

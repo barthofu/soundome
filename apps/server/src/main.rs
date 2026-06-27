@@ -275,6 +275,7 @@ fn rocket() -> _ {
                 routes::playlists::get_tracks,
                 routes::playlists::export,
                 routes::library::scan,
+                routes::storage::storage_stats,
             ],
         )
         // .mount("/api", routes![routes::audio::stream,])
