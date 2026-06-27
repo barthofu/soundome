@@ -41,7 +41,7 @@ TARGET="${1:-}"
 VERSION="${2:-}"
 
 if [[ -z "$TARGET" || -z "$VERSION" ]]; then
-    echo "Usage: $0 <server|cli> <version>  (e.g. $0 server 1.2.0)"
+    echo "Usage: $0 <server|cli> <version>  (e.g. $0 server 1.2.0 or 1.2.0-rc1)"
     exit 1
 fi
 
@@ -49,9 +49,10 @@ if [[ "$TARGET" != "server" && "$TARGET" != "cli" ]]; then
     err "first argument must be 'server' or 'cli', got: '$TARGET'"
 fi
 
-# Validate semver (x.y.z)
-if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    err "version must be semver (e.g. 1.2.0), got: '$VERSION'"
+# Validate semver (x.y.z with optional prerelease/build metadata)
+SEMVER_REGEX='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
+if ! [[ "$VERSION" =~ $SEMVER_REGEX ]]; then
+    err "version must be semver (e.g. 1.2.0 or 1.2.0-rc1), got: '$VERSION'"
 fi
 
 # ── environment checks ────────────────────────────────────────────────────────
