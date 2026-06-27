@@ -39,6 +39,12 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         dry_run: bool,
     },
+
+    /// Ingest a single local audio file into the library.
+    Ingest {
+        /// Absolute path to the audio file to ingest.
+        file_path: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -191,6 +197,9 @@ async fn main() -> anyhow::Result<()> {
             dry_run,
         } => {
             commands::scan::scan(&client, library_root.as_deref(), dry_run).await?;
+        }
+        Commands::Ingest { file_path } => {
+            commands::ingest::ingest(&client, &file_path).await?;
         }
     }
 

@@ -117,6 +117,9 @@ impl Weights {
     const ALBUM: f64 = 0.4;
     const DURATION: f64 = 1.0;
     const RELEASE_DATE: f64 = 0.3;
+    /// When both tracks have a track number, a mismatch is a strong negative signal.
+    /// Two tracks on the same album by the same artist should differ here.
+    const TRACK_NUMBER: f64 = 0.8;
 }
 
 impl Track {
@@ -262,23 +265,25 @@ impl Track {
         }
 
         // Duration comparison (within tolerance ranges)
-        if let (Some(duration1), Some(duration2)) = (&self.duration, &other_track.duration) {
-            let diff = (duration1 - duration2 / 1000).abs();
-            let duration_score = if diff <= 2000 {
-                // <= 2 seconds tolerance
+        // All duration values are in seconds throughout the codebase.
+        if let (Some(duration1), Some(duration2)) = (self.duration, other_track.duration) {
+            let diff = (duration1 - duration2).abs();
+            let duration_score = if diff <= 2 {
+                // within 2 s — effectively the same track
                 Weights::DURATION
-            } else if diff <= 5000 {
-                // <= 5 seconds tolerance
-                Weights::DURATION / 2.0
+            } else if diff <= 5 {
+                // within 5 s — likely the same (intro / outro differences)
+                Weights::DURATION * 0.5
             } else {
+                // beyond 5 s tolerance — clearly different recordings; add the
+                // weight to the denominator but contribute nothing to the score
+                // so it acts as a penalty rather than being ignored.
                 0.0
             };
+            // Always include DURATION in the denominator so that a large diff
+            // lowers the overall score rather than being silently skipped.
             score += duration_score;
-            total_weight += if duration_score > 0.0 {
-                Weights::DURATION
-            } else {
-                0.0
-            };
+            total_weight += Weights::DURATION;
         }
 
         // Release date comparison (exact match)
@@ -287,6 +292,17 @@ impl Track {
                 score += Weights::RELEASE_DATE;
                 total_weight += Weights::RELEASE_DATE;
             }
+        }
+
+        // Track number: when both sides provide it, a match is a strong positive signal
+        // and a mismatch is a strong negative one — this is the key discriminant between
+        // two different tracks on the same album by the same artist.
+        if let (Some(tn1), Some(tn2)) = (self.track_number, other_track.track_number) {
+            total_weight += Weights::TRACK_NUMBER;
+            if tn1 == tn2 {
+                score += Weights::TRACK_NUMBER;
+            }
+            // mismatch contributes 0 — effectively penalises the total score
         }
 
         // Return normalized score (0.0 if no valid comparison)

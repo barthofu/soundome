@@ -67,6 +67,8 @@ pub enum TaskType {
     SyncArtist,
     SyncAlbum,
     DownloadTrack,
+    /// Batch ingest of all audio files found in the configured `ingest_dir`.
+    IngestDir,
 }
 
 impl TaskType {
@@ -77,6 +79,7 @@ impl TaskType {
             "SyncArtist" => TaskType::SyncArtist,
             "SyncAlbum" => TaskType::SyncAlbum,
             "DownloadTrack" => TaskType::DownloadTrack,
+            "IngestDir" => TaskType::IngestDir,
             _ => TaskType::DownloadTrack,
         }
     }

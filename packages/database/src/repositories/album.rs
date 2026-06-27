@@ -156,6 +156,72 @@ impl AlbumRepository for DieselAlbumRepository {
         self.get_by_id(conn, album_id)
     }
 
+    fn find_by_title_and_artists(
+        &self,
+        conn: &mut SqliteConnection,
+        title: &str,
+        artist_names: &[String],
+    ) -> SoundomeResult<Option<Album>> {
+        if artist_names.is_empty() {
+            // No artist hint — fall back to title-only (safe: caller owns the flow)
+            let entity: Option<AlbumEntity> = schema::album::table
+                .filter(schema::album::title.eq(title))
+                .first(conn)
+                .optional()
+                .map_err(|e| shared::errors::Error::Database(e.to_string()))?;
+            return match entity {
+                Some(e) => self.get_by_id(conn, e.id).map(Some),
+                None => Ok(None),
+            };
+        }
+
+        let title_lower = title.to_lowercase();
+        let artist_names_lower: Vec<String> =
+            artist_names.iter().map(|s| s.to_lowercase()).collect();
+
+        // Load all albums whose title matches (exact or case-insensitive).
+        let candidates: Vec<AlbumEntity> = schema::album::table
+            .filter(schema::album::title.eq(title))
+            .load(conn)
+            .or_else(|_| {
+                // If exact-case fails, load all and filter in Rust for Unicode safety.
+                schema::album::table
+                    .load::<AlbumEntity>(conn)
+                    .map(|all| {
+                        all.into_iter()
+                            .filter(|e| e.title.to_lowercase() == title_lower)
+                            .collect()
+                    })
+            })
+            .map_err(|e| shared::errors::Error::Database(e.to_string()))?;
+
+        for candidate in candidates {
+            // Load this album's artists and check for a name overlap.
+            let artists: Vec<ArtistEntity> = schema::artist_albums::table
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_albums::artist_id.eq(schema::artist::id)),
+                )
+                .filter(schema::artist_albums::album_id.eq(candidate.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .unwrap_or_default();
+
+            let has_matching_artist = artists.iter().any(|a| {
+                let a_lower = a.name.to_lowercase();
+                artist_names_lower
+                    .iter()
+                    .any(|req| *req == a_lower)
+            });
+
+            if has_matching_artist {
+                return self.get_by_id(conn, candidate.id).map(Some);
+            }
+        }
+
+        Ok(None)
+    }
+
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Option<Album>> {
     //     use diesel::prelude::*;
     //     use crate::schema;

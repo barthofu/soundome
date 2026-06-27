@@ -81,6 +81,17 @@ pub trait AlbumRepository: Send + Sync {
     fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &Album)
         -> SoundomeResult<Album>;
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
+    /// Find an existing album by title **and** primary artist name(s).
+    ///
+    /// Returns the first album whose normalised title matches **and** whose
+    /// artist set intersects with `artist_names` (case-insensitive).  Returns
+    /// `None` when no such album exists.
+    fn find_by_title_and_artists(
+        &self,
+        conn: &mut SqliteConnection,
+        title: &str,
+        artist_names: &[String],
+    ) -> SoundomeResult<Option<Album>>;
     /// Replace all references for an album (delete existing, then insert provided ones)
     fn set_references(
         &self,

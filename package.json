@@ -9,7 +9,7 @@
     "web:build": "pnpm --filter @soundome/web build",
     "web:check": "pnpm --filter @soundome/web check",
     "server:dev": "cargo run -p soundome-server",
-    "server:build": "cargo build -p soundome-server --release -j 4",
+    "server:build": "cargo build -p soundome-server",
     "cargo:build": "cargo build --workspace",
     "cargo:build:release": "cargo build --workspace --release -j 4",
     "cargo:test": "cargo test -q",

@@ -3,7 +3,7 @@ use std::path::Path;
 use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 
-use super::models::{AlbumDto, ArtistDto, PlaylistDto, PlaylistTrackDto, ScanReport, TrackDto};
+use super::models::{AlbumDto, ArtistDto, IngestResult, PlaylistDto, PlaylistTrackDto, ScanReport, TrackDto};
 
 pub struct ApiClient {
     client: Client,
@@ -97,5 +97,23 @@ impl ApiClient {
             .json()
             .await?;
         Ok(report)
+    }
+
+    /// Call `POST /api/library/ingest` for a single local audio file.
+    pub async fn ingest(&self, file_path: &str) -> anyhow::Result<IngestResult> {
+        use serde_json::json;
+
+        let url = format!("{}/api/library/ingest", self.base_url);
+        let body = json!({ "file_path": file_path });
+        let result = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(result)
     }
 }

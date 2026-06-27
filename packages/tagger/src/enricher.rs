@@ -46,9 +46,12 @@ impl MetadataProvider {
 
 /// Instantiate all metadata providers that are enabled in config, in config order.
 fn build_providers() -> Vec<MetadataProvider> {
-    Config::get()
-        .tagger
-        .metadata_providers
+    build_providers_from_list(&Config::get().tagger.metadata_providers.clone())
+}
+
+/// Instantiate providers from an explicit ordered list (used to override the default order).
+fn build_providers_from_list(names: &[String]) -> Vec<MetadataProvider> {
+    names
         .iter()
         .filter_map(|name| match name.as_str() {
             "musicbrainz" => Some(MetadataProvider::MusicBrainz(
@@ -72,8 +75,17 @@ fn build_providers() -> Vec<MetadataProvider> {
 /// Query all enabled metadata providers in priority order and return the first
 /// `Exact` match found, falling back to the best `Partial` match across all providers.
 pub async fn get_best_match_from_track(track: &Track) -> Match<Track> {
-    let providers = build_providers();
+    run_providers(track, &build_providers()).await
+}
 
+/// Same as `get_best_match_from_track` but uses `ingest_metadata_providers` from config.
+/// Intended for local-file ingest where Spotify should take priority.
+pub async fn get_best_match_from_track_for_ingest(track: &Track) -> Match<Track> {
+    let order = Config::get().tagger.ingest_metadata_providers.clone();
+    run_providers(track, &build_providers_from_list(&order)).await
+}
+
+async fn run_providers(track: &Track, providers: &[MetadataProvider]) -> Match<Track> {
     if providers.is_empty() {
         tracing::warn!("No tagger metadata providers enabled in config");
         return Match::None;
@@ -81,7 +93,7 @@ pub async fn get_best_match_from_track(track: &Track) -> Match<Track> {
 
     let mut best_partial: Option<Track> = None;
 
-    for provider in &providers {
+    for provider in providers {
         match provider.get_best_match_from_track(track).await {
             Match::Exact(t) => {
                 return Match::Exact(t);

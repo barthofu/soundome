@@ -1,12 +1,16 @@
-# Soundome
+<p align="center">
+    <img height="450" src="./assets/images/soundome_logo.png"></img>
+</p>
 
-Soundome is a Rust monorepo for building and maintaining a personal music library from streaming URLs and local files. The current implementation focuses on fetching metadata, enriching tracks with MusicBrainz, downloading audio from a provider, tagging files, organizing them on disk, and persisting the result in SQLite.
+# What is Soundome?
+
+Soundome is a self-hosted tool that centralizes, downloads, tags, and automatically organizes your music library from multiple sources (Spotify, SoundCloud, YouTube…). It handles metadata, prevents duplicates, keeps track of original sources, and provides a web interface for manual corrections. 
 
 The project is still work in progress. Some surfaces are production-shaped, while others are scaffolds or partial implementations. The documentation in this repository is therefore organized around what is already wired in code versus what is still planned.
 
 ## Quick start
 
-### 1 — Create the config file
+### 1. Create the config file
 
 ```bash
 curl -o config.toml https://raw.githubusercontent.com/barthofu/soundome/main/config.example.toml
@@ -22,14 +26,14 @@ client_secret = "your_spotify_client_secret"
 
 Everything else has safe defaults. AI enrichment and proxy are disabled by default.
 
-### 2 — Create the `.env` file
+### 2. Create the `.env` file
 
 ```dotenv
 DATABASE_URL=data/soundome.db
 SOUNDOME__DATABASE__URL=data/soundome.db
 ```
 
-### 3 — Create the `docker-compose.yml`
+### 3. Create the `docker-compose.yml`
 
 ```yaml
 services:
@@ -50,7 +54,7 @@ services:
     restart: unless-stopped
 ```
 
-### 4 — Run
+### 4. Run
 
 ```bash
 docker compose up -d
@@ -123,3 +127,14 @@ pnpm cargo:fmt
 pnpm web:check
 ```
 
+## AI Notice
+
+**Project development:** While the final stages of this project were completed with AI assistance (without which it might never have reached completion), the entire architecture and core codebase were hand-crafted and informed by intensive design work prior to using AI tools (well, it wasn't such a thing back then).
+
+**Runtime AI usage:** Soundome can optionally use AI to curate and standardize base metadata extracted from SoundCloud tracks, where source metadata is often noisy. This feature is optional and can be disabled entirely. When enabled, you can use OpenRouter's API or connect a local [Ollama](https://ollama.ai/) instance for on-device processing.
+
+## License
+
+MIT License
+
+Copyright (c) barthofu

@@ -33,6 +33,13 @@ pub struct GeneralConfig {
     pub base_library_dir: String,
     #[serde(default = "GeneralConfig::default_temp_download_dir")]
     pub temp_download_dir: String,
+    /// Directory watched for local audio files to ingest.
+    /// Files submitted via `POST /api/library/ingest` without an explicit path
+    /// are resolved relative to this directory.
+    /// Defaults to `./ingest`.
+    /// ENV: SOUNDOME__GENERAL__INGEST_DIR
+    #[serde(default = "GeneralConfig::default_ingest_dir")]
+    pub ingest_dir: String,
 }
 
 impl Default for GeneralConfig {
@@ -40,6 +47,7 @@ impl Default for GeneralConfig {
         Self {
             base_library_dir: Self::default_base_library_dir(),
             temp_download_dir: Self::default_temp_download_dir(),
+            ingest_dir: Self::default_ingest_dir(),
         }
     }
 }
@@ -50,6 +58,9 @@ impl GeneralConfig {
     }
     fn default_temp_download_dir() -> String {
         "./temp".to_string()
+    }
+    fn default_ingest_dir() -> String {
+        "./ingest".to_string()
     }
 }
 
@@ -200,12 +211,21 @@ pub struct TaggerConfig {
     /// Supported values: "musicbrainz", "bandcamp", "spotify"
     #[serde(default = "TaggerConfig::default_providers")]
     pub metadata_providers: Vec<String>,
+
+    /// Provider order used specifically for local-file ingest.
+    /// Defaults to `["spotify", "musicbrainz", "bandcamp"]` so that Spotify's
+    /// richer metadata (cover art, ISRC, track_number) takes priority over
+    /// MusicBrainz when ingesting files from disk.
+    /// ENV: SOUNDOME__TAGGER__INGEST_METADATA_PROVIDERS
+    #[serde(default = "TaggerConfig::default_ingest_providers")]
+    pub ingest_metadata_providers: Vec<String>,
 }
 
 impl Default for TaggerConfig {
     fn default() -> Self {
         Self {
             metadata_providers: Self::default_providers(),
+            ingest_metadata_providers: Self::default_ingest_providers(),
         }
     }
 }
@@ -216,6 +236,14 @@ impl TaggerConfig {
             "musicbrainz".to_string(),
             "bandcamp".to_string(),
             "spotify".to_string(),
+        ]
+    }
+
+    fn default_ingest_providers() -> Vec<String> {
+        vec![
+            "spotify".to_string(),
+            "musicbrainz".to_string(),
+            "bandcamp".to_string(),
         ]
     }
 }

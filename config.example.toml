@@ -54,6 +54,12 @@ base_library_dir = "./library"
 # ENV: SOUNDOME__GENERAL__TEMP_DOWNLOAD_DIR
 temp_download_dir = "./temp"
 
+# Directory where local audio files are dropped for ingestion.
+# Files submitted via `POST /api/library/ingest` or `soundome ingest <file>`
+# are resolved relative to this directory when only a filename is provided.
+# ENV: SOUNDOME__GENERAL__INGEST_DIR
+ingest_dir = "./ingest"
+
 
 # =============================================================================
 # [logs]
@@ -221,6 +227,13 @@ provider_order = ["openrouter"]
 # Supported values: "musicbrainz", "bandcamp", "spotify"
 # ENV: SOUNDOME__TAGGER__METADATA_PROVIDERS
 metadata_providers = ["musicbrainz", "bandcamp", "spotify"]
+
+# Provider order used specifically when ingesting local audio files.
+# Spotify is placed first because it provides richer metadata (cover art,
+# track_number, ISRC) and avoids the false-match problem that MusicBrainz
+# can exhibit with tracks from the same album.
+# ENV: SOUNDOME__TAGGER__INGEST_METADATA_PROVIDERS
+ingest_metadata_providers = ["spotify", "musicbrainz", "bandcamp"]
 
 
 # =============================================================================

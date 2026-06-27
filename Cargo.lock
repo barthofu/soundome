@@ -1091,6 +1091,7 @@ dependencies = [
  "downloader",
  "fetcher",
  "organizer",
+ "reqwest 0.12.28",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -3768,7 +3769,9 @@ dependencies = [
  "cookie",
  "cookie_store 0.22.1",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
+ "futures-util",
  "h2 0.4.7",
  "http 1.2.0",
  "http-body 1.0.1",
@@ -4763,10 +4766,12 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "tagger",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "walkdir",
 ]
 
 [[package]]

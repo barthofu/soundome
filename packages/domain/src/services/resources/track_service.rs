@@ -216,7 +216,26 @@ impl TrackService {
                 let saved_album = if let Some(id) = album.id {
                     self.album_repo.update(tx, id, album)?
                 } else {
-                    self.album_repo.create(tx, album)?
+                    // Deduplicate by (title, artist names): two albums share a row only
+                    // when both their title AND at least one artist name match.
+                    // This prevents "Greatest Hits" from two unrelated artists
+                    // from collapsing into the same DB row.
+                    let artist_names: Vec<String> =
+                        album.artists.iter().map(|a| a.name.clone()).collect();
+                    match self
+                        .album_repo
+                        .find_by_title_and_artists(tx, &album.title, &artist_names)?
+                    {
+                        Some(existing) => existing,
+                        None => {
+                            let created = self.album_repo.create(tx, album)?;
+                            let aid = created.id.ok_or_else(|| {
+                                Error::Internal("missing album id after create".into())
+                            })?;
+                            self.album_repo.create_references(tx, aid, &album.references)?;
+                            self.album_repo.get_by_id(tx, aid)?
+                        }
+                    }
                 };
                 let album_id = saved_album.id.ok_or_else(|| {
                     Error::Internal("missing album id after create/update".into())

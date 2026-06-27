@@ -275,6 +275,9 @@ fn rocket() -> _ {
                 routes::playlists::get_tracks,
                 routes::playlists::export,
                 routes::library::scan,
+                routes::library::ingest,
+                routes::library::list_ingest_files,
+                routes::library::ingest_all,
                 routes::storage::storage_stats,
             ],
         )

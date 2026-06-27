@@ -88,6 +88,13 @@ pub struct TrackDto {
     pub needs_validation: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IngestResult {
+    pub title: String,
+    pub artists: Vec<String>,
+    pub needs_validation: bool,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ScanCategory {

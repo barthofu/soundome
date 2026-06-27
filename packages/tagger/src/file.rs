@@ -39,12 +39,30 @@ pub fn get_track_from_file(file_path: &PathBuf) -> SoundomeResult<Track> {
 /**
  * Tag an audio file with the provided track information.
  * Also writes the SOUNDOME_ID custom tag when `track.soundome_id` is set.
+ * Optionally writes cover art when `cover_bytes` is provided.
  */
 pub fn tag_file_with_track(file_path: &PathBuf, track: &Track) -> SoundomeResult<()> {
+    tag_file_with_track_and_cover(file_path, track, None)
+}
+
+/// Like `tag_file_with_track` but also embeds raw cover art bytes.
+pub fn tag_file_with_track_and_cover(
+    file_path: &PathBuf,
+    track: &Track,
+    cover_bytes: Option<&[u8]>,
+) -> SoundomeResult<()> {
     let mut tag = Tag::new()
         .read_from_path(file_path)
         .map_err(|e| Error::Custom(format!("Error reading audio tags: {:?}", e)))?;
     convert_track_to_tag(&mut tag, track);
+
+    if let Some(bytes) = cover_bytes {
+        tag.set_album_cover(audiotags::Picture {
+            mime_type: audiotags::MimeType::Jpeg,
+            data: bytes,
+        });
+    }
+
     tag.write_to_path(file_path.display().to_string().as_str())
         .map_err(|e| Error::Custom(format!("Error writing audio tags: {:?}", e)))?;
 

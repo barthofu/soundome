@@ -64,7 +64,7 @@ export interface MatchCandidateDto {
 }
 
 export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Cancelled' | 'Cancelling';
-export type TaskType = 'SyncPlaylist' | 'SyncArtist' | 'SyncAlbum' | 'DownloadTrack';
+export type TaskType = 'SyncPlaylist' | 'SyncArtist' | 'SyncAlbum' | 'DownloadTrack' | 'IngestDir';
 
 export interface TaskTrackErrorDto {
   track: string;

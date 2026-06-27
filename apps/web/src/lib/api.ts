@@ -380,6 +380,67 @@ export async function triggerSyncSchedule(id: number): Promise<{ task_id: number
 }
 
 // ================================================================================================
+// Ingest
+// ================================================================================================
+
+export interface IngestFileTags {
+  title: string | null;
+  artists: string[];
+  album: string | null;
+  date: string | null;
+  genre: string | null;
+  duration_secs: number | null;
+  track_number: number | null;
+}
+
+export interface IngestFileEntry {
+  name: string;
+  path: string;
+  relative_path: string;
+  size_bytes: number;
+  tags: IngestFileTags | null;
+}
+
+export interface IngestFilesResponse {
+  ingest_dir: string;
+  files: IngestFileEntry[];
+}
+
+export interface IngestResult {
+  title: string;
+  artists: string[];
+  needs_validation: boolean;
+}
+
+export async function listIngestFiles(): Promise<IngestFilesResponse> {
+  const res = await fetch(`${BASE}/library/ingest/files`);
+  if (!res.ok) throw new Error(`Failed to list ingest files: ${res.statusText}`);
+  return res.json();
+}
+
+export async function ingestFile(filePath: string): Promise<IngestResult> {
+  const res = await fetch(`${BASE}/library/ingest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_path: filePath }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function ingestAll(): Promise<{ task_id: number }> {
+  const res = await fetch(`${BASE}/library/ingest/all`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+// ================================================================================================
 // Storage Stats
 // ================================================================================================
 

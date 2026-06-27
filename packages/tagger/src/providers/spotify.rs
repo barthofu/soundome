@@ -2,7 +2,7 @@ use std::env;
 
 use config::Config;
 use rspotify::{
-    model::{FullTrack, SearchResult, SearchType, SimplifiedAlbum, SimplifiedArtist},
+    model::{FullArtist, FullTrack, SearchResult, SearchType, SimplifiedAlbum, SimplifiedArtist},
     prelude::BaseClient,
     ClientCredsSpotify, Credentials,
 };
@@ -74,6 +74,48 @@ impl Spotify {
             }
         }
     }
+
+    /// Search Spotify for an artist by name and return the first image URL found.
+    ///
+    /// Uses the artist search endpoint (not the deprecated `/artists/{id}` batch
+    /// endpoint) so it works with current Spotify API limits.  Best-effort: returns
+    /// `None` on any error or when no image is available.
+    fn fetch_artist_icon(&self, artist_name: &str) -> Option<String> {
+        let result = self
+            .client
+            .search(artist_name, SearchType::Artist, None, None, Some(1), Some(0));
+
+        match result {
+            Ok(SearchResult::Artists(page)) => page
+                .items
+                .into_iter()
+                .next()
+                .and_then(|a: FullArtist| a.images.into_iter().next().map(|img| img.url)),
+            Ok(_) => None,
+            Err(e) => {
+                tracing::warn!(
+                    "Spotify artist icon search failed for {:?}: {}",
+                    artist_name,
+                    e
+                );
+                None
+            }
+        }
+    }
+
+    /// Enrich `icon` fields on a track's artists by searching Spotify for each
+    /// artist that currently has no icon.  One search request per artist without
+    /// an icon — best-effort, never fails the enrichment.
+    fn enrich_artist_icons(&self, track: &mut Track) {
+        for artist in &mut track.artists {
+            if artist.icon.is_some() {
+                continue;
+            }
+            if let Some(url) = self.fetch_artist_icon(&artist.name) {
+                artist.icon = Some(url);
+            }
+        }
+    }
 }
 
 impl TagProvider for Spotify {
@@ -86,7 +128,7 @@ impl TagProvider for Spotify {
 
         let candidates = self.search_tracks(&query);
 
-        candidates
+        let result = candidates
             .into_iter()
             .map(|candidate| {
                 let score = track.compare(&candidate);
@@ -102,7 +144,20 @@ impl TagProvider for Spotify {
                 } else {
                     Match::None
                 }
-            })
+            });
+
+        // Enrich artist icons on the matched track.
+        match result {
+            Match::Exact(mut t) => {
+                self.enrich_artist_icons(&mut t);
+                Match::Exact(t)
+            }
+            Match::Partial(mut t) => {
+                self.enrich_artist_icons(&mut t);
+                Match::Partial(t)
+            }
+            Match::None => Match::None,
+        }
     }
 
     async fn get_match_from_query(&self, query: &str) -> Match<Track> {

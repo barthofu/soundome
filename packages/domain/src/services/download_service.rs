@@ -17,7 +17,6 @@ use shared::{
 use uuid::Uuid;
 
 pub use tagger::enricher::MatchCandidate;
-
 use super::{
     album_service::AlbumService,
     artist_service::ArtistService,
@@ -575,6 +574,221 @@ impl DownloadService {
         Ok(new_processed_tracks)
     }
 
+    /// Ingest all audio files found in `ingest_dir`, one by one.
+    ///
+    /// Progress and per-track stats are persisted live to `task_id` so the UI
+    /// can poll `GET /api/tasks/:id` for real-time feedback.
+    pub async fn ingest_local_dir(
+        &self,
+        conn: &mut SqliteConnection,
+        ingest_dir: &Path,
+        task_id: i32,
+    ) -> SoundomeResult<()> {
+        let audio_extensions = ["mp3", "flac", "m4a", "mp4", "aac", "ogg", "opus", "wav"];
+
+        // Collect all audio files first so we know the total upfront.
+        let files: Vec<PathBuf> = walkdir::WalkDir::new(ingest_dir)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .and_then(|x| x.to_str())
+                    .map(|x| audio_extensions.contains(&x.to_lowercase().as_str()))
+                    .unwrap_or(false)
+            })
+            .map(|e| e.path().to_path_buf())
+            .collect();
+
+        let total = files.len() as i32;
+        tracing::info!("Ingest dir {:?}: found {} audio files", ingest_dir, total);
+
+        let mut stats = shared::models::TaskStats::default();
+
+        for (i, file_path) in files.iter().enumerate() {
+            tracing::info!("Ingesting [{}/{}]: {:?}", i + 1, total, file_path);
+
+            match self.ingest_local_file(conn, file_path).await {
+                Ok(t) => {
+                    if t.needs_validation {
+                        stats.to_validate += 1;
+                        stats.to_validate_tracks.push(shared::models::TaskTrackValidation {
+                            track: t.display(),
+                            track_id: t.id,
+                            reason: t.validation_reason.clone(),
+                        });
+                    } else {
+                        stats.downloaded += 1;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to ingest {:?}: {}", file_path, e);
+                    stats.errors.push(shared::models::TaskTrackError {
+                        track: file_path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| file_path.display().to_string()),
+                        reason: e.to_string(),
+                        track_id: None,
+                        provider_url: None,
+                    });
+                }
+            }
+
+            if let Err(e) = self
+                .task_service
+                .update_progress(conn, task_id, (i + 1) as i32, total)
+            {
+                tracing::warn!("Failed to update ingest task progress: {}", e);
+            }
+            if let Err(e) = self.task_service.update_stats(conn, task_id, &stats) {
+                tracing::warn!("Failed to update ingest task stats: {}", e);
+            }
+        }
+
+        tracing::info!(
+            "Ingest dir complete: {} ingested, {} to validate, {} errors",
+            stats.downloaded,
+            stats.to_validate,
+            stats.errors.len()
+        );
+
+        Ok(())
+    }
+
+    // ============================================================================================
+    // == Local file ingest
+    // ============================================================================================
+
+    /// Ingest a single local audio file into the library.
+    ///
+    /// Workflow (mirrors `docs/workflows/download.md` — "Import a local file"):
+    /// 1. Read tags from the file.
+    /// 2. Evaluate metadata quality; enrich via MusicBrainz when needed.
+    /// 3. If enrichment is partial or absent, persist as `needs_validation = true`.
+    /// 4. Deduplicate by title/artist against existing DB tracks.
+    /// 5. Tag, organise, and persist the winner.
+    pub async fn ingest_local_file(
+        &self,
+        conn: &mut SqliteConnection,
+        file_path: &Path,
+    ) -> SoundomeResult<Track> {
+        tracing::info!("===========\nIngesting local file: {:?}\n------", file_path);
+
+        // Step 1: Read tags from the file.
+        let mut track = tagger::file::get_track_from_file(&file_path.to_path_buf())
+            .map_err(|e| Error::Custom(format!("Failed to read audio tags: {e}")))?;
+
+        // Step 1b: If track_number is missing from the tags, try to infer it from
+        // the file name. Many DIY releases use patterns like "08 - Title.flac" or
+        // "08_Title.flac". Having the track number improves match scoring significantly.
+        if track.track_number.is_none() {
+            track.track_number = infer_track_number_from_filename(file_path);
+            if let Some(n) = track.track_number {
+                tracing::debug!("Inferred track_number {} from filename", n);
+            }
+        }
+
+        tracing::info!("Read tags from file: {}", track.display());
+
+        // Step 2: Enrich metadata using the ingest-specific provider order (Spotify first).
+        // `enrich_metada` may set `needs_validation` on the track.
+        let (should_validate, existing_track_opt) =
+            self.enrich_metada(conn, &mut track, true).await?;
+
+        if should_validate {
+            tracing::warn!(
+                "Ingest: saving for manual validation — reason={:?}",
+                track.validation_reason
+            );
+            // Copy the file to the staging dir so it is not moved from its original location yet.
+            let staged_path = self.stage_local_file(file_path)?;
+            track.file_path = Some(staged_path);
+            let saved = self.save_track(conn, &track).await?;
+            return Ok(saved);
+        }
+
+        // Step 3: Deduplication.
+        let existing_track = if existing_track_opt.is_some() {
+            existing_track_opt
+        } else {
+            self.dedupe_track(conn, &track).await
+        };
+
+        match existing_track {
+            Some(mut existing_track) => {
+                tracing::info!(
+                    "Ingest: existing track found: {}, comparing quality",
+                    existing_track.display()
+                );
+
+                let new_is_better = self
+                    .track_service
+                    .is_better_quality(&existing_track, &track);
+
+                if new_is_better {
+                    tracing::info!("Ingest: new file has better quality, replacing");
+
+                    let mut track_for_merge = track.clone();
+                    normalize_album_and_artist_refs_as_metadata(&mut track_for_merge);
+                    existing_track.transpose_refs(&track_for_merge);
+                    apply_source_provider_replacement(&mut existing_track, &track);
+
+                    self.process_track_file(&mut existing_track, file_path).await?;
+                    let updated = self.save_track(conn, &existing_track).await?;
+                    Ok(updated)
+                } else {
+                    tracing::info!(
+                        "Ingest: existing file is equal or better quality, skipping file move"
+                    );
+
+                    // Keep existing audio; merge useful metadata from the ingested file.
+                    let mut track_for_merge = track.clone();
+                    normalize_album_and_artist_refs_as_metadata(&mut track_for_merge);
+                    demote_track_source_and_provider_to_metadata(&mut track_for_merge);
+                    existing_track.transpose_refs(&track_for_merge);
+
+                    let updated = self.save_track(conn, &existing_track).await?;
+                    Ok(updated)
+                }
+            }
+            None => {
+                tracing::info!("Ingest: no existing track, finalising");
+                self.process_track_file(&mut track, file_path).await?;
+                let inserted = self.save_track(conn, &track).await?;
+                Ok(inserted)
+            }
+        }
+    }
+
+    /// Copy a local file into the staging directory so it can be processed without
+    /// modifying the original location. Returns the path of the staged copy.
+    ///
+    /// The staged filename is prefixed with a UUID to guarantee uniqueness even when
+    /// multiple files share the same original name (e.g. two different `track.mp3`
+    /// from different ingest sessions).
+    fn stage_local_file(&self, source: &Path) -> SoundomeResult<PathBuf> {
+        let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
+        std::fs::create_dir_all(&staging_dir)
+            .map_err(|e| Error::Custom(format!("Could not create staging dir: {e}")))?;
+
+        let file_name = source
+            .file_name()
+            .ok_or_else(|| Error::Custom("Source path has no file name".to_string()))?
+            .to_string_lossy();
+
+        // Prefix with a UUID so two files named identically never collide in staging.
+        let unique_name = format!("{}-{}", Uuid::new_v4(), file_name);
+        let dest = staging_dir.join(&unique_name);
+
+        std::fs::copy(source, &dest)
+            .map_err(|e| Error::Custom(format!("Failed to stage local file: {e}")))?;
+        tracing::debug!("Staged local file {:?} → {:?}", source, dest);
+        Ok(dest)
+    }
+
     // ============================================================================================
     // == Sub private and utils methods
     // ============================================================================================
@@ -757,7 +971,7 @@ impl DownloadService {
 
         // Step 1: Enrich metadata
         tracing::info!("Getting metadata via tagger providers");
-        let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track).await?;
+        let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track, false).await?;
 
         // Step 2: Try to download to staging.
         // SoundCloud DRM-protected tracks will return SoundCloudDrmProtected instead of a hard error.
@@ -845,6 +1059,9 @@ impl DownloadService {
 
     /// Enrich metadata using metadata providers, and deduplicate entities in DB
     ///
+    /// `for_ingest` — when `true`, uses `ingest_metadata_providers` from config
+    /// (Spotify-first by default) instead of the standard download order.
+    ///
     /// Returns:
     /// - boolean indicating if the track should be marked as "to validate"
     /// - boolean indicating if the track should be compared in quality (already exists in DB)
@@ -852,6 +1069,7 @@ impl DownloadService {
         &self,
         conn: &mut SqliteConnection,
         track: &mut Track,
+        for_ingest: bool,
     ) -> SoundomeResult<(bool, Option<Track>)> {
         // Check if album/artists with same source ref url exist in DB and associate them
         let existing_album = track.album.as_ref().and_then(|a| {
@@ -876,7 +1094,11 @@ impl DownloadService {
         }
 
         // Get metadata from all enabled providers
-        let best_match = tagger::enricher::get_best_match_from_track(track).await;
+        let best_match = if for_ingest {
+            tagger::enricher::get_best_match_from_track_for_ingest(track).await
+        } else {
+            tagger::enricher::get_best_match_from_track(track).await
+        };
 
         // Apply best match metadata
         if let Match::Exact(matched_track) = best_match {
@@ -1004,8 +1226,38 @@ impl DownloadService {
             tracing::debug!("Assigned SOUNDOME_ID: {:?}", track.soundome_id);
         }
 
-        tagger::file::tag_file_with_track(&file_path.to_path_buf(), track)?;
-        tracing::info!("Tagged file with downloaded_track metadata");
+        // Ensure file_path is set on the track — required by the organizer.
+        // In the URL-download path this is already set by `download_track`; in the
+        // local-ingest path the track comes from tag reading and has no path yet.
+        if track.file_path.is_none() {
+            track.file_path = Some(file_path.to_path_buf());
+        }
+
+        // Best-effort: download cover art from its URL and embed it in the file.
+        let cover_url_opt = track.cover.clone();
+        let cover_bytes: Option<Vec<u8>> = if let Some(url) = cover_url_opt {
+            tokio::task::spawn_blocking(move || {
+                reqwest::blocking::get(&url)
+                    .and_then(|resp| resp.error_for_status())
+                    .and_then(|resp| resp.bytes().map(|b| b.to_vec()))
+                    .map_err(|e| {
+                        tracing::warn!("Could not download cover art from {}: {}", url, e);
+                        e
+                    })
+                    .ok()
+            })
+            .await
+            .unwrap_or(None)
+        } else {
+            None
+        };
+
+        tagger::file::tag_file_with_track_and_cover(
+            &file_path.to_path_buf(),
+            track,
+            cover_bytes.as_deref(),
+        )?;
+        tracing::info!("Tagged file with track metadata");
 
         // Move the file to the correct location
         let base_library_dir = Config::get().general.base_library_dir.clone();
@@ -1077,6 +1329,27 @@ fn demote_track_source_and_provider_to_metadata(track: &mut Track) {
 
 fn same_ref_identity(a: &shared::models::Reference, b: &shared::models::Reference) -> bool {
     a.platform == b.platform && a.external_id == b.external_id && a.external_url == b.external_url
+}
+
+/// Try to extract a track number from a file name when the embedded tag is absent.
+///
+/// Recognises common patterns:
+///   "08 - Title.flac"   → 8
+///   "08_Title.flac"     → 8
+///   "08. Title.flac"    → 8
+///   "08Title.flac"      → 8  (leading digits only)
+///   "Track08.flac"      → ignored (no leading digits)
+fn infer_track_number_from_filename(path: &Path) -> Option<i32> {
+    let stem = path.file_stem()?.to_string_lossy();
+    // Match 1–3 leading digits optionally followed by a separator character.
+    let digits: String = stem
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    if digits.is_empty() || digits.len() > 3 {
+        return None;
+    }
+    digits.parse::<i32>().ok().filter(|&n| n >= 1 && n <= 999)
 }
 
 fn apply_source_provider_replacement(existing_track: &mut Track, new_track: &Track) {

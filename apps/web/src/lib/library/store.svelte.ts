@@ -91,6 +91,12 @@ function createLibraryStore() {
   let drillPlaylistTracksLoading = $state(false);
   let drillPlaylistTracksError: string | null = $state(null);
 
+  // ── Global refresh state ───────────────────────────────────────────────────
+  let refreshing = $state(false);
+  let lastRefreshed: Date | null = $state(null);
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  const POLL_INTERVAL_MS = 30_000;
+
   let trackSearch = $state('');
   let albumSearch = $state('');
   let artistSearch = $state('');
@@ -231,13 +237,33 @@ function createLibraryStore() {
   }
   function switchTab(t: Tab) { navigate(t); clearArtistSelection(); }
   function clearDrill() { navigate(tab); }
+
   function handleRefresh() {
     clearDrill();
-    if (tab === 'tracks') { tracksLoaded = false; tracks = []; loadTracks(); }
-    else if (tab === 'albums') { albumsLoaded = false; albums = []; loadAlbums(); }
-    else if (tab === 'playlists') { playlistsLoaded = false; playlists = []; loadPlaylists(); }
-    else { artistsLoaded = false; artists = []; loadArtists(); }
+    loadAll();
   }
+
+  async function loadAll() {
+    refreshing = true;
+    tracksLoaded = false; albumsLoaded = false; artistsLoaded = false; playlistsLoaded = false;
+    tracks = []; albums = []; artists = []; playlists = [];
+    try {
+      await Promise.all([loadTracks(), loadAlbums(), loadArtists(), loadPlaylists()]);
+      lastRefreshed = new Date();
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  function startPoll() {
+    stopPoll();
+    pollInterval = setInterval(() => { loadAll(); }, POLL_INTERVAL_MS);
+  }
+
+  function stopPoll() {
+    if (pollInterval !== null) { clearInterval(pollInterval); pollInterval = null; }
+  }
+
   function drillIntoArtist(a: LibraryArtistDto) { navigate('artists', a.id); }
   function drillIntoAlbum(album: LibraryAlbumDto) {
     if (tab === 'albums') navigate('albums', undefined, album.id);
@@ -499,7 +525,7 @@ function createLibraryStore() {
     get similarFilterActive() { return similarFilterActive; }, set similarFilterActive(v: boolean) { similarFilterActive = v; },
     get similarArtistIds() { return similarArtistIds; },
 
-    navigate, applyHash, switchTab, clearDrill, handleRefresh,
+    navigate, applyHash, switchTab, clearDrill, handleRefresh, loadAll, startPoll, stopPoll,
     drillIntoArtist, drillIntoAlbum, backToArtist, backToRoot,
     drillIntoPlaylist,
     loadTracks, loadAlbums, loadArtists, loadPlaylists,
@@ -508,6 +534,9 @@ function createLibraryStore() {
     handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist,
     toggleArtistSelection, clearArtistSelection, startMergePicking, cancelMergePicking, pickMergeTarget,
     fmtDuration, isRemote,
+
+    get refreshing() { return refreshing; },
+    get lastRefreshed() { return lastRefreshed; },
   };
 }
 

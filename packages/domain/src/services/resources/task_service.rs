@@ -95,6 +95,28 @@ impl TaskService {
         self.task_repo.create(conn, &task)
     }
 
+    /// Create a new pending task for a batch ingest of all files in `ingest_dir`.
+    pub fn create_ingest_dir(
+        &self,
+        conn: &mut SqliteConnection,
+        ingest_dir: &str,
+    ) -> shared::types::SoundomeResult<Task> {
+        let task = Task {
+            id: None,
+            task_type: TaskType::IngestDir,
+            status: TaskStatus::Pending,
+            payload: serde_json::json!({ "ingest_dir": ingest_dir }).to_string(),
+            label: Some(format!("Ingest: {ingest_dir}")),
+            progress: 0,
+            total: None,
+            error: None,
+            stats: None,
+            created_at: None,
+            updated_at: None,
+        };
+        self.task_repo.create(conn, &task)
+    }
+
     pub fn set_running(
         &self,
         conn: &mut SqliteConnection,

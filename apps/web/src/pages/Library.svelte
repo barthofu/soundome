@@ -24,6 +24,12 @@
     }
   });
 
+  // Start auto-poll when the Library page mounts, stop when it unmounts.
+  $effect(() => {
+    lib.startPoll();
+    return () => lib.stopPoll();
+  });
+
   // Browser back / forward
   $effect(() => {
     function onPopState() { lib.applyHash(); }
@@ -58,12 +64,28 @@
     document.addEventListener('keydown', onKeydown);
     return () => document.removeEventListener('keydown', onKeydown);
   });
+
+  function formatLastRefreshed(d: Date | null): string {
+    if (!d) return '';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
 </script>
 
 <div class="library-page">
   <div class="page-header">
     <h1>Library</h1>
-    <button class="btn-header" onclick={lib.handleRefresh}>Refresh</button>
+    <div class="header-right">
+      {#if lib.lastRefreshed}
+        <span class="last-refreshed">Updated {formatLastRefreshed(lib.lastRefreshed)}</span>
+      {/if}
+      <button class="btn-header" onclick={lib.handleRefresh} disabled={lib.refreshing}>
+        {#if lib.refreshing}
+          <span class="spinner"></span> Refreshing…
+        {:else}
+          Refresh
+        {/if}
+      </button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -130,6 +152,44 @@
   .library-page { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
   .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
   h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .last-refreshed {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .btn-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: inherit;
+    font-family: inherit;
+  }
+  .btn-header:hover:not(:disabled) { background: var(--surface-2); }
+  .btn-header:disabled { opacity: 0.5; cursor: default; }
+
+  .spinner {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
   .tab { background: none; border: none; color: var(--muted); font-size: 0.875rem; padding: 0.5rem 1rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 4px 4px 0 0; display: flex; align-items: center; gap: 0.4rem; transition: color 0.15s; font-family: inherit; }

@@ -7,9 +7,10 @@
   import Library from './pages/Library.svelte';
   import Storage from './pages/Storage.svelte';
   import SyncSchedules from './pages/SyncSchedules.svelte';
+  import Ingest from './pages/Ingest.svelte';
   import HelpModal from './lib/HelpModal.svelte';
 
-  type Page = 'home' | 'validations' | 'tasks' | 'library' | 'storage' | 'sync';
+  type Page = 'home' | 'validations' | 'tasks' | 'library' | 'storage' | 'sync' | 'ingest';
 
   let page: Page = $state('home');
   let pendingCount = $state(0);
@@ -111,6 +112,13 @@
       Sync
     </button>
     <button
+      class="nav-link"
+      class:active={page === 'ingest'}
+      onclick={() => navigate('ingest')}
+    >
+      Ingest
+    </button>
+    <button
       class="nav-link nav-help"
       onclick={() => (helpOpen = true)}
       title="Help (press ?)"
@@ -132,6 +140,8 @@
     <Validations onDownloaded={refreshCounts} />
   {:else if page === 'sync'}
     <SyncSchedules />
+  {:else if page === 'ingest'}
+    <Ingest />
   {:else}
     <Tasks onNavigateValidations={() => navigate('validations')} />
   {/if}
