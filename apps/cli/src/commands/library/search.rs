@@ -24,7 +24,11 @@ pub async fn search(
     match entity {
         SearchEntity::Playlists => {
             let mut rows = client.get_playlists().await?;
-            apply_playlist_filters(&mut rows, options.query.as_deref(), options.source.as_deref());
+            apply_playlist_filters(
+                &mut rows,
+                options.query.as_deref(),
+                options.source.as_deref(),
+            );
             apply_limit(&mut rows, options.limit);
             print_playlists(&rows, format)?;
         }

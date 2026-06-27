@@ -1350,7 +1350,10 @@ fn infer_track_number_from_filename(path: &Path) -> Option<i32> {
     if digits.is_empty() || digits.len() > 3 {
         return None;
     }
-    digits.parse::<i32>().ok().filter(|&n| (1..=999).contains(&n))
+    digits
+        .parse::<i32>()
+        .ok()
+        .filter(|&n| (1..=999).contains(&n))
 }
 
 fn apply_source_provider_replacement(existing_track: &mut Track, new_track: &Track) {

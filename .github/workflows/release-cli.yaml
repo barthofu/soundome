@@ -1,0 +1,154 @@
+name: Release CLI
+
+# Triggered by tags of the form v<major>.<minor>.<patch>-cli
+# e.g.  git tag v1.0.0-cli && git push origin v1.0.0-cli
+on:
+  push:
+    tags:
+      - "v*.*.*-cli"
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN_NAME: soundome
+
+jobs:
+  # ------------------------------------------------------------------ #
+  # Build matrix — one job per (OS, target) pair                        #
+  # ------------------------------------------------------------------ #
+  build:
+    name: Build · ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86-64 — fully static musl binary
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            use_cross: true
+
+          # Linux arm64 — fully static musl binary
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            use_cross: true
+
+          # macOS Intel
+          - os: macos-13
+            target: x86_64-apple-darwin
+            use_cross: false
+
+          # macOS Apple Silicon
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            use_cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross (Linux musl targets)
+        if: matrix.use_cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Build (cross)
+        if: matrix.use_cross
+        run: cross build --release --bin ${{ env.BIN_NAME }} --target ${{ matrix.target }}
+
+      - name: Build (cargo)
+        if: ${{ !matrix.use_cross }}
+        run: cargo build --release --bin ${{ env.BIN_NAME }} --target ${{ matrix.target }}
+
+      - name: Package binary
+        shell: bash
+        run: |
+          ASSET="${{ env.BIN_NAME }}-${{ matrix.target }}"
+          cp "target/${{ matrix.target }}/release/${{ env.BIN_NAME }}" "$ASSET"
+          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ #
+  # Publish — collect artifacts and create the GitHub Release           #
+  # ------------------------------------------------------------------ #
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: artifacts
+        run: sha256sum * > checksums.txt
+
+      # Strip the -cli suffix from the tag to get the semver version
+      # v1.0.0-cli → 1.0.0
+      - name: Derive semver from tag
+        id: semver
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          VERSION="${VERSION%-cli}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      # Generate the changelog body for this release only (from previous cli tag to HEAD)
+      - name: Generate release changelog
+        run: |
+          # Find the previous cli tag (if any) to scope the changelog
+          PREV_TAG=$(git tag --list "v*-cli" --sort=-version:refname | sed -n '2p')
+          if [[ -n "$PREV_TAG" ]]; then
+            git-cliff "${PREV_TAG}..HEAD" --tag "v${{ steps.semver.outputs.version }}" --strip all > RELEASE_NOTES.md
+          else
+            git-cliff --tag "v${{ steps.semver.outputs.version }}" --strip all > RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "soundome CLI v${{ steps.semver.outputs.version }}"
+          body_path: RELEASE_NOTES.md
+          files: |
+            artifacts/*
