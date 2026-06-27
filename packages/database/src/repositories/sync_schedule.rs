@@ -107,7 +107,11 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
         let schedule = self.get_by_id(conn, id)?;
 
         let now = chrono::Utc::now().naive_utc();
-        let next = calculate_next_run(now, schedule.interval_seconds, schedule.cron_expression.as_deref())?;
+        let next = calculate_next_run(
+            now,
+            schedule.interval_seconds,
+            schedule.cron_expression.as_deref(),
+        )?;
 
         diesel::update(schema::sync_schedule::table.filter(schema::sync_schedule::id.eq(id)))
             .set((

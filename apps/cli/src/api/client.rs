@@ -3,7 +3,9 @@ use std::path::Path;
 use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 
-use super::models::{AlbumDto, ArtistDto, IngestResult, PlaylistDto, PlaylistTrackDto, ScanReport, TrackDto};
+use super::models::{
+    AlbumDto, ArtistDto, IngestResult, PlaylistDto, PlaylistTrackDto, ScanReport, TrackDto,
+};
 
 pub struct ApiClient {
     client: Client,

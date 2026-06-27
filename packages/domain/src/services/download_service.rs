@@ -16,7 +16,6 @@ use shared::{
 };
 use uuid::Uuid;
 
-pub use tagger::enricher::MatchCandidate;
 use super::{
     album_service::AlbumService,
     artist_service::ArtistService,
@@ -24,6 +23,7 @@ use super::{
     task_service::TaskService,
     track_service::{TrackService, ValidationPatch},
 };
+pub use tagger::enricher::MatchCandidate;
 
 pub struct DownloadService {
     track_service: Arc<TrackService>,
@@ -614,11 +614,13 @@ impl DownloadService {
                 Ok(t) => {
                     if t.needs_validation {
                         stats.to_validate += 1;
-                        stats.to_validate_tracks.push(shared::models::TaskTrackValidation {
-                            track: t.display(),
-                            track_id: t.id,
-                            reason: t.validation_reason.clone(),
-                        });
+                        stats
+                            .to_validate_tracks
+                            .push(shared::models::TaskTrackValidation {
+                                track: t.display(),
+                                track_id: t.id,
+                                reason: t.validation_reason.clone(),
+                            });
                     } else {
                         stats.downloaded += 1;
                     }
@@ -736,7 +738,8 @@ impl DownloadService {
                     existing_track.transpose_refs(&track_for_merge);
                     apply_source_provider_replacement(&mut existing_track, &track);
 
-                    self.process_track_file(&mut existing_track, file_path).await?;
+                    self.process_track_file(&mut existing_track, file_path)
+                        .await?;
                     let updated = self.save_track(conn, &existing_track).await?;
                     Ok(updated)
                 } else {
@@ -904,9 +907,9 @@ impl DownloadService {
             };
             track.references.push(provider_ref.clone());
 
-            let source_ref = track.get_source().ok_or_else(|| {
-                Error::Custom(format!("track {} has no source reference", id))
-            })?;
+            let source_ref = track
+                .get_source()
+                .ok_or_else(|| Error::Custom(format!("track {} has no source reference", id)))?;
 
             let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
             downloader::download(&source_ref, &provider_ref, &track.title, staging_dir).await?
@@ -971,7 +974,8 @@ impl DownloadService {
 
         // Step 1: Enrich metadata
         tracing::info!("Getting metadata via tagger providers");
-        let (should_validate, mut existing_track) = self.enrich_metada(conn, &mut track, false).await?;
+        let (should_validate, mut existing_track) =
+            self.enrich_metada(conn, &mut track, false).await?;
 
         // Step 2: Try to download to staging.
         // SoundCloud DRM-protected tracks will return SoundCloudDrmProtected instead of a hard error.
@@ -1342,14 +1346,11 @@ fn same_ref_identity(a: &shared::models::Reference, b: &shared::models::Referenc
 fn infer_track_number_from_filename(path: &Path) -> Option<i32> {
     let stem = path.file_stem()?.to_string_lossy();
     // Match 1–3 leading digits optionally followed by a separator character.
-    let digits: String = stem
-        .chars()
-        .take_while(|c| c.is_ascii_digit())
-        .collect();
+    let digits: String = stem.chars().take_while(|c| c.is_ascii_digit()).collect();
     if digits.is_empty() || digits.len() > 3 {
         return None;
     }
-    digits.parse::<i32>().ok().filter(|&n| n >= 1 && n <= 999)
+    digits.parse::<i32>().ok().filter(|&n| (1..=999).contains(&n))
 }
 
 fn apply_source_provider_replacement(existing_track: &mut Track, new_track: &Track) {

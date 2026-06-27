@@ -159,9 +159,13 @@ pub async fn create(
 
     let schedule = db
         .run(move |conn| {
-            services
-                .sync_schedule_service
-                .create(conn, body.playlist_url, body.label, interval_seconds, body.cron_expression)
+            services.sync_schedule_service.create(
+                conn,
+                body.playlist_url,
+                body.label,
+                interval_seconds,
+                body.cron_expression,
+            )
         })
         .await
         .map_err(|e| {

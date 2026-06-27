@@ -81,9 +81,14 @@ impl Spotify {
     /// endpoint) so it works with current Spotify API limits.  Best-effort: returns
     /// `None` on any error or when no image is available.
     fn fetch_artist_icon(&self, artist_name: &str) -> Option<String> {
-        let result = self
-            .client
-            .search(artist_name, SearchType::Artist, None, None, Some(1), Some(0));
+        let result = self.client.search(
+            artist_name,
+            SearchType::Artist,
+            None,
+            None,
+            Some(1),
+            Some(0),
+        );
 
         match result {
             Ok(SearchResult::Artists(page)) => page

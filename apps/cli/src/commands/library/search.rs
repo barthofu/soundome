@@ -5,40 +5,51 @@ use crate::api::models::{AlbumDto, ArtistDto, PlaylistDto, TrackDto};
 use crate::api::ApiClient;
 use crate::{OutputFormat, SearchEntity};
 
+/// Options for filtering search results
+pub struct SearchOptions {
+    pub query: Option<String>,
+    pub source: Option<String>,
+    pub genre: Option<String>,
+    pub needs_validation: bool,
+    pub has_file: bool,
+    pub limit: Option<usize>,
+}
+
 pub async fn search(
     client: &ApiClient,
     entity: SearchEntity,
-    query: Option<&str>,
-    source: Option<&str>,
-    genre: Option<&str>,
-    needs_validation: bool,
-    has_file: bool,
-    limit: Option<usize>,
+    options: SearchOptions,
     format: OutputFormat,
 ) -> anyhow::Result<()> {
     match entity {
         SearchEntity::Playlists => {
             let mut rows = client.get_playlists().await?;
-            apply_playlist_filters(&mut rows, query, source);
-            apply_limit(&mut rows, limit);
+            apply_playlist_filters(&mut rows, options.query.as_deref(), options.source.as_deref());
+            apply_limit(&mut rows, options.limit);
             print_playlists(&rows, format)?;
         }
         SearchEntity::Artists => {
             let mut rows = client.get_artists().await?;
-            apply_artist_filters(&mut rows, query);
-            apply_limit(&mut rows, limit);
+            apply_artist_filters(&mut rows, options.query.as_deref());
+            apply_limit(&mut rows, options.limit);
             print_artists(&rows, format)?;
         }
         SearchEntity::Albums => {
             let mut rows = client.get_albums().await?;
-            apply_album_filters(&mut rows, query);
-            apply_limit(&mut rows, limit);
+            apply_album_filters(&mut rows, options.query.as_deref());
+            apply_limit(&mut rows, options.limit);
             print_albums(&rows, format)?;
         }
         SearchEntity::Tracks => {
             let mut rows = client.get_tracks().await?;
-            apply_track_filters(&mut rows, query, genre, needs_validation, has_file);
-            apply_limit(&mut rows, limit);
+            apply_track_filters(
+                &mut rows,
+                options.query.as_deref(),
+                options.genre.as_deref(),
+                options.needs_validation,
+                options.has_file,
+            );
+            apply_limit(&mut rows, options.limit);
             print_tracks(&rows, format)?;
         }
     }

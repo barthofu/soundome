@@ -1,7 +1,4 @@
-use std::{
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
 use config::Config;
 use domain::services::{scan_service::ScanReport, ServiceLayer};
@@ -120,16 +117,11 @@ fn spawn_ingest_dir_task(
                 }
                 Err(e) => {
                     tracing::error!("Ingest dir task {} failed: {}", task_id, e);
-                    if let Err(e2) =
-                        services
-                            .task_service
-                            .set_failed(conn, task_id, &e.to_string())
+                    if let Err(e2) = services
+                        .task_service
+                        .set_failed(conn, task_id, &e.to_string())
                     {
-                        tracing::error!(
-                            "Failed to mark ingest task {} as failed: {}",
-                            task_id,
-                            e2
-                        );
+                        tracing::error!("Failed to mark ingest task {} as failed: {}", task_id, e2);
                     }
                 }
             }
@@ -282,17 +274,21 @@ pub async fn list_ingest_files() -> Result<Json<IngestFilesResponse>, Error> {
                 .unwrap_or_else(|_| name.clone());
 
             // Best-effort tag read — never fail the whole listing for one bad file.
-            let tags = tagger::file::get_track_from_file(&path).ok().map(|t| {
-                IngestFileTags {
-                    title: if t.title.is_empty() { None } else { Some(t.title) },
+            let tags = tagger::file::get_track_from_file(&path)
+                .ok()
+                .map(|t| IngestFileTags {
+                    title: if t.title.is_empty() {
+                        None
+                    } else {
+                        Some(t.title)
+                    },
                     artists: t.artists.into_iter().map(|a| a.name).collect(),
                     album: t.album.map(|a| a.title),
                     date: t.date,
                     genre: t.genre,
                     duration_secs: t.duration.map(|d| d as u32),
                     track_number: t.track_number.map(|n| n as u32),
-                }
-            });
+                });
 
             entries.push(IngestFileEntry {
                 name,

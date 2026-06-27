@@ -185,13 +185,11 @@ impl AlbumRepository for DieselAlbumRepository {
             .load(conn)
             .or_else(|_| {
                 // If exact-case fails, load all and filter in Rust for Unicode safety.
-                schema::album::table
-                    .load::<AlbumEntity>(conn)
-                    .map(|all| {
-                        all.into_iter()
-                            .filter(|e| e.title.to_lowercase() == title_lower)
-                            .collect()
-                    })
+                schema::album::table.load::<AlbumEntity>(conn).map(|all| {
+                    all.into_iter()
+                        .filter(|e| e.title.to_lowercase() == title_lower)
+                        .collect()
+                })
             })
             .map_err(|e| shared::errors::Error::Database(e.to_string()))?;
 
@@ -209,9 +207,7 @@ impl AlbumRepository for DieselAlbumRepository {
 
             let has_matching_artist = artists.iter().any(|a| {
                 let a_lower = a.name.to_lowercase();
-                artist_names_lower
-                    .iter()
-                    .any(|req| *req == a_lower)
+                artist_names_lower.contains(&a_lower)
             });
 
             if has_matching_artist {

@@ -222,17 +222,19 @@ impl TrackService {
                     // from collapsing into the same DB row.
                     let artist_names: Vec<String> =
                         album.artists.iter().map(|a| a.name.clone()).collect();
-                    match self
-                        .album_repo
-                        .find_by_title_and_artists(tx, &album.title, &artist_names)?
-                    {
+                    match self.album_repo.find_by_title_and_artists(
+                        tx,
+                        &album.title,
+                        &artist_names,
+                    )? {
                         Some(existing) => existing,
                         None => {
                             let created = self.album_repo.create(tx, album)?;
                             let aid = created.id.ok_or_else(|| {
                                 Error::Internal("missing album id after create".into())
                             })?;
-                            self.album_repo.create_references(tx, aid, &album.references)?;
+                            self.album_repo
+                                .create_references(tx, aid, &album.references)?;
                             self.album_repo.get_by_id(tx, aid)?
                         }
                     }

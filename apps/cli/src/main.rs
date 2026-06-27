@@ -159,12 +159,14 @@ async fn main() -> anyhow::Result<()> {
                 commands::library::search::search(
                     &client,
                     entity,
-                    query.as_deref(),
-                    source.as_deref(),
-                    genre.as_deref(),
-                    needs_validation,
-                    has_file,
-                    limit,
+                    commands::library::search::SearchOptions {
+                        query,
+                        source,
+                        genre,
+                        needs_validation,
+                        has_file,
+                        limit,
+                    },
                     format,
                 )
                 .await?;
