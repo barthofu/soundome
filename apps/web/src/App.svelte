@@ -5,14 +5,13 @@
   import Validations from './pages/Validations.svelte';
   import Tasks from './pages/Tasks.svelte';
   import Library from './pages/Library.svelte';
-  import Storage from './pages/Storage.svelte';
-  import SyncSchedules from './pages/SyncSchedules.svelte';
+  import Tools from './pages/Tools.svelte';
   import Ingest from './pages/Ingest.svelte';
   import HelpModal from './lib/HelpModal.svelte';
 
-  type Page = 'home' | 'validations' | 'tasks' | 'library' | 'storage' | 'sync' | 'ingest';
+  type Page = 'download' | 'validations' | 'tasks' | 'library' | 'tools' | 'ingest';
 
-  let page: Page = $state('home');
+  let page: Page = $state('library');
   let pendingCount = $state(0);
   let activeTasksCount = $state(0);
   let helpOpen = $state(false);
@@ -57,15 +56,11 @@
 </script>
 
 <nav>
-  <button class="brand" onclick={() => navigate('home')}>Soundome</button>
+  <!-- Brand -->
+  <button class="brand" onclick={() => navigate('library')}>Soundome</button>
+
   <div class="nav-links">
-    <button
-      class="nav-link"
-      class:active={page === 'home'}
-      onclick={() => navigate('home')}
-    >
-      Download
-    </button>
+    <!-- Group 1: Library (leftmost, standalone) -->
     <button
       class="nav-link"
       class:active={page === 'library'}
@@ -73,12 +68,24 @@
     >
       Library
     </button>
+
+    <!-- Separator -->
+    <span class="nav-sep" aria-hidden="true"></span>
+
+    <!-- Group 2: Main workflow -->
     <button
       class="nav-link"
-      class:active={page === 'storage'}
-      onclick={() => navigate('storage')}
+      class:active={page === 'download'}
+      onclick={() => navigate('download')}
     >
-      Storage
+      Download
+    </button>
+    <button
+      class="nav-link"
+      class:active={page === 'ingest'}
+      onclick={() => navigate('ingest')}
+    >
+      Ingest
     </button>
     <button
       class="nav-link"
@@ -90,56 +97,67 @@
         <span class="badge">{pendingCount}</span>
       {/if}
     </button>
+
+    <!-- Separator -->
+    <span class="nav-sep" aria-hidden="true"></span>
+
+    <!-- Group 3: Utility icons only -->
+
+    <!-- Tasks icon -->
     <button
-      class="nav-link"
+      class="nav-icon"
       class:active={page === 'tasks'}
       onclick={() => navigate('tasks')}
+      title="Tasks"
+      aria-label="Tasks"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/>
         <polyline points="12 6 12 12 16 14"/>
       </svg>
-      Tasks
       {#if activeTasksCount > 0}
         <span class="badge">{activeTasksCount}</span>
       {/if}
     </button>
+
+    <!-- Tools icon -->
     <button
-      class="nav-link"
-      class:active={page === 'sync'}
-      onclick={() => navigate('sync')}
+      class="nav-icon"
+      class:active={page === 'tools'}
+      onclick={() => navigate('tools')}
+      title="Tools"
+      aria-label="Tools"
     >
-      Sync
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
     </button>
+
+    <!-- Help icon -->
     <button
-      class="nav-link"
-      class:active={page === 'ingest'}
-      onclick={() => navigate('ingest')}
-    >
-      Ingest
-    </button>
-    <button
-      class="nav-link nav-help"
+      class="nav-icon nav-help"
       onclick={() => (helpOpen = true)}
       title="Help (press ?)"
       aria-label="Help"
     >
-      ?
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
     </button>
   </div>
 </nav>
 
 <main>
-  {#if page === 'home'}
+  {#if page === 'download'}
     <Home onNavigateTasks={() => navigate('tasks')} />
   {:else if page === 'library'}
     <Library />
-  {:else if page === 'storage'}
-    <Storage />
+  {:else if page === 'tools'}
+    <Tools />
   {:else if page === 'validations'}
     <Validations onDownloaded={refreshCounts} />
-  {:else if page === 'sync'}
-    <SyncSchedules />
   {:else if page === 'ingest'}
     <Ingest />
   {:else}
@@ -172,25 +190,40 @@
     letter-spacing: 0.05em;
     cursor: pointer;
     padding: 0;
+    flex-shrink: 0;
   }
 
   .nav-links {
     display: flex;
-    gap: 0.25rem;
+    align-items: center;
+    gap: 0.15rem;
   }
 
+  /* Thin separator */
+  .nav-sep {
+    display: block;
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    margin: 0 0.4rem;
+    flex-shrink: 0;
+  }
+
+  /* Text nav items */
   .nav-link {
     background: none;
     border: none;
     color: var(--muted);
     font-size: 0.875rem;
-    padding: 0.35rem 0.75rem;
+    font-family: inherit;
+    padding: 0.35rem 0.7rem;
     border-radius: 6px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.4rem;
     transition: color 0.15s, background 0.15s;
+    white-space: nowrap;
   }
 
   .nav-link:hover {
@@ -203,31 +236,64 @@
     background: var(--surface-2);
   }
 
-  .nav-help {
-    font-weight: 700;
-    font-size: 1rem;
-    min-width: 28px;
+  /* Icon-only nav items */
+  .nav-icon {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 0.35rem 0.45rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
     justify-content: center;
-    opacity: 0.55;
+    position: relative;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .nav-icon:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  .nav-icon.active {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  .nav-help {
+    opacity: 0.6;
   }
 
   .nav-help:hover {
     opacity: 1;
   }
 
+  /* Badge */
   .badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
     background: #e05252;
     color: #fff;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 700;
     border-radius: 9px;
     line-height: 1;
+  }
+
+  /* Badge on icon buttons: absolute top-right */
+  .nav-icon .badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    min-width: 14px;
+    height: 14px;
+    font-size: 0.6rem;
+    padding: 0 3px;
   }
 
   main {
