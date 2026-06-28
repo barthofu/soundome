@@ -51,7 +51,7 @@ function createLibraryStore() {
   const _initHash = (() => {
     const raw = location.hash.replace('#', '');
     const p = raw.split('/');
-    const t = (['artists', 'albums', 'tracks', 'playlists'] as const).find(x => x === p[0]) ?? 'artists';
+    const t = (['artists', 'albums', 'tracks', 'playlists'] as const).find(x => x === p[0]) ?? 'albums';
     const aid = t === 'artists' && p[1] ? (parseInt(p[1]) || null) : null;
     const bid =
       t === 'albums' && p[1] ? (parseInt(p[1]) || null) :
@@ -221,9 +221,9 @@ function createLibraryStore() {
   function applyHash() {
     editState = null;
     const raw = location.hash.replace('#', '');
-    if (!raw) { tab = 'artists'; drillArtistId = null; drillAlbumId = null; drillPlaylistId = null; return; }
+    if (!raw) { tab = 'albums'; drillArtistId = null; drillAlbumId = null; drillPlaylistId = null; return; }
     const p = raw.split('/');
-    const t = (['artists', 'albums', 'tracks', 'playlists'] as const).find(x => x === p[0]) ?? 'artists';
+    const t = (['artists', 'albums', 'tracks', 'playlists'] as const).find(x => x === p[0]) ?? 'albums';
     if (t === 'tracks') { tab = 'tracks'; drillArtistId = null; drillAlbumId = null; drillPlaylistId = null; return; }
     if (t === 'playlists') {
       tab = 'playlists'; drillArtistId = null; drillAlbumId = null;
