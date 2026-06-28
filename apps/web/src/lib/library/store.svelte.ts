@@ -96,8 +96,6 @@ function createLibraryStore() {
   // ── Global refresh state ───────────────────────────────────────────────────
   let refreshing = $state(false);
   let lastRefreshed: Date | null = $state(null);
-  let pollInterval: ReturnType<typeof setInterval> | null = null;
-  const POLL_INTERVAL_MS = 30_000;
 
   let trackSearch = $state('');
   let albumSearch = $state('');
@@ -255,15 +253,6 @@ function createLibraryStore() {
     } finally {
       refreshing = false;
     }
-  }
-
-  function startPoll() {
-    stopPoll();
-    pollInterval = setInterval(() => { loadAll(); }, POLL_INTERVAL_MS);
-  }
-
-  function stopPoll() {
-    if (pollInterval !== null) { clearInterval(pollInterval); pollInterval = null; }
   }
 
   function drillIntoArtist(a: LibraryArtistDto) { navigate('artists', a.id); }
@@ -605,7 +594,7 @@ function createLibraryStore() {
     get similarFilterActive() { return similarFilterActive; }, set similarFilterActive(v: boolean) { similarFilterActive = v; },
     get similarArtistIds() { return similarArtistIds; },
 
-    navigate, applyHash, switchTab, clearDrill, handleRefresh, loadAll, startPoll, stopPoll,
+    navigate, applyHash, switchTab, clearDrill, handleRefresh, loadAll,
     drillIntoArtist, drillIntoAlbum, backToArtist, backToRoot,
     drillIntoPlaylist,
     loadTracks, loadAlbums, loadArtists, loadPlaylists,

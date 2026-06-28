@@ -6,28 +6,14 @@
   import PlaylistsTab from '../lib/library/PlaylistsTab.svelte';
   import EditModal from '../lib/library/EditModal.svelte';
 
-  // Load data for initial tab / drilled state
+  // Load all collections eagerly when the Library page mounts.
   $effect(() => {
-    if (lib.tab === 'tracks' && !lib.tracksLoaded) lib.loadTracks();
-    if (lib.tab === 'albums' && !lib.albumsLoaded) lib.loadAlbums();
-    if (lib.tab === 'artists' && !lib.artistsLoaded) lib.loadArtists();
-    if (lib.tab === 'playlists' && !lib.playlistsLoaded) lib.loadPlaylists();
-  });
-
-  // Load extra data when drilling
-  $effect(() => {
-    if (lib.drillArtistId != null) {
-      if (!lib.albumsLoaded) lib.loadAlbums();
-      if (!lib.tracksLoaded) lib.loadTracks();
-    } else if (lib.drillAlbumId != null) {
-      if (!lib.tracksLoaded) lib.loadTracks();
+    if (!lib.tracksLoaded && !lib.tracksLoading &&
+        !lib.albumsLoaded && !lib.albumsLoading &&
+        !lib.artistsLoaded && !lib.artistsLoading &&
+        !lib.playlistsLoaded && !lib.playlistsLoading) {
+      lib.loadAll();
     }
-  });
-
-  // Start auto-poll when the Library page mounts, stop when it unmounts.
-  $effect(() => {
-    lib.startPoll();
-    return () => lib.stopPoll();
   });
 
   // Browser back / forward
