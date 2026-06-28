@@ -90,12 +90,14 @@
     <p class="status">No playlists found.</p>
   {:else}
     <div class="grid">
-      {#each lib.filteredPlaylists as p (p.id)}
-        <div class="card"
-          onmouseenter={() => {}}
-          onmouseleave={() => {}}>
-          <button class="card-main" onclick={() => lib.drillIntoPlaylist(p)}>
-            {@render coverWrap(p.cover, p.name)}
+       {#each lib.filteredPlaylists as p (p.id)}
+         <div class="card"
+           role="button"
+           tabindex="0"
+           onmouseenter={() => lib.drillIntoPlaylist(p)}
+           onmouseleave={() => {}}>
+           <button class="card-main" onclick={() => lib.drillIntoPlaylist(p)}>
+             {@render coverWrap(p.cover, p.name)}
             <div class="card-info">
               <div class="card-title" title={p.name}>{p.name}</div>
               <div class="card-sub">{p.source}</div>

@@ -20,14 +20,26 @@
   let matchesError: string | null = $state(null);
 
   // editable copies — reset whenever we open the form
-  let editTitle = $state(track.title);
-  let editArtists = $state(track.artists.map((a) => a.name).join(', '));
-  let editAlbum = $state(track.album?.title ?? '');
-  let editGenre = $state(track.genre ?? '');
-  let editDate = $state(track.date ?? '');
-  let editTrackNumber = $state(track.track_number?.toString() ?? '');
-  let editDiscNumber = $state(track.disc_number?.toString() ?? '');
-  let editLabel = $state(track.label ?? '');
+  let editTitle = $state('');
+  let editArtists = $state('');
+  let editAlbum = $state('');
+  let editGenre = $state('');
+  let editDate = $state('');
+  let editTrackNumber = $state('');
+  let editDiscNumber = $state('');
+  let editLabel = $state('');
+
+  // Initialize edit fields from track and react to track changes
+  $effect(() => {
+    editTitle = track.title;
+    editArtists = track.artists.map((a) => a.name).join(', ');
+    editAlbum = track.album?.title ?? '';
+    editGenre = track.genre ?? '';
+    editDate = track.date ?? '';
+    editTrackNumber = track.track_number?.toString() ?? '';
+    editDiscNumber = track.disc_number?.toString() ?? '';
+    editLabel = track.label ?? '';
+  });
 
   let cardEl: HTMLElement | undefined = $state();
   let hovered = $state(false);
@@ -214,42 +226,42 @@
 
   <div class="body">
     {#if editing}
-      <div class="edit-form">
-        <div class="field">
-          <label>Title</label>
-          <input bind:value={editTitle} placeholder="Title" />
-        </div>
-        <div class="field">
-          <label>Artists <span class="hint">comma-separated</span></label>
-          <input bind:value={editArtists} placeholder="Artist 1, Artist 2" />
-        </div>
-        <div class="field">
-          <label>Album</label>
-          <input bind:value={editAlbum} placeholder="Album title" />
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label>Genre</label>
-            <input bind:value={editGenre} placeholder="Genre" />
-          </div>
-          <div class="field">
-            <label>Date</label>
-            <input bind:value={editDate} placeholder="YYYY-MM-DD" />
-          </div>
-          <div class="field narrow">
-            <label>Track #</label>
-            <input bind:value={editTrackNumber} placeholder="1" type="number" min="1" />
-          </div>
-          <div class="field narrow">
-            <label>Disc #</label>
-            <input bind:value={editDiscNumber} placeholder="1" type="number" min="1" />
-          </div>
-        </div>
-        <div class="field">
-          <label>Label</label>
-          <input bind:value={editLabel} placeholder="Label" />
-        </div>
-      </div>
+       <div class="edit-form">
+         <div class="field">
+           <label for="edit-title">Title</label>
+           <input id="edit-title" bind:value={editTitle} placeholder="Title" />
+         </div>
+         <div class="field">
+           <label for="edit-artists">Artists <span class="hint">comma-separated</span></label>
+           <input id="edit-artists" bind:value={editArtists} placeholder="Artist 1, Artist 2" />
+         </div>
+         <div class="field">
+           <label for="edit-album">Album</label>
+           <input id="edit-album" bind:value={editAlbum} placeholder="Album title" />
+         </div>
+         <div class="field-row">
+           <div class="field">
+             <label for="edit-genre">Genre</label>
+             <input id="edit-genre" bind:value={editGenre} placeholder="Genre" />
+           </div>
+           <div class="field">
+             <label for="edit-date">Date</label>
+             <input id="edit-date" bind:value={editDate} placeholder="YYYY-MM-DD" />
+           </div>
+           <div class="field narrow">
+             <label for="edit-track-number">Track #</label>
+             <input id="edit-track-number" bind:value={editTrackNumber} placeholder="1" type="number" min="1" />
+           </div>
+           <div class="field narrow">
+             <label for="edit-disc-number">Disc #</label>
+             <input id="edit-disc-number" bind:value={editDiscNumber} placeholder="1" type="number" min="1" />
+           </div>
+         </div>
+         <div class="field">
+           <label for="edit-label">Label</label>
+           <input id="edit-label" bind:value={editLabel} placeholder="Label" />
+         </div>
+       </div>
     {:else}
       <div class="info">
         <div class="row main">

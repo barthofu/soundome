@@ -57,10 +57,12 @@
   {:else}
     <div class="card-grid">
       {#each lib.filteredTracks as t (t.id)}
-        <div class="card"
-          class:warn-border={t.needs_validation}
-          onmouseenter={() => (lib.hoveredItem = { type: 'track', id: t.id })}
-          onmouseleave={() => (lib.hoveredItem = null)}>
+         <div class="card"
+           class:warn-border={t.needs_validation}
+           role="button"
+           tabindex="0"
+           onmouseenter={() => (lib.hoveredItem = { type: 'track', id: t.id })}
+           onmouseleave={() => (lib.hoveredItem = null)}>
           {@render coverWrap(t.cover, t.title)}
           <div class="card-body">
             <div class="card-title" title={t.title}>{t.title}</div>
