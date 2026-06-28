@@ -357,7 +357,11 @@ pub async fn get_references(
 
 /// Add a reference to a track.
 #[openapi]
-#[post("/tracks/<id>/references", format = "application/json", data = "<body>")]
+#[post(
+    "/tracks/<id>/references",
+    format = "application/json",
+    data = "<body>"
+)]
 pub async fn add_reference(
     id: i32,
     body: Json<AddReferenceBody>,
@@ -367,20 +371,16 @@ pub async fn add_reference(
     let services = Arc::clone(services);
     let reference = body.into_inner().into_reference();
 
-    db.run(move |conn| {
-        services
-            .track_service
-            .add_reference(conn, id, reference)
-    })
-    .await
-    .map(|refs| Json(refs.into_iter().map(reference_to_dto).collect()))
-    .map_err(|err| {
-        crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "Internal".to_string(),
-            message: err.to_string(),
+    db.run(move |conn| services.track_service.add_reference(conn, id, reference))
+        .await
+        .map(|refs| Json(refs.into_iter().map(reference_to_dto).collect()))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
         })
-    })
 }
 
 /// Remove a single reference from a track by its reference row ID.

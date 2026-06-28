@@ -81,17 +81,14 @@ impl AlbumService {
         album_id: i32,
         reference: Reference,
     ) -> SoundomeResult<Vec<Reference>> {
-        self.album_repo.create_references(conn, album_id, &[reference])?;
+        self.album_repo
+            .create_references(conn, album_id, &[reference])?;
         let album = self.album_repo.get_by_id(conn, album_id)?;
         Ok(album.references)
     }
 
     /// Delete a single reference row by its own ID.
-    pub fn delete_reference(
-        &self,
-        conn: &mut SqliteConnection,
-        ref_id: i32,
-    ) -> SoundomeResult<()> {
+    pub fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()> {
         self.album_repo.delete_reference(conn, ref_id)
     }
 

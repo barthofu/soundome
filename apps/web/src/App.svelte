@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getPendingCount, getActiveTasksCount } from './lib/api';
+  import { getPendingCount, getActiveTasksCount, getVersion } from './lib/api';
   import Home from './pages/Home.svelte';
   import Validations from './pages/Validations.svelte';
   import Tasks from './pages/Tasks.svelte';
@@ -15,6 +15,7 @@
   let pendingCount = $state(0);
   let activeTasksCount = $state(0);
   let helpOpen = $state(false);
+  let version = $state('');
 
   async function refreshCounts() {
     try {
@@ -31,6 +32,7 @@
 
   onMount(() => {
     refreshCounts();
+    getVersion().then((v) => (version = v));
     const interval = setInterval(refreshCounts, 5_000);
 
     function onKeydown(e: KeyboardEvent) {
@@ -57,7 +59,13 @@
 
 <nav>
   <!-- Brand -->
-  <button class="brand" onclick={() => navigate('library')}>Soundome</button>
+  <button class="brand" onclick={() => navigate('library')}>Soundome
+
+    {#if version}
+      <span class="version">v{version}</span>
+    {/if}
+  </button>
+  
 
   <div class="nav-links">
     <!-- Group 1: Library (leftmost, standalone) -->
@@ -191,6 +199,15 @@
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
+  }
+
+  .version {
+    font-size: 0.7rem;
+    color: var(--muted);
+    opacity: 0.6;
+    margin-left: 0.4rem;
+    flex-shrink: 0;
+    user-select: none;
   }
 
   .nav-links {

@@ -518,3 +518,10 @@ export async function getStorageStats(): Promise<StorageStatsDto> {
   return res.json();
 }
 
+export async function getVersion(): Promise<string> {
+  const res = await fetch(`${BASE}/version`);
+  if (!res.ok) return '';
+  const data: { version: string } = await res.json();
+  return data.version;
+}
+

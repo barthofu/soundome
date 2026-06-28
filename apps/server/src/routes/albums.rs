@@ -199,7 +199,11 @@ pub async fn get_references(
 
 /// Add a reference to an album.
 #[openapi]
-#[post("/albums/<id>/references", format = "application/json", data = "<body>")]
+#[post(
+    "/albums/<id>/references",
+    format = "application/json",
+    data = "<body>"
+)]
 pub async fn add_reference(
     id: i32,
     body: Json<AddReferenceBody>,

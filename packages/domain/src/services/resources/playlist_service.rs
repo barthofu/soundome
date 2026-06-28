@@ -3,7 +3,9 @@ use std::{path::PathBuf, sync::Arc};
 use config::Config;
 use diesel::SqliteConnection;
 
-use crate::ports::repositories::{AlbumRepository, ArtistRepository, PlaylistRepository, TrackRepository};
+use crate::ports::repositories::{
+    AlbumRepository, ArtistRepository, PlaylistRepository, TrackRepository,
+};
 use crate::services::resources::track_ops::delete_track_with_cascade;
 
 pub struct PlaylistService {

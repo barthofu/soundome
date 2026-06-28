@@ -24,7 +24,8 @@ pub struct YoutubeMusic {
 
 impl YoutubeMusic {
     const TRACK_REGEX: &str = r#"/(?:https?:)?(?:\/\/)?(?:[0-9A-Z-]+\.)?(?:youtu\.be\/|youtube(?:-nocookie)?\.com\S*?[^\w\s-])([\w-]{11})(?=[^\w-]|$)(?![?=&+%\w.-]*(?:['"][^<>]*>|<\/a>))[?=&+%\w.-]*/gim"#;
-    const PLAYLIST_REGEX: &str = r"^https://music\.youtube\.com/(?:playlist|watch)\?.*\blist=([^#&?]+)";
+    const PLAYLIST_REGEX: &str =
+        r"^https://music\.youtube\.com/(?:playlist|watch)\?.*\blist=([^#&?]+)";
     const ARTIST_REGEX: &str = r"^https:\/\/music\.youtube\.com\/channel\/([A-Za-z0-9_-]+)$";
 
     pub fn new() -> SoundomeResult<Self> {

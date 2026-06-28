@@ -240,6 +240,7 @@ fn rocket() -> _ {
                 routes::misc::index,
                 routes::misc::get_all,
                 routes::misc::get_providers,
+                routes::misc::get_version,
                 routes::validations::get_pending,
                 routes::validations::get_recent,
                 routes::validations::approve_validation,

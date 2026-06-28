@@ -1,13 +1,20 @@
 name: Docker
 
 on:
+  # Official release: triggered by semver tags only (excludes CLI tags)
   push:
-    # branches:
-    #   - main
     tags:
       - "v*.*.*"
       - "!v*.*.*-cli"
       - "!v*.*.*-cli-*"
+
+  # Manual test build: any branch, no latest tag
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag, or commit SHA to build"
+        required: true
+        default: main
 
 env:
   REGISTRY: ghcr.io
@@ -24,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
           submodules: recursive
 
       - name: Set up Docker Buildx
@@ -36,24 +44,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
+      # --- Release tags: semver + latest ---
+      - name: Extract Docker metadata (release)
+        id: meta-release
+        if: github.event_name == 'push'
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest
+
+      # --- Manual dispatch: branch-sha only, no latest ---
+      - name: Derive test tags (manual)
+        id: meta-manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          REF="${{ github.event.inputs.ref }}"
+          SHA=$(git rev-parse --short HEAD)
+          # Sanitize ref for use as a Docker tag (replace / and other forbidden chars)
+          SAFE_REF=$(echo "$REF" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SAFE_REF}-${SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ github.event_name == 'push' && steps.meta-release.outputs.tags || steps.meta-manual.outputs.tags }}
+          labels: ${{ steps.meta-release.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

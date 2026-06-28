@@ -28,7 +28,11 @@ impl ArtistDto {
             id: artist.id?,
             name: artist.name,
             icon: artist.icon,
-            references: artist.references.into_iter().map(reference_to_dto).collect(),
+            references: artist
+                .references
+                .into_iter()
+                .map(reference_to_dto)
+                .collect(),
         })
     }
 }
@@ -217,7 +221,15 @@ pub async fn get_references(
     let services = Arc::clone(services);
     db.run(move |conn| services.artist_service.get_by_id(conn, id))
         .await
-        .map(|artist| Json(artist.references.into_iter().map(reference_to_dto).collect()))
+        .map(|artist| {
+            Json(
+                artist
+                    .references
+                    .into_iter()
+                    .map(reference_to_dto)
+                    .collect(),
+            )
+        })
         .map_err(|err| {
             crate::utils::error::Error::Custom(CustomError {
                 status: Status::NotFound,
@@ -229,7 +241,11 @@ pub async fn get_references(
 
 /// Add a reference to an artist.
 #[openapi]
-#[post("/artists/<id>/references", format = "application/json", data = "<body>")]
+#[post(
+    "/artists/<id>/references",
+    format = "application/json",
+    data = "<body>"
+)]
 pub async fn add_reference(
     id: i32,
     body: Json<AddReferenceBody>,

@@ -22,7 +22,7 @@
             rustc
             rustfmt
             pre-commit
-            rustPackages.clippy
+            pkgs-master.rustPackages.clippy
             rust-analyzer
 
             # tools

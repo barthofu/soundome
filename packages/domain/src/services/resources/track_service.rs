@@ -381,17 +381,14 @@ impl TrackService {
         track_id: i32,
         reference: Reference,
     ) -> SoundomeResult<Vec<Reference>> {
-        self.track_repo.create_references(conn, track_id, &[reference])?;
+        self.track_repo
+            .create_references(conn, track_id, &[reference])?;
         let track = self.track_repo.get_by_id(conn, track_id)?;
         Ok(track.references)
     }
 
     /// Delete a single reference row by its own ID.
-    pub fn delete_reference(
-        &self,
-        conn: &mut SqliteConnection,
-        ref_id: i32,
-    ) -> SoundomeResult<()> {
+    pub fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()> {
         self.track_repo.delete_reference(conn, ref_id)
     }
 }

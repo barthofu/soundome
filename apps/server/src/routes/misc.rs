@@ -10,6 +10,21 @@ use shared::models::Artist;
 
 use crate::utils::{database::Db, error::CustomError};
 
+#[derive(Serialize, JsonSchema)]
+pub struct VersionResponse {
+    /// Application version (from Cargo.toml at compile time).
+    pub version: &'static str,
+}
+
+/// Returns the current server version.
+#[openapi]
+#[get("/version")]
+pub fn get_version() -> Json<VersionResponse> {
+    Json(VersionResponse {
+        version: env!("CARGO_PKG_VERSION"),
+    })
+}
+
 #[openapi]
 #[get("/")]
 pub async fn index() -> Json<String> {

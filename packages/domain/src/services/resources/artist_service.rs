@@ -91,7 +91,8 @@ impl ArtistService {
         artist_id: i32,
         reference: Reference,
     ) -> shared::types::SoundomeResult<Vec<Reference>> {
-        self.artist_repo.create_references(conn, artist_id, &[reference])?;
+        self.artist_repo
+            .create_references(conn, artist_id, &[reference])?;
         let artist = self.artist_repo.get_by_id(conn, artist_id)?;
         Ok(artist.references)
     }

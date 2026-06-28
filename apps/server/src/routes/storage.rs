@@ -110,7 +110,7 @@ pub async fn storage_stats(
             .collect();
 
         // Sort by bytes descending
-        artist_dtos.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+        artist_dtos.sort_by_key(|a| std::cmp::Reverse(a.bytes));
 
         let total_formatted = format_bytes(total_bytes);
 
