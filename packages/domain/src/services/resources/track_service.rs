@@ -3,7 +3,7 @@ use std::sync::Arc;
 use diesel::{Connection, SqliteConnection};
 use shared::{
     errors::Error,
-    models::{Album, AlbumType, Artist, ReferenceType, Track},
+    models::{Album, AlbumType, Artist, Reference, ReferenceType, Track},
     types::SoundomeResult,
 };
 
@@ -372,5 +372,26 @@ impl TrackService {
         };
 
         Ok(file_deleted)
+    }
+
+    /// Append a single reference to a track and return the full updated list.
+    pub fn add_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        track_id: i32,
+        reference: Reference,
+    ) -> SoundomeResult<Vec<Reference>> {
+        self.track_repo.create_references(conn, track_id, &[reference])?;
+        let track = self.track_repo.get_by_id(conn, track_id)?;
+        Ok(track.references)
+    }
+
+    /// Delete a single reference row by its own ID.
+    pub fn delete_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        ref_id: i32,
+    ) -> SoundomeResult<()> {
+        self.track_repo.delete_reference(conn, ref_id)
     }
 }

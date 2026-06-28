@@ -574,4 +574,16 @@ impl TrackRepository for DieselTrackRepository {
 
         Ok(result)
     }
+
+    fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()> {
+        diesel::delete(schema::track_ref::table.filter(schema::track_ref::id.eq(ref_id)))
+            .execute(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to delete track reference {}: {}",
+                    ref_id, err
+                ))
+            })?;
+        Ok(())
+    }
 }

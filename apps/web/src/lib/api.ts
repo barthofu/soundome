@@ -11,6 +11,8 @@ import type {
   UpdateArtistBody,
   LibraryPlaylistDto,
   PlaylistTrackDto,
+  ReferenceDto,
+  AddReferenceBody,
 } from './types';
 
 const BASE = '/api';
@@ -307,6 +309,50 @@ export async function getPlaylistTracks(id: number): Promise<PlaylistTrackDto[]>
 export async function deletePlaylist(id: number, deleteTracks = false): Promise<void> {
   const url = deleteTracks ? `${BASE}/playlists/${id}?delete_tracks=true` : `${BASE}/playlists/${id}`;
   const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
+// ================================================================================================
+// References (tracks, albums, artists)
+// ================================================================================================
+
+export async function getEntityReferences(
+  entity: 'tracks' | 'albums' | 'artists',
+  id: number,
+): Promise<ReferenceDto[]> {
+  const res = await fetch(`${BASE}/${entity}/${id}/references`);
+  if (!res.ok) throw new Error(`Failed to fetch references: ${res.statusText}`);
+  return res.json();
+}
+
+export async function addEntityReference(
+  entity: 'tracks' | 'albums' | 'artists',
+  id: number,
+  body: AddReferenceBody,
+): Promise<ReferenceDto[]> {
+  const res = await fetch(`${BASE}/${entity}/${id}/references`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function deleteEntityReference(
+  entity: 'tracks' | 'albums' | 'artists',
+  entityId: number,
+  refId: number,
+): Promise<void> {
+  const res = await fetch(`${BASE}/${entity}/${entityId}/references/${refId}`, {
+    method: 'DELETE',
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message ?? res.statusText);

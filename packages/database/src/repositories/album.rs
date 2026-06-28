@@ -402,4 +402,16 @@ impl AlbumRepository for DieselAlbumRepository {
                 ))
             })
     }
+
+    fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()> {
+        diesel::delete(schema::album_ref::table.filter(schema::album_ref::id.eq(ref_id)))
+            .execute(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to delete album reference {}: {}",
+                    ref_id, err
+                ))
+            })?;
+        Ok(())
+    }
 }

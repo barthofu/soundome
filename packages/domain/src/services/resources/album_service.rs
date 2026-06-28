@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use diesel::SqliteConnection;
-use shared::types::SoundomeResult;
+use shared::{models::Reference, types::SoundomeResult};
 
 use crate::ports::repositories::{AlbumRepository, ArtistRepository};
 
@@ -72,6 +72,27 @@ impl AlbumService {
 
     pub fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
         self.album_repo.count(conn)
+    }
+
+    /// Append a single reference to an album and return the full updated list.
+    pub fn add_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        album_id: i32,
+        reference: Reference,
+    ) -> SoundomeResult<Vec<Reference>> {
+        self.album_repo.create_references(conn, album_id, &[reference])?;
+        let album = self.album_repo.get_by_id(conn, album_id)?;
+        Ok(album.references)
+    }
+
+    /// Delete a single reference row by its own ID.
+    pub fn delete_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        ref_id: i32,
+    ) -> SoundomeResult<()> {
+        self.album_repo.delete_reference(conn, ref_id)
     }
 
     // Custom

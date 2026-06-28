@@ -553,4 +553,16 @@ impl ArtistRepository for DieselArtistRepository {
                 ))
             })
     }
+
+    fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()> {
+        diesel::delete(schema::artist_ref::table.filter(schema::artist_ref::id.eq(ref_id)))
+            .execute(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to delete artist reference {}: {}",
+                    ref_id, err
+                ))
+            })?;
+        Ok(())
+    }
 }

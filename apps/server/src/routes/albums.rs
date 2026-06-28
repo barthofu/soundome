@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use domain::services::ServiceLayer;
-use rocket::{delete, get, http::Status, patch, serde::json::Json};
+use rocket::{delete, get, http::Status, patch, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared::models::Album;
 
+use crate::routes::tracks::{reference_to_dto, AddReferenceBody, ReferenceDto};
 use crate::utils::{database::Db, error::CustomError, response::Success};
 
 // ================================================================================================
@@ -27,6 +28,7 @@ pub struct AlbumDto {
     pub album_type: String,
     pub cover: Option<String>,
     pub date: Option<String>,
+    pub references: Vec<ReferenceDto>,
 }
 
 impl AlbumDto {
@@ -45,6 +47,7 @@ impl AlbumDto {
             album_type: album.album_type.as_ref().to_string(),
             cover: album.cover,
             date: album.date,
+            references: album.references.into_iter().map(reference_to_dto).collect(),
         })
     }
 }
@@ -158,6 +161,77 @@ pub async fn delete(
 ) -> Result<Json<Success>, crate::utils::error::Error> {
     let services = Arc::clone(services);
     db.run(move |conn| services.album_service.delete_by_id(conn, id))
+        .await
+        .map(|_| Json(Success { success: true }))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
+// ================================================================================================
+// Reference sub-resource
+// ================================================================================================
+
+/// List all references attached to an album.
+#[openapi]
+#[get("/albums/<id>/references")]
+pub async fn get_references(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<ReferenceDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.album_service.get_by_id(conn, id))
+        .await
+        .map(|album| Json(album.references.into_iter().map(reference_to_dto).collect()))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::NotFound,
+                code: "NotFound".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
+/// Add a reference to an album.
+#[openapi]
+#[post("/albums/<id>/references", format = "application/json", data = "<body>")]
+pub async fn add_reference(
+    id: i32,
+    body: Json<AddReferenceBody>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<ReferenceDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let reference = body.into_inner().into_reference();
+
+    db.run(move |conn| services.album_service.add_reference(conn, id, reference))
+        .await
+        .map(|refs| Json(refs.into_iter().map(reference_to_dto).collect()))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
+/// Remove a single reference from an album by its reference row ID.
+#[openapi]
+#[delete("/albums/<_id>/references/<ref_id>")]
+pub async fn delete_reference(
+    _id: i32,
+    ref_id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Success>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.album_service.delete_reference(conn, ref_id))
         .await
         .map(|_| Json(Success { success: true }))
         .map_err(|err| {

@@ -4,12 +4,14 @@ import {
   getArtists, updateArtist, deleteArtist, mergeArtists,
   uploadArtistImage, uploadAlbumImage, uploadTrackImage,
   getPlaylists, getPlaylistTracks, deletePlaylist,
+  addEntityReference, deleteEntityReference,
 } from '../api';
 import type {
   LibraryTrackDto, UpdateTrackBody,
   LibraryAlbumDto, UpdateAlbumBody,
   LibraryArtistDto, UpdateArtistBody,
   LibraryPlaylistDto, PlaylistTrackDto,
+  ReferenceDto, AddReferenceBody,
 } from '../types';
 
 export type Tab = 'artists' | 'albums' | 'tracks' | 'playlists';
@@ -475,6 +477,55 @@ function createLibraryStore() {
     }
   }
 
+  // ── Reference helpers ─────────────────────────────────────────────────────
+  async function addReference(
+    entity: 'tracks' | 'albums' | 'artists',
+    id: number,
+    body: AddReferenceBody,
+  ): Promise<void> {
+    const updatedRefs = await addEntityReference(entity, id, body);
+    _applyRefUpdate(entity, id, updatedRefs);
+  }
+
+  async function deleteReference(
+    entity: 'tracks' | 'albums' | 'artists',
+    entityId: number,
+    ref: ReferenceDto,
+  ): Promise<void> {
+    if (ref.id == null) return;
+    await deleteEntityReference(entity, entityId, ref.id);
+    const updatedRefs = (entity === 'tracks'
+      ? tracks.find(t => t.id === entityId)?.references
+      : entity === 'albums'
+        ? albums.find(a => a.id === entityId)?.references
+        : artists.find(a => a.id === entityId)?.references
+    )?.filter(r => r.id !== ref.id) ?? [];
+    _applyRefUpdate(entity, entityId, updatedRefs);
+  }
+
+  function _applyRefUpdate(
+    entity: 'tracks' | 'albums' | 'artists',
+    id: number,
+    refs: ReferenceDto[],
+  ): void {
+    if (entity === 'tracks') {
+      tracks = tracks.map(t => t.id === id ? { ...t, references: refs } : t);
+      if (editState?.type === 'track' && editState.item.id === id) {
+        editState = { ...editState, item: { ...editState.item, references: refs } };
+      }
+    } else if (entity === 'albums') {
+      albums = albums.map(a => a.id === id ? { ...a, references: refs } : a);
+      if (editState?.type === 'album' && editState.item.id === id) {
+        editState = { ...editState, item: { ...editState.item, references: refs } };
+      }
+    } else {
+      artists = artists.map(a => a.id === id ? { ...a, references: refs } : a);
+      if (editState?.type === 'artist' && editState.item.id === id) {
+        editState = { ...editState, item: { ...editState.item, references: refs } };
+      }
+    }
+  }
+
   // ── Utilities ──────────────────────────────────────────────────────────────
   function fmtDuration(secs: number | null): string {
     if (secs == null) return '\u2014';
@@ -563,6 +614,7 @@ function createLibraryStore() {
     handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist, handleDeletePlaylist,
     toggleArtistSelection, clearArtistSelection, startMergePicking, cancelMergePicking, pickMergeTarget,
     fmtDuration, isRemote,
+    addReference, deleteReference,
 
     get refreshing() { return refreshing; },
     get lastRefreshed() { return lastRefreshed; },

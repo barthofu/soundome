@@ -1,5 +1,6 @@
 <script lang="ts">
   import { lib } from './store.svelte';
+  import ReferencesPanel from './ReferencesPanel.svelte';
 
   let dialogEl: HTMLDialogElement | undefined = $state(undefined);
 
@@ -124,6 +125,11 @@
               placeholder="Label" />
           </label>
         </div>
+        <ReferencesPanel
+          references={lib.editState.item.references}
+          onAdd={(body) => lib.addReference('tracks', lib.editState!.item.id, body)}
+          onDelete={(ref) => lib.deleteReference('tracks', lib.editState!.item.id, ref)}
+        />
       </div>
 
     {:else if lib.editState.type === 'album'}
@@ -180,6 +186,11 @@
             oninput={(e) => { lib.albumDraft.date = (e.currentTarget as HTMLInputElement).value || undefined; }}
             placeholder="YYYY-MM-DD" />
         </label>
+        <ReferencesPanel
+          references={lib.editState.item.references}
+          onAdd={(body) => lib.addReference('albums', lib.editState!.item.id, body)}
+          onDelete={(ref) => lib.deleteReference('albums', lib.editState!.item.id, ref)}
+        />
       </div>
 
     {:else}
@@ -231,6 +242,11 @@
           <input value={lib.artistDraft.name ?? ''}
             oninput={(e) => { lib.artistDraft.name = (e.currentTarget as HTMLInputElement).value; }} />
         </label>
+        <ReferencesPanel
+          references={lib.editState.item.references}
+          onAdd={(body) => lib.addReference('artists', lib.editState!.item.id, body)}
+          onDelete={(ref) => lib.deleteReference('artists', lib.editState!.item.id, ref)}
+        />
       </div>
     {/if}
 

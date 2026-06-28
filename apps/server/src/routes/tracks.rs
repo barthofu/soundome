@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use domain::services::ServiceLayer;
 use rocket::fs::NamedFile;
-use rocket::{delete, get, http::Status, patch, serde::json::Json};
+use rocket::{delete, get, http::Status, patch, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use shared::models::{Album, Artist, Track};
+use shared::models::{Album, Artist, Platform, Reference, ReferenceType, Track};
 
 use crate::utils::{database::Db, error::CustomError, response::Success};
 
@@ -26,6 +26,54 @@ pub struct TrackAlbumDto {
     pub title: String,
 }
 
+// ================================================================================================
+// Shared reference DTO (used by all entity routes)
+// ================================================================================================
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ReferenceDto {
+    pub id: Option<i32>,
+    pub ref_type: String,
+    pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
+}
+
+pub fn reference_to_dto(r: Reference) -> ReferenceDto {
+    ReferenceDto {
+        id: r.id,
+        ref_type: r.ref_type.as_ref().to_string(),
+        platform: r.platform.as_ref().to_string(),
+        external_id: r.external_id,
+        external_url: r.external_url,
+    }
+}
+
+/// Body for manually adding a reference to any entity.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct AddReferenceBody {
+    /// One of: Source, Provider, Metadata, Reference
+    pub ref_type: String,
+    /// One of: Spotify, SoundCloud, MusicBrainz, YoutubeMusic, Youtube, Bandcamp, Unknown
+    pub platform: String,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
+}
+
+impl AddReferenceBody {
+    pub fn into_reference(self) -> Reference {
+        Reference {
+            id: None,
+            ref_type: ReferenceType::from_str(&self.ref_type),
+            platform: Platform::from_str(&self.platform),
+            external_id: self.external_id,
+            external_url: self.external_url,
+        }
+    }
+}
+
+// ================================================================================================
+
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct TrackDto {
     pub id: i32,
@@ -41,6 +89,7 @@ pub struct TrackDto {
     pub label: Option<String>,
     pub file_path: Option<String>,
     pub needs_validation: bool,
+    pub references: Vec<ReferenceDto>,
 }
 
 impl TrackDto {
@@ -71,6 +120,7 @@ impl TrackDto {
                 .file_path
                 .and_then(|p| p.to_str().map(|s| s.to_string())),
             needs_validation: track.needs_validation,
+            references: track.references.into_iter().map(reference_to_dto).collect(),
         })
     }
 }
@@ -278,4 +328,79 @@ pub async fn download_file(
             message: format!("Audio file not found on disk: {}", file_path.display()),
         })
     })
+}
+
+// ================================================================================================
+// Reference sub-resource
+// ================================================================================================
+
+/// List all references attached to a track.
+#[openapi]
+#[get("/tracks/<id>/references")]
+pub async fn get_references(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<ReferenceDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.track_service.get_by_id(conn, id))
+        .await
+        .map(|track| Json(track.references.into_iter().map(reference_to_dto).collect()))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::NotFound,
+                code: "NotFound".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
+/// Add a reference to a track.
+#[openapi]
+#[post("/tracks/<id>/references", format = "application/json", data = "<body>")]
+pub async fn add_reference(
+    id: i32,
+    body: Json<AddReferenceBody>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<ReferenceDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let reference = body.into_inner().into_reference();
+
+    db.run(move |conn| {
+        services
+            .track_service
+            .add_reference(conn, id, reference)
+    })
+    .await
+    .map(|refs| Json(refs.into_iter().map(reference_to_dto).collect()))
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
+}
+
+/// Remove a single reference from a track by its reference row ID.
+#[openapi]
+#[delete("/tracks/<_id>/references/<ref_id>")]
+pub async fn delete_reference(
+    _id: i32,
+    ref_id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Success>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.track_service.delete_reference(conn, ref_id))
+        .await
+        .map(|_| Json(Success { success: true }))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
 }

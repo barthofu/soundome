@@ -55,6 +55,8 @@ pub trait TrackRepository: Send + Sync {
     ) -> SoundomeResult<Option<Track>>;
     /// Return all tracks that have a non-null `file_path` (i.e. finalized tracks).
     fn get_all_finalized(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>>;
+    /// Delete a single reference row by its own ID.
+    fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()>;
     // /// Find a track by unique fields (e.g. title + artists + album)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Option<Track>>;
 }
@@ -101,6 +103,8 @@ pub trait AlbumRepository: Send + Sync {
         album_id: i32,
         references: &[shared::models::Reference],
     ) -> SoundomeResult<()>;
+    /// Delete a single reference row by its own ID.
+    fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()>;
     // /// Find an album by unique fields (e.g. title + artists + date)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Option<Album>>;
 }
@@ -172,6 +176,8 @@ pub trait ArtistRepository: Send + Sync {
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
     /// Count the number of tracks linked to this artist (via artist_tracks).
     fn count_tracks(&self, conn: &mut SqliteConnection, artist_id: i32) -> SoundomeResult<i64>;
+    /// Delete a single reference row by its own ID.
+    fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()>;
     // /// Find an artist by unique fields (e.g. name)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Option<Artist>>;
 }

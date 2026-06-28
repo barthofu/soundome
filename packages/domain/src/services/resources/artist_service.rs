@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use diesel::SqliteConnection;
+use shared::models::Reference;
 
 use crate::ports::repositories::ArtistRepository;
 
@@ -81,5 +82,26 @@ impl ArtistService {
 
     pub fn count(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<i64> {
         self.artist_repo.count(conn)
+    }
+
+    /// Append a single reference to an artist and return the full updated list.
+    pub fn add_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+        reference: Reference,
+    ) -> shared::types::SoundomeResult<Vec<Reference>> {
+        self.artist_repo.create_references(conn, artist_id, &[reference])?;
+        let artist = self.artist_repo.get_by_id(conn, artist_id)?;
+        Ok(artist.references)
+    }
+
+    /// Delete a single reference row by its own ID.
+    pub fn delete_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        ref_id: i32,
+    ) -> shared::types::SoundomeResult<()> {
+        self.artist_repo.delete_reference(conn, ref_id)
     }
 }
