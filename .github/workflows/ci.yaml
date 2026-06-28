@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - develop
+    tags:
+      - "v*.*.*"
   pull_request:
     branches: ["**"]
 
@@ -81,3 +83,15 @@ jobs:
 
       - name: Type-check
         run: pnpm web:check
+
+  docker-release:
+    name: Docker release
+    needs:
+      - rust
+      - web
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-cli')
+    uses: ./.github/workflows/docker.yaml
+    with:
+      ref: ${{ github.ref_name }}
+      release_tag: ${{ github.ref_name }}
+    secrets: inherit

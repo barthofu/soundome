@@ -1,12 +1,16 @@
 name: Docker
 
 on:
-  # Official release: triggered by semver tags only (excludes CLI tags)
-  push:
-    tags:
-      - "v*.*.*"
-      - "!v*.*.*-cli"
-      - "!v*.*.*-cli-*"
+  workflow_call:
+    inputs:
+      ref:
+        description: "Branch, tag, or commit SHA to build"
+        required: true
+        type: string
+      release_tag:
+        description: "Release tag to publish with semver tags"
+        required: false
+        type: string
 
   # Manual test build: any branch, no latest tag
   workflow_dispatch:
@@ -31,8 +35,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.event.inputs.ref }}
+          fetch-depth: 0
           submodules: recursive
+
+      - name: Resolve release tag
+        id: release-tag
+        if: inputs.release_tag != ''
+        shell: bash
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag '$TAG' is not a non-CLI semver tag."
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Derive release Docker tags
+        id: meta-release
+        if: inputs.release_tag != ''
+        shell: bash
+        run: |
+          TAG="${{ steps.release-tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+
+          {
+            echo 'tags<<EOF'
+            echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:'"$VERSION"
+            echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:'"$MAJOR_MINOR"
+            echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -43,18 +78,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      # --- Release tags: semver + latest ---
-      - name: Extract Docker metadata (release)
-        id: meta-release
-        if: github.event_name == 'push'
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
 
       # --- Manual dispatch: branch-sha only, no latest ---
       - name: Derive test tags (manual)
@@ -72,7 +95,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ github.event_name == 'push' && steps.meta-release.outputs.tags || steps.meta-manual.outputs.tags }}
-          labels: ${{ steps.meta-release.outputs.labels }}
+          tags: ${{ inputs.release_tag != '' && steps.meta-release.outputs.tags || steps.meta-manual.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
