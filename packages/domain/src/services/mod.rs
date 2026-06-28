@@ -41,6 +41,9 @@ impl ServiceLayer {
         ));
         let playlist_service = Arc::new(playlist_service::PlaylistService::new(
             repositories.playlist.clone(),
+            repositories.track.clone(),
+            repositories.album.clone(),
+            repositories.artist.clone(),
         ));
         let sync_schedule_service = Arc::new(sync_schedule_service::SyncScheduleService::new(
             repositories.sync_schedule.clone(),

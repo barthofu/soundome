@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain::services::ServiceLayer;
-use rocket::{get, http::Status, post, serde::json::Json};
+use rocket::{delete, get, http::Status, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -170,4 +170,34 @@ pub async fn export(
                 message: err.to_string(),
             }),
         })
+}
+
+/// Delete a playlist (and its track associations).
+///
+/// Pass `?delete_tracks=true` to also delete every track that belongs to this
+/// playlist from the library. Defaults to `false` (tracks are kept).
+#[openapi]
+#[delete("/playlists/<id>?<delete_tracks>")]
+pub async fn delete(
+    id: i32,
+    delete_tracks: Option<bool>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Success>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let delete_tracks = delete_tracks.unwrap_or(false);
+    db.run(move |conn| {
+        services
+            .playlist_service
+            .delete_by_id(conn, id, delete_tracks)
+    })
+    .await
+    .map(|_| Json(Success { success: true }))
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
 }

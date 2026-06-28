@@ -160,6 +160,28 @@ impl PlaylistRepository for DieselPlaylistRepository {
         Ok(result)
     }
 
+    fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
+        // Delete junction rows first, then the playlist row itself.
+        diesel::delete(
+            schema::playlist_tracks::table.filter(schema::playlist_tracks::playlist_id.eq(id)),
+        )
+        .execute(conn)
+        .map_err(|e| {
+            shared::errors::Error::Database(format!(
+                "Failed to delete playlist tracks for playlist {}: {}",
+                id, e
+            ))
+        })?;
+
+        diesel::delete(schema::playlist::table.filter(schema::playlist::id.eq(id)))
+            .execute(conn)
+            .map_err(|e| {
+                shared::errors::Error::Database(format!("Failed to delete playlist {}: {}", id, e))
+            })?;
+
+        Ok(())
+    }
+
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64> {
         schema::playlist::table
             .count()

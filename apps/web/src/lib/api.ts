@@ -304,6 +304,15 @@ export async function getPlaylistTracks(id: number): Promise<PlaylistTrackDto[]>
   return res.json();
 }
 
+export async function deletePlaylist(id: number, deleteTracks = false): Promise<void> {
+  const url = deleteTracks ? `${BASE}/playlists/${id}?delete_tracks=true` : `${BASE}/playlists/${id}`;
+  const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
 // ================================================================================================
 // Sync Schedules
 // ================================================================================================

@@ -41,6 +41,9 @@
           {#if playlist.source_url}
             <a class="source-link" href={playlist.source_url} target="_blank" rel="noopener noreferrer">Open source ↗</a>
           {/if}
+          <div class="detail-actions">
+            <button class="btn-delete" onclick={() => lib.handleDeletePlaylist(playlist.id)}>Delete playlist</button>
+          </div>
         </div>
       </div>
     {:else}
@@ -88,13 +91,20 @@
   {:else}
     <div class="grid">
       {#each lib.filteredPlaylists as p (p.id)}
-        <button class="card" onclick={() => lib.drillIntoPlaylist(p)}>
-          {@render coverWrap(p.cover, p.name)}
-          <div class="card-info">
-            <div class="card-title" title={p.name}>{p.name}</div>
-            <div class="card-sub">{p.source}</div>
+        <div class="card"
+          onmouseenter={() => {}}
+          onmouseleave={() => {}}>
+          <button class="card-main" onclick={() => lib.drillIntoPlaylist(p)}>
+            {@render coverWrap(p.cover, p.name)}
+            <div class="card-info">
+              <div class="card-title" title={p.name}>{p.name}</div>
+              <div class="card-sub">{p.source}</div>
+            </div>
+          </button>
+          <div class="card-hover-actions">
+            <button class="btn-delete" onclick={(e) => { e.stopPropagation(); lib.handleDeletePlaylist(p.id); }}>Del</button>
           </div>
-        </button>
+        </div>
       {/each}
     </div>
   {/if}
@@ -134,15 +144,23 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    cursor: pointer;
-    text-align: left;
-    padding: 0;
+    position: relative;
     transition: border-color 0.15s;
-    color: inherit;
-    font-family: inherit;
   }
   .card:hover {
     border-color: var(--accent, #7cb7ff);
+  }
+  .card-main {
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    font-family: inherit;
+    width: 100%;
   }
   .cover-wrap {
     width: 100%;
@@ -184,6 +202,47 @@
     color: var(--muted, #888);
     text-transform: capitalize;
   }
+  .card-hover-actions {
+    display: none;
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    gap: 0.25rem;
+  }
+  .card:hover .card-hover-actions {
+    display: flex;
+  }
+
+  /* Detail hero actions */
+  .detail-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .detail-actions button {
+    padding: 0.3rem 0.75rem;
+    border-radius: 5px;
+    border: 1px solid var(--border, #333);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+    background: var(--surface-2, #1c1c1c);
+    color: var(--text, #eee);
+  }
+  .detail-actions button:hover { background: var(--surface, #141414); }
+
+  /* Delete button */
+  .btn-delete {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, #e05 35%, transparent);
+    background: color-mix(in srgb, #e05 10%, var(--surface, #111));
+    color: #e05;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: inherit;
+  }
+  .btn-delete:hover { background: color-mix(in srgb, #e05 20%, var(--surface, #111)); }
 
   /* Detail view */
   .detail-hero {

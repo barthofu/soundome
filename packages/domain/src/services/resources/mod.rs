@@ -3,4 +3,5 @@ pub mod artist_service;
 pub mod playlist_service;
 pub mod sync_schedule_service;
 pub mod task_service;
+pub mod track_ops;
 pub mod track_service;

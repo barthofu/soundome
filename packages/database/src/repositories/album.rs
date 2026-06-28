@@ -389,4 +389,17 @@ impl AlbumRepository for DieselAlbumRepository {
                 shared::errors::Error::Database(format!("Failed to count albums: {}", err))
             })
     }
+
+    fn count_tracks(&self, conn: &mut SqliteConnection, album_id: i32) -> SoundomeResult<i64> {
+        schema::track::table
+            .filter(schema::track::album_id.eq(album_id))
+            .count()
+            .get_result(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to count tracks for album {}: {}",
+                    album_id, err
+                ))
+            })
+    }
 }

@@ -3,7 +3,7 @@ import {
   getAlbums, updateAlbum, deleteAlbum,
   getArtists, updateArtist, deleteArtist, mergeArtists,
   uploadArtistImage, uploadAlbumImage, uploadTrackImage,
-  getPlaylists, getPlaylistTracks,
+  getPlaylists, getPlaylistTracks, deletePlaylist,
 } from '../api';
 import type {
   LibraryTrackDto, UpdateTrackBody,
@@ -407,6 +407,35 @@ function createLibraryStore() {
       if (drillArtistId === id) navigate('artists');
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
+  async function handleDeletePlaylist(id: number) {
+    if (!confirm('Delete this playlist?')) return;
+    const deleteTracks = confirm(
+      'Also delete the tracks that belong to this playlist?\n\n' +
+      'OK → delete the playlist AND its tracks\n' +
+      'Cancel → delete only the playlist (tracks are kept)'
+    );
+    try {
+      // If we need to remove tracks from local state but don't have them loaded yet,
+      // fetch the list before deleting so we know which IDs to purge.
+      let trackIdsToRemove: Set<number> = new Set();
+      if (deleteTracks) {
+        const source =
+          drillPlaylistId === id && drillPlaylistTracks.length > 0
+            ? drillPlaylistTracks
+            : await getPlaylistTracks(id);
+        trackIdsToRemove = new Set(source.map(t => t.id));
+      }
+
+      await deletePlaylist(id, deleteTracks);
+      playlists = playlists.filter(p => p.id !== id);
+
+      if (deleteTracks && trackIdsToRemove.size > 0) {
+        tracks = tracks.filter(t => !trackIdsToRemove.has(t.id));
+      }
+
+      if (drillPlaylistId === id) navigate('playlists');
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  }
 
   // ── Artist selection helpers ───────────────────────────────────────────────
   function toggleArtistSelection(id: number) {
@@ -531,7 +560,7 @@ function createLibraryStore() {
     loadTracks, loadAlbums, loadArtists, loadPlaylists,
     startEditTrack, startEditAlbum, startEditArtist,
     openEditForHovered, saveEdit, uploadImage,
-    handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist,
+    handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist, handleDeletePlaylist,
     toggleArtistSelection, clearArtistSelection, startMergePicking, cancelMergePicking, pickMergeTarget,
     fmtDuration, isRemote,
 

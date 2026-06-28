@@ -24,7 +24,7 @@ pub struct YoutubeMusic {
 
 impl YoutubeMusic {
     const TRACK_REGEX: &str = r#"/(?:https?:)?(?:\/\/)?(?:[0-9A-Z-]+\.)?(?:youtu\.be\/|youtube(?:-nocookie)?\.com\S*?[^\w\s-])([\w-]{11})(?=[^\w-]|$)(?![?=&+%\w.-]*(?:['"][^<>]*>|<\/a>))[?=&+%\w.-]*/gim"#;
-    const PLAYLIST_REGEX: &str = r#"/^.*(music.youtube\/|list=)([^#&?]*).*/"#;
+    const PLAYLIST_REGEX: &str = r"^https://music\.youtube\.com/(?:playlist|watch)\?.*\blist=([^#&?]+)";
     const ARTIST_REGEX: &str = r"^https:\/\/music\.youtube\.com\/channel\/([A-Za-z0-9_-]+)$";
 
     pub fn new() -> SoundomeResult<Self> {
@@ -89,14 +89,14 @@ impl YoutubeMusic {
     fn get_album_id_from_url(&self, url: &str) -> Option<String> {
         let re = Regex::new(Self::PLAYLIST_REGEX).ok()?;
         let captures = re.captures(url).ok().flatten()?;
-        captures.get(2).map(|m| m.as_str().to_string())
+        captures.get(1).map(|m| m.as_str().to_string())
     }
 
     /// Extracts the id from a youtube music playlist url (e.g: https://music.youtube.com/watch?v=YvI_FNrczzQ&list=RDCLAK5uy_mHkFNBTuR8DZUj61H5XY2onS7nRujVFx8 -> xxxxxxx)
     fn get_playlist_id_from_url(&self, url: &str) -> Option<String> {
         let re = Regex::new(Self::PLAYLIST_REGEX).ok()?;
         let captures = re.captures(url).ok().flatten()?;
-        captures.get(2).map(|m| m.as_str().to_string())
+        captures.get(1).map(|m| m.as_str().to_string())
     }
 }
 

@@ -81,6 +81,8 @@ pub trait AlbumRepository: Send + Sync {
     fn create_or_ignore(&self, conn: &mut SqliteConnection, album: &Album)
         -> SoundomeResult<Album>;
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
+    /// Count the number of tracks linked to this album.
+    fn count_tracks(&self, conn: &mut SqliteConnection, album_id: i32) -> SoundomeResult<i64>;
     /// Find an existing album by title **and** primary artist name(s).
     ///
     /// Returns the first album whose normalised title matches **and** whose
@@ -168,6 +170,8 @@ pub trait ArtistRepository: Send + Sync {
         target_id: i32,
     ) -> SoundomeResult<()>;
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
+    /// Count the number of tracks linked to this artist (via artist_tracks).
+    fn count_tracks(&self, conn: &mut SqliteConnection, artist_id: i32) -> SoundomeResult<i64>;
     // /// Find an artist by unique fields (e.g. name)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Option<Artist>>;
 }
@@ -199,6 +203,7 @@ pub trait PlaylistRepository: Send + Sync {
         conn: &mut SqliteConnection,
         playlist_id: i32,
     ) -> SoundomeResult<Vec<Track>>;
+    fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
 }
 

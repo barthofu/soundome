@@ -3,15 +3,29 @@ use std::{path::PathBuf, sync::Arc};
 use config::Config;
 use diesel::SqliteConnection;
 
-use crate::ports::repositories::PlaylistRepository;
+use crate::ports::repositories::{AlbumRepository, ArtistRepository, PlaylistRepository, TrackRepository};
+use crate::services::resources::track_ops::delete_track_with_cascade;
 
 pub struct PlaylistService {
     playlist_repo: Arc<dyn PlaylistRepository + Send + Sync>,
+    track_repo: Arc<dyn TrackRepository + Send + Sync>,
+    album_repo: Arc<dyn AlbumRepository + Send + Sync>,
+    artist_repo: Arc<dyn ArtistRepository + Send + Sync>,
 }
 
 impl PlaylistService {
-    pub fn new(playlist_repo: Arc<dyn PlaylistRepository + Send + Sync>) -> Self {
-        Self { playlist_repo }
+    pub fn new(
+        playlist_repo: Arc<dyn PlaylistRepository + Send + Sync>,
+        track_repo: Arc<dyn TrackRepository + Send + Sync>,
+        album_repo: Arc<dyn AlbumRepository + Send + Sync>,
+        artist_repo: Arc<dyn ArtistRepository + Send + Sync>,
+    ) -> Self {
+        Self {
+            playlist_repo,
+            track_repo,
+            album_repo,
+            artist_repo,
+        }
     }
 
     pub fn get_all(
@@ -106,5 +120,37 @@ impl PlaylistService {
 
     pub fn count(&self, conn: &mut SqliteConnection) -> shared::types::SoundomeResult<i64> {
         self.playlist_repo.count(conn)
+    }
+
+    /// Delete a playlist and its track associations.
+    ///
+    /// When `delete_tracks` is `true`, every track that belongs to this playlist
+    /// is also deleted from the library via `delete_track_with_cascade`, which
+    /// automatically removes orphaned albums and artists.
+    pub fn delete_by_id(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+        delete_tracks: bool,
+    ) -> shared::types::SoundomeResult<()> {
+        if delete_tracks {
+            let tracks = self.playlist_repo.get_tracks(conn, id)?;
+            // Remove playlist + junction rows first so they don't block track deletion.
+            self.playlist_repo.delete(conn, id)?;
+            for track in tracks {
+                if let Some(track_id) = track.id {
+                    delete_track_with_cascade(
+                        conn,
+                        track_id,
+                        &self.track_repo,
+                        &self.album_repo,
+                        &self.artist_repo,
+                    )?;
+                }
+            }
+        } else {
+            self.playlist_repo.delete(conn, id)?;
+        }
+        Ok(())
     }
 }

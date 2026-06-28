@@ -8,6 +8,7 @@ use shared::{
 };
 
 use crate::ports::repositories::{AlbumRepository, ArtistRepository, TrackRepository};
+use crate::services::resources::track_ops::delete_track_with_cascade;
 
 /// Patch applied when a user approves a pending validation.
 /// All fields are optional; only provided fields overwrite the existing value.
@@ -71,8 +72,19 @@ impl TrackService {
         self.track_repo.update(conn, id, updated_track)
     }
 
+    /// Delete a track by ID.
+    ///
+    /// After removing the track row, checks whether its album and each of its
+    /// artists have become orphans (no remaining tracks).  Orphaned albums and
+    /// artists are deleted automatically inside the same transaction.
     pub fn delete_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
-        self.track_repo.delete(conn, id)
+        delete_track_with_cascade(
+            conn,
+            id,
+            &self.track_repo,
+            &self.album_repo,
+            &self.artist_repo,
+        )
     }
 
     // Getters
