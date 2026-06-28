@@ -90,6 +90,9 @@ jobs:
       - rust
       - web
     if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-cli')
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/docker.yaml
     with:
       ref: ${{ github.ref_name }}
