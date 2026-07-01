@@ -425,6 +425,9 @@ function createLibraryStore() {
       }
 
       if (drillPlaylistId === id) navigate('playlists');
+      
+      // Refresh all data after deletion
+      loadAll();
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
 

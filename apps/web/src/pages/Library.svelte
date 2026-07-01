@@ -6,14 +6,9 @@
   import PlaylistsTab from '../lib/library/PlaylistsTab.svelte';
   import EditModal from '../lib/library/EditModal.svelte';
 
-  // Load all collections eagerly when the Library page mounts.
+  // Refresh all collections when arriving on this page.
   $effect(() => {
-    if (!lib.tracksLoaded && !lib.tracksLoading &&
-        !lib.albumsLoaded && !lib.albumsLoading &&
-        !lib.artistsLoaded && !lib.artistsLoading &&
-        !lib.playlistsLoaded && !lib.playlistsLoading) {
-      lib.loadAll();
-    }
+    lib.loadAll();
   });
 
   // Browser back / forward

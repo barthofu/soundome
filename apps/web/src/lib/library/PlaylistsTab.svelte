@@ -91,11 +91,7 @@
   {:else}
     <div class="grid">
        {#each lib.filteredPlaylists as p (p.id)}
-         <div class="card"
-           role="button"
-           tabindex="0"
-           onmouseenter={() => lib.drillIntoPlaylist(p)}
-           onmouseleave={() => {}}>
+         <div class="card">
            <button class="card-main" onclick={() => lib.drillIntoPlaylist(p)}>
              {@render coverWrap(p.cover, p.name)}
             <div class="card-info">
