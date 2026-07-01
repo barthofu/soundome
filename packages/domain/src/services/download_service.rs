@@ -105,10 +105,22 @@ impl DownloadService {
                     "Could not fetch playlist metadata ({}), using URL as name",
                     e
                 );
+                // Extract platform from URL for better fallback naming
+                let (platform, name) = if url.contains("spotify.com") {
+                    (shared::models::Platform::Spotify, url.to_string())
+                } else if url.contains("soundcloud.com") {
+                    (shared::models::Platform::SoundCloud, url.to_string())
+                } else if url.contains("youtube.com") || url.contains("youtu.be") {
+                    (shared::models::Platform::Youtube, url.to_string())
+                } else if url.contains("music.youtube.com") {
+                    (shared::models::Platform::YoutubeMusic, url.to_string())
+                } else {
+                    (shared::models::Platform::Unknown, url.to_string())
+                };
                 shared::models::Playlist {
                     id: None,
-                    name: url.to_string(),
-                    source: shared::models::Platform::Unknown,
+                    name,
+                    source: platform,
                     source_url: Some(url.to_string()),
                     cover: None,
                 }
@@ -121,9 +133,10 @@ impl DownloadService {
             playlist_id
         );
 
-        // Update task label to the actual playlist name as soon as it is known.
+        // Update task label to the actual playlist name with platform indicator.
         if let Some(tid) = task_id {
-            if let Err(e) = self.task_service.update_label(conn, tid, &playlist.name) {
+            let label = format!("[{}] {}", playlist.source, playlist.name);
+            if let Err(e) = self.task_service.update_label(conn, tid, &label) {
                 tracing::warn!("Failed to update task label to playlist name: {}", e);
             }
         }
@@ -301,9 +314,14 @@ impl DownloadService {
             artist_id
         );
 
-        // Update task label to the artist name.
+        // Update task label to the artist name with platform indicator.
         if let Some(tid) = task_id {
-            if let Err(e) = self.task_service.update_label(conn, tid, &artist.name) {
+            let platform = artist
+                .get_source()
+                .map(|r| r.platform.to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            let label = format!("[{}] {}", platform, artist.name);
+            if let Err(e) = self.task_service.update_label(conn, tid, &label) {
                 tracing::warn!("Failed to update task label to artist name: {}", e);
             }
         }
@@ -452,9 +470,14 @@ impl DownloadService {
                 .join(", ")
         );
 
-        // Update task label to the album title.
+        // Update task label to the album title with platform indicator.
         if let Some(tid) = task_id {
-            if let Err(e) = self.task_service.update_label(conn, tid, &album_meta.title) {
+            let platform = album_meta
+                .get_source()
+                .map(|r| r.platform.to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            let label = format!("[{}] {}", platform, album_meta.title);
+            if let Err(e) = self.task_service.update_label(conn, tid, &label) {
                 tracing::warn!("Failed to update task label to album title: {}", e);
             }
         }

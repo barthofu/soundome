@@ -9,12 +9,13 @@ use rspotify::{
         AlbumId, AlbumType as SpotifyAlbumType, ArtistId, Country, Market, PlaylistId,
         SearchResult, SearchType, TrackId,
     },
-    prelude::BaseClient,
+    prelude::{BaseClient, Id},
     ClientCredsSpotify, Credentials,
 };
+use serde;
 use shared::{
     errors::Error,
-    http::ProxyRotator,
+    http::{HttpClientBuilder, ProxyRotator},
     models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track},
     types::SoundomeResult,
 };
@@ -103,15 +104,80 @@ impl Source for Spotify {
     async fn get_playlist_from_url(&self, url: &str) -> SoundomeResult<Playlist> {
         let id = PlaylistId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
-        let playlist = self
-            .client
-            .playlist(id, None, None)
-            .map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
 
-        let cover = playlist.images.first().map(|img| img.url.clone());
+        // rspotify ≤ 0.16.1 panics inside `FullPlaylistShadow → FullPlaylist` when
+        // Spotify omits both `items` and `tracks` from the response (happens for
+        // non-owned playlists in development mode after the February 2026 API change).
+        // We bypass rspotify's deserialization entirely and call the API directly with
+        // `fields=id,name,images` so we only parse the fields we actually need.
+        //
+        // Note: rspotify is compiled with `client-ureq` (sync), so `token` is a
+        // `std::sync::Mutex`, not an async one.
+        let access_token = {
+            let guard = self.client.token.lock().unwrap();
+            guard
+                .as_ref()
+                .map(|t| t.access_token.clone())
+                .ok_or_else(|| Error::Config("Spotify token not available".to_string()))?
+        };
+
+        // Build the HTTP client without consuming a round-robin proxy rotation slot.
+        // `HttpClientBuilder::get_reqwest_client()` calls `ProxyRotator::get_next_proxy()`
+        // on every invocation, which would silently shift the shared round-robin index
+        // used elsewhere (e.g. yt-dlp downloads in packages/downloader), causing unrelated
+        // requests to land on a different proxy than before. `Spotify::new()` already sets
+        // `ALL_PROXY` once (consistent with the ureq-backed rspotify client), and passing
+        // `None` here lets reqwest pick that same env proxy up without an extra rotation.
+        let http = HttpClientBuilder::get_reqwest_client_with_specific_proxy(None).map_err(|e| {
+            error!("Failed to build HTTP client for Spotify: {}", e);
+            Error::Config("HTTP client setup failed".to_string())
+        })?;
+
+        let response = http
+            .get(format!(
+                "https://api.spotify.com/v1/playlists/{}",
+                id.id()
+            ))
+            .header("Authorization", format!("Bearer {}", access_token))
+            .query(&[("fields", "id,name,images")])
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Spotify HTTP error for playlist {}: {}", url, e);
+                Error::Network(e.to_string())
+            })?;
+
+        if !response.status().is_success() {
+            error!(
+                "Spotify API returned {} for playlist {}",
+                response.status(),
+                url
+            );
+            return Err(Error::NotFound(format!("Spotify playlist from {}", url)));
+        }
+
+        #[derive(serde::Deserialize)]
+        struct PlaylistMeta {
+            name: String,
+            images: Option<Vec<ImageRef>>,
+        }
+        #[derive(serde::Deserialize)]
+        struct ImageRef {
+            url: String,
+        }
+
+        let meta: PlaylistMeta = response.json().await.map_err(|e| {
+            error!("Failed to parse Spotify playlist metadata for {}: {}", url, e);
+            Error::NotFound(format!("Spotify playlist from {}", url))
+        })?;
+
+        let cover = meta
+            .images
+            .and_then(|imgs| imgs.into_iter().next().map(|img| img.url));
+
         Ok(Playlist {
             id: None,
-            name: playlist.name,
+            name: meta.name,
             source: Platform::Spotify,
             source_url: Some(url.to_string()),
             cover,
@@ -121,20 +187,45 @@ impl Source for Spotify {
     async fn get_playlist_tracks_from_url(&self, url: &str) -> SoundomeResult<Vec<PlaylistTrack>> {
         let id = PlaylistId::from_id(self.url_to_id(url))
             .map_err(|_| Error::InvalidUrl(url.to_string()))?;
-        let playlist = self
-            .client
-            .playlist(id, None, None)
-            .map_err(|_| Error::NotFound(format!("Spotify playlist from {}", url).to_string()))?;
 
-        Ok(playlist
-            .items
-            .items
-            .iter()
-            .enumerate()
-            .filter_map(|(i, track)| {
-                mappers::convert_playlist_item(track, i.try_into().unwrap_or(0))
-            })
-            .collect())
+        // Use the dedicated /playlists/{id}/items endpoint instead of /playlists/{id}.
+        // Since the February 2026 Spotify API change, playlist track contents are no
+        // longer embedded in GET /playlists/{id} for apps in development mode that do
+        // not own the playlist. The dedicated items endpoint remains accessible.
+        let mut all_tracks: Vec<PlaylistTrack> = Vec::new();
+        let mut offset: u32 = 0;
+        let limit: u32 = 50;
+
+        loop {
+            let page = self
+                .client
+                .playlist_items_manual(
+                    id.clone(),
+                    None,
+                    Some(Market::Country(Country::France)),
+                    Some(limit),
+                    Some(offset),
+                )
+                .map_err(|e| {
+                    error!("Spotify API error fetching playlist items {}: {}", url, e);
+                    Error::NotFound(format!("Spotify playlist from {}", url))
+                })?;
+
+            let base_pos = offset;
+            for (i, item) in page.items.iter().enumerate() {
+                let pos = base_pos + i as u32;
+                if let Some(track) = mappers::convert_playlist_item(item, pos) {
+                    all_tracks.push(track);
+                }
+            }
+
+            if page.next.is_none() || page.items.is_empty() {
+                break;
+            }
+            offset += limit;
+        }
+
+        Ok(all_tracks)
     }
 
     async fn get_artist_from_url(&self, url: &str) -> SoundomeResult<Artist> {

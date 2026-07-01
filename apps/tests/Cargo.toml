@@ -1,0 +1,18 @@
+[package]
+name = "soundome-tests"
+version = "0.1.0"
+edition = "2021"
+
+# This crate contains integration tests that hit real external APIs.
+# Run with: cargo test -p soundome-tests -- --nocapture
+# Tests that require credentials are gated behind #[ignore] and must be
+# run explicitly: cargo test -p soundome-tests -- --ignored --nocapture
+
+[dependencies]
+fetcher = { path = "../../packages/fetcher" }
+shared = { path = "../../packages/shared" }
+config = { path = "../../packages/config" }
+
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber = { workspace = true }
+dotenvy = { git = "https://github.com/allan2/dotenvy", features = ["macros"] }
