@@ -4124,7 +4124,7 @@ dependencies = [
 
 [[package]]
 name = "soundome-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "config 0.1.0",
  "database",
@@ -4146,18 +4146,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "walkdir",
-]
-
-[[package]]
-name = "soundome-tests"
-version = "0.1.0"
-dependencies = [
- "config 0.1.0",
- "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
- "fetcher",
- "shared",
- "tokio",
- "tracing-subscriber",
 ]
 
 [[package]]

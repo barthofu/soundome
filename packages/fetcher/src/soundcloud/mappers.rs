@@ -1,7 +1,7 @@
 use rsoundcloud::http::StatusCode;
 use shared::{
     errors::Error,
-    models::{Album, AlbumType, Artist, PlaylistTrack, Reference, ReferenceType, Track},
+    models::{Album, AlbumType, Artist, Reference, ReferenceType, Track},
 };
 
 /// Converts an rsoundcloud ClientError into a shared Error.
@@ -140,19 +140,6 @@ pub fn convert_track(
             external_url: Some(track.permalink_url.clone()),
         }],
     }
-}
-
-/// Converts a Soundcloud track to a shared PlaylistTrack.
-pub fn convert_playlist_item(
-    item: rsoundcloud::models::track::Track,
-    pos: u32,
-) -> Option<PlaylistTrack> {
-    Some(PlaylistTrack {
-        id: None,
-        track: convert_track(item, None),
-        added_at: None,
-        position: Some(pos),
-    })
 }
 
 /// Converts a Soundcloud BasicTrack (from user tracks endpoint) to a shared Track.

@@ -1,4 +1,4 @@
-pub mod mappers;
+mod mappers;
 
 use async_trait::async_trait;
 use config::Config;

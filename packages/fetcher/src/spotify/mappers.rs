@@ -179,11 +179,3 @@ pub fn convert_simplified_track(track: &SimplifiedTrack, album: &SimplifiedAlbum
         }],
     }
 }
-
-// =========================================
-// Utils
-// =========================================
-
-pub fn track_name_fixup(_track: &FullTrack) -> String {
-    String::from("")
-}

@@ -1,4 +1,4 @@
-pub mod mappers;
+mod mappers;
 
 use std::env;
 
@@ -128,16 +128,14 @@ impl Source for Spotify {
         // requests to land on a different proxy than before. `Spotify::new()` already sets
         // `ALL_PROXY` once (consistent with the ureq-backed rspotify client), and passing
         // `None` here lets reqwest pick that same env proxy up without an extra rotation.
-        let http = HttpClientBuilder::get_reqwest_client_with_specific_proxy(None).map_err(|e| {
-            error!("Failed to build HTTP client for Spotify: {}", e);
-            Error::Config("HTTP client setup failed".to_string())
-        })?;
+        let http =
+            HttpClientBuilder::get_reqwest_client_with_specific_proxy(None).map_err(|e| {
+                error!("Failed to build HTTP client for Spotify: {}", e);
+                Error::Config("HTTP client setup failed".to_string())
+            })?;
 
         let response = http
-            .get(format!(
-                "https://api.spotify.com/v1/playlists/{}",
-                id.id()
-            ))
+            .get(format!("https://api.spotify.com/v1/playlists/{}", id.id()))
             .header("Authorization", format!("Bearer {}", access_token))
             .query(&[("fields", "id,name,images")])
             .send()
@@ -167,7 +165,10 @@ impl Source for Spotify {
         }
 
         let meta: PlaylistMeta = response.json().await.map_err(|e| {
-            error!("Failed to parse Spotify playlist metadata for {}: {}", url, e);
+            error!(
+                "Failed to parse Spotify playlist metadata for {}: {}",
+                url, e
+            );
             Error::NotFound(format!("Spotify playlist from {}", url))
         })?;
 
