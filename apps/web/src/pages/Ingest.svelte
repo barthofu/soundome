@@ -463,65 +463,128 @@
 
 <style>
   .ingest-page {
-    max-width: 820px;
+    max-width: 900px;
     margin: 0 auto;
-    padding: 2rem 1rem;
+    padding: 1rem 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .ingest-page {
+      padding: 1.5rem 1rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .ingest-page {
+      padding: 2rem 1rem;
+    }
   }
 
   h2 {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
   }
 
+  @media (min-width: 768px) {
+    h2 {
+      font-size: 1.5rem;
+    }
+  }
+
   .subtitle {
     color: var(--muted);
-    margin-bottom: 2rem;
-    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.8rem;
+  }
+
+  @media (min-width: 640px) {
+    .subtitle {
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
   }
 
   .section {
-    margin-bottom: 2.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .section {
+      margin-bottom: 2.5rem;
+    }
   }
 
   h3 {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.6rem;
     display: flex;
     align-items: baseline;
-    gap: 0.6rem;
+    gap: 0.4rem;
     flex-wrap: wrap;
   }
 
+  @media (min-width: 640px) {
+    h3 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      gap: 0.6rem;
+    }
+  }
+
   .dir-path {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 400;
     color: var(--muted);
     font-family: monospace;
     background: var(--surface-2);
-    padding: 0.1rem 0.45rem;
+    padding: 0.08rem 0.35rem;
     border-radius: 4px;
+    word-break: break-all;
+  }
+
+  @media (min-width: 640px) {
+    .dir-path {
+      font-size: 0.78rem;
+      padding: 0.1rem 0.45rem;
+    }
   }
 
   .hint {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--muted);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  @media (min-width: 640px) {
+    .hint {
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+    }
   }
 
   /* ── Buttons ── */
   button {
-    padding: 0.55rem 1.1rem;
+    padding: 0.4rem 0.9rem;
     border-radius: 6px;
     border: none;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 500;
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.3rem;
     font-family: inherit;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 640px) {
+    button {
+      padding: 0.55rem 1.1rem;
+      font-size: 0.9rem;
+      gap: 0.4rem;
+    }
   }
 
   button:disabled {
@@ -540,16 +603,30 @@
   }
 
   .btn-sm {
-    padding: 0.3rem 0.75rem;
-    font-size: 0.82rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .btn-sm {
+      padding: 0.3rem 0.75rem;
+      font-size: 0.82rem;
+    }
   }
 
   /* ── Batch row ── */
   .batch-row {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
     flex-wrap: wrap;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  @media (min-width: 640px) {
+    .batch-row {
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
   }
 
   /* ── Task status ── */
@@ -560,26 +637,47 @@
     background: var(--surface, #1a1a1a);
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+  }
+
+  @media (min-width: 640px) {
+    .task-stats {
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
   }
 
   .task-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .task-label {
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+  }
+
+  @media (min-width: 640px) {
+    .task-label {
+      font-size: 0.9rem;
+    }
   }
 
   .progress-bar-wrap {
-    height: 6px;
+    height: 5px;
     background: var(--surface-2, #2a2a2a);
     border-radius: 3px;
     overflow: hidden;
+  }
+
+  @media (min-width: 640px) {
+    .progress-bar-wrap {
+      height: 6px;
+    }
   }
 
   .progress-bar {
@@ -590,16 +688,29 @@
   }
 
   .progress-label {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     color: var(--muted);
     text-align: right;
   }
 
+  @media (min-width: 640px) {
+    .progress-label {
+      font-size: 0.78rem;
+    }
+  }
+
   .stats-row {
     display: flex;
-    gap: 1rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    font-size: 0.82rem;
+    font-size: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .stats-row {
+      gap: 1rem;
+      font-size: 0.82rem;
+    }
   }
 
   .stat.ok   { color: #6dc87a; }
@@ -607,8 +718,8 @@
   .stat.error { color: var(--error, #e55); }
 
   .status-badge {
-    font-size: 0.75rem;
-    padding: 0.18rem 0.5rem;
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
     border-radius: 20px;
     font-weight: 600;
   }

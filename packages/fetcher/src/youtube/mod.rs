@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use config::Config;
+use rustypipe::client::RustyPipe;
 use serde::Deserialize;
 use shared::{
     errors::Error,
@@ -7,7 +8,6 @@ use shared::{
     models::{Album, Artist, Platform, Playlist, PlaylistTrack, Reference, ReferenceType, Track},
     types::SoundomeResult,
 };
-use rustypipe::client::RustyPipe;
 use std::process::Command;
 
 use crate::Source;
@@ -120,29 +120,29 @@ impl Youtube {
 #[async_trait]
 impl Source for Youtube {
     async fn get_track_from_url(&self, url: &str) -> SoundomeResult<Track> {
-        let video_id = Self::get_id_from_url(url)
-            .ok_or(Error::InvalidUrl(url.to_string()))?;
+        let video_id = Self::get_id_from_url(url).ok_or(Error::InvalidUrl(url.to_string()))?;
 
         // Try to extract metadata using yt-dlp
-        let (title, artist_name, duration, needs_validation) = if let Some(info) = Self::get_video_metadata(url) {
-            let artist = info
-                .channel
-                .or(info.uploader)
-                .unwrap_or_else(|| "Unknown Artist".to_string());
-            (info.title, artist, info.duration, false)
-        } else {
-            // Fallback: create a track with minimal metadata that requires validation
-            tracing::warn!(
-                "Failed to extract YouTube metadata for {}, will require validation",
-                url
-            );
-            (
-                "Unknown Title (YouTube)".to_string(),
-                "Unknown Artist".to_string(),
-                None,
-                true,
-            )
-        };
+        let (title, artist_name, duration, needs_validation) =
+            if let Some(info) = Self::get_video_metadata(url) {
+                let artist = info
+                    .channel
+                    .or(info.uploader)
+                    .unwrap_or_else(|| "Unknown Artist".to_string());
+                (info.title, artist, info.duration, false)
+            } else {
+                // Fallback: create a track with minimal metadata that requires validation
+                tracing::warn!(
+                    "Failed to extract YouTube metadata for {}, will require validation",
+                    url
+                );
+                (
+                    "Unknown Title (YouTube)".to_string(),
+                    "Unknown Artist".to_string(),
+                    None,
+                    true,
+                )
+            };
 
         Ok(Track {
             id: None,
@@ -186,8 +186,7 @@ impl Source for Youtube {
     }
 
     async fn get_playlist_from_url(&self, url: &str) -> SoundomeResult<Playlist> {
-        let _list_id = Self::get_playlist_id(url)
-            .ok_or(Error::InvalidUrl(url.to_string()))?;
+        let _list_id = Self::get_playlist_id(url).ok_or(Error::InvalidUrl(url.to_string()))?;
 
         // Create a minimal playlist metadata
         tracing::info!("Creating YouTube playlist from URL");
@@ -253,8 +252,8 @@ impl Source for Youtube {
 
     fn is_valid_track_url(url: &str) -> bool {
         // Match youtube.com/watch?v=... and youtu.be/...
-        (url.contains("youtube.com/watch?v=") || url.contains("youtu.be/"))
-            && url.len() > 20 // Basic sanity check
+        (url.contains("youtube.com/watch?v=") || url.contains("youtu.be/")) && url.len() > 20
+        // Basic sanity check
     }
 
     fn is_valid_playlist_url(url: &str) -> bool {

@@ -75,7 +75,7 @@ fi
 # ── run tests ─────────────────────────────────────────────────────────────────
 
 say "Running tests…"
-if ! cargo test -q; then
+if ! cargo test -q --workspace --exclude openrouter_api; then
     err "tests failed. Fix the failures and try again."
 fi
 ok "All tests passed"

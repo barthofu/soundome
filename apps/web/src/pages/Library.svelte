@@ -130,34 +130,103 @@
 <EditModal />
 
 <style>
-  .library-page { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+  .library-page { 
+    max-width: 1400px; 
+    margin: 0 auto; 
+    padding: 1rem 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .library-page {
+      padding: 1.5rem 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .library-page {
+      padding: 2rem 1.5rem;
+    }
+  }
+
+  .page-header { 
+    display: flex; 
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+    justify-content: space-between; 
+    margin-bottom: 1.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .page-header {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+
+  h1 { 
+    font-size: 1.25rem; 
+    font-weight: 700; 
+    margin: 0;
+  }
+
+  @media (min-width: 768px) {
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
 
   .header-right {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  @media (min-width: 640px) {
+    .header-right {
+      width: auto;
+      gap: 0.75rem;
+    }
   }
 
   .last-refreshed {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     color: var(--muted);
+    display: none;
+  }
+
+  @media (min-width: 640px) {
+    .last-refreshed {
+      display: block;
+      font-size: 0.78rem;
+    }
   }
 
   .btn-header {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 1rem;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface);
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: inherit;
     font-family: inherit;
+    white-space: nowrap;
   }
+
+  @media (min-width: 768px) {
+    .btn-header {
+      padding: 0.4rem 1rem;
+      font-size: 0.875rem;
+      gap: 0.4rem;
+    }
+  }
+
   .btn-header:hover:not(:disabled) { background: var(--surface-2); }
   .btn-header:disabled { opacity: 0.5; cursor: default; }
 
@@ -172,15 +241,101 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
-  .tab { background: none; border: none; color: var(--muted); font-size: 0.875rem; padding: 0.5rem 1rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 4px 4px 0 0; display: flex; align-items: center; gap: 0.4rem; transition: color 0.15s; font-family: inherit; }
+  .tabs { 
+    display: flex; 
+    gap: 0.25rem; 
+    border-bottom: 1px solid var(--border); 
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab { 
+    background: none; 
+    border: none; 
+    color: var(--muted); 
+    font-size: 0.75rem; 
+    padding: 0.4rem 0.7rem; 
+    cursor: pointer; 
+    border-bottom: 2px solid transparent; 
+    margin-bottom: -1px; 
+    border-radius: 4px 4px 0 0; 
+    display: flex; 
+    align-items: center; 
+    gap: 0.3rem; 
+    transition: color 0.15s; 
+    font-family: inherit;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 768px) {
+    .tab {
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      gap: 0.4rem;
+    }
+  }
+
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .tab-count { font-size: 0.75rem; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 0 0.4rem; }
-  .tab-badge { background: var(--warning); color: #000; font-size: 0.68rem; font-weight: 700; border-radius: 10px; padding: 0 0.35rem; }
+  .tab-count { 
+    font-size: 0.65rem; 
+    color: var(--muted); 
+    background: var(--surface-2); 
+    border-radius: 10px; 
+    padding: 0 0.3rem;
+  }
 
-  .breadcrumb { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; font-size: 0.875rem; }
-  .crumb-btn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font-size: inherit; font-family: inherit; }
+  @media (min-width: 768px) {
+    .tab-count {
+      font-size: 0.75rem;
+      padding: 0 0.4rem;
+    }
+  }
+
+  .tab-badge { 
+    background: var(--warning); 
+    color: #000; 
+    font-size: 0.6rem; 
+    font-weight: 700; 
+    border-radius: 10px; 
+    padding: 0 0.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .tab-badge {
+      font-size: 0.68rem;
+      padding: 0 0.35rem;
+    }
+  }
+
+  .breadcrumb { 
+    display: flex; 
+    align-items: center; 
+    gap: 0.4rem; 
+    margin-bottom: 1.25rem; 
+    font-size: 0.75rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (min-width: 768px) {
+    .breadcrumb {
+      font-size: 0.875rem;
+      gap: 0.5rem;
+    }
+  }
+
+  .crumb-btn { 
+    background: none; 
+    border: none; 
+    color: var(--accent); 
+    cursor: pointer; 
+    padding: 0; 
+    font-size: inherit; 
+    font-family: inherit;
+    white-space: nowrap;
+  }
   .crumb-btn:hover { text-decoration: underline; }
   .crumb-sep { color: var(--muted); }
   .crumb-current { color: var(--text); font-weight: 500; }

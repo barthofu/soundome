@@ -16,6 +16,7 @@
   let activeTasksCount = $state(0);
   let helpOpen = $state(false);
   let version = $state('');
+  let mobileMenuOpen = $state(false);
 
   async function refreshCounts() {
     try {
@@ -53,6 +54,7 @@
 
   function navigate(to: Page) {
     page = to;
+    mobileMenuOpen = false;
     if (to === 'validations') refreshCounts();
   }
 </script>
@@ -66,8 +68,16 @@
     {/if}
   </button>
   
+  <!-- Hamburger menu button (visible on mobile) -->
+  <button class="hamburger" onclick={() => (mobileMenuOpen = !mobileMenuOpen)} aria-label="Toggle menu" aria-expanded={mobileMenuOpen}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </button>
 
-  <div class="nav-links">
+  <div class="nav-links" class:mobile-open={mobileMenuOpen}>
     <!-- Group 1: Library (leftmost, standalone) -->
     <button
       class="nav-link"
@@ -181,7 +191,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 1.5rem;
+    padding: 0 1rem;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     position: sticky;
@@ -189,16 +199,51 @@
     z-index: 10;
   }
 
+  @media (max-width: 640px) {
+    nav {
+      padding: 0 0.75rem;
+      height: 44px;
+    }
+  }
+
   .brand {
     background: none;
     border: none;
     color: var(--text);
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.95rem;
     letter-spacing: 0.05em;
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  @media (min-width: 641px) {
+    .brand {
+      font-size: 1rem;
+    }
+  }
+
+  .hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: 0.25rem;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 641px) {
+    .hamburger {
+      display: none;
+    }
   }
 
   .version {
@@ -211,14 +256,41 @@
   }
 
   .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    gap: 0;
+    padding: 0.5rem 0;
+    max-height: calc(100vh - 44px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-links.mobile-open {
     display: flex;
-    align-items: center;
-    gap: 0.15rem;
+  }
+
+  @media (min-width: 641px) {
+    .nav-links {
+      display: flex;
+      position: static;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.15rem;
+      padding: 0;
+      border: none;
+      max-height: none;
+    }
   }
 
   /* Thin separator */
   .nav-sep {
-    display: block;
+    display: none;
     width: 1px;
     height: 16px;
     background: var(--border);
@@ -226,21 +298,39 @@
     flex-shrink: 0;
   }
 
+  @media (min-width: 641px) {
+    .nav-sep {
+      display: block;
+    }
+  }
+
   /* Text nav items */
   .nav-link {
     background: none;
     border: none;
     color: var(--muted);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     font-family: inherit;
-    padding: 0.35rem 0.7rem;
-    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    border-radius: 0;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.4rem;
     transition: color 0.15s, background 0.15s;
     white-space: nowrap;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  @media (min-width: 641px) {
+    .nav-link {
+      padding: 0.35rem 0.7rem;
+      border-radius: 6px;
+      width: auto;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
   }
 
   .nav-link:hover {
@@ -258,14 +348,24 @@
     background: none;
     border: none;
     color: var(--muted);
-    padding: 0.35rem 0.45rem;
-    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    border-radius: 0;
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     position: relative;
     transition: color 0.15s, background 0.15s;
+    width: 100%;
+  }
+
+  @media (min-width: 641px) {
+    .nav-icon {
+      padding: 0.35rem 0.45rem;
+      border-radius: 6px;
+      width: auto;
+      justify-content: center;
+    }
   }
 
   .nav-icon:hover {
@@ -316,5 +416,12 @@
   main {
     min-height: calc(100vh - 48px);
     background: var(--bg);
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 640px) {
+    main {
+      min-height: calc(100vh - 44px);
+    }
   }
 </style>

@@ -273,21 +273,47 @@
 
 <style>
   .tasks-page {
-    max-width: 640px;
-    margin: 2rem auto;
-    padding: 0 1rem;
+    max-width: 800px;
+    margin: 1rem auto;
+    padding: 0 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .tasks-page {
+      margin: 1.5rem auto;
+      padding: 0 1rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .tasks-page {
+      margin: 2rem auto;
+    }
   }
 
   h2 {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
     color: var(--text);
+  }
+
+  @media (min-width: 640px) {
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1.25rem;
+    }
   }
 
   .empty {
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+  }
+
+  @media (min-width: 640px) {
+    .empty {
+      font-size: 0.9rem;
+    }
   }
 
   .task-list {
@@ -296,43 +322,79 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .task-list {
+      gap: 0.75rem;
+    }
   }
 
   .task-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 0.85rem 1rem;
+    padding: 0.7rem 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.4rem;
+  }
+
+  @media (min-width: 640px) {
+    .task-card {
+      padding: 0.85rem 1rem;
+      gap: 0.5rem;
+    }
   }
 
   .task-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  @media (min-width: 640px) {
+    .task-header {
+      gap: 0.5rem;
+      flex-wrap: nowrap;
+    }
   }
 
   .task-header-right {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.35rem;
     flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  @media (min-width: 640px) {
+    .task-header-right {
+      gap: 0.5rem;
+    }
   }
 
   .retry-btn {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    padding: 2px 8px;
+    padding: 2px 6px;
     border-radius: 99px;
     border: 1px solid #555;
     background: transparent;
     color: #aaa;
     cursor: pointer;
   }
+
+  @media (min-width: 768px) {
+    .retry-btn {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+    }
+  }
+
   .retry-btn:hover:not(:disabled) {
     background: #2a2a2a;
     color: #fff;
@@ -343,15 +405,23 @@
   }
 
   .cancel-btn {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    padding: 2px 8px;
+    padding: 2px 6px;
     border-radius: 99px;
     border: 1px solid #b91c1c;
     background: transparent;
     color: #f87171;
     cursor: pointer;
   }
+
+  @media (min-width: 768px) {
+    .cancel-btn {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+    }
+  }
+
   .cancel-btn:hover:not(:disabled) {
     background: #3b1a1a;
     color: #fca5a5;
@@ -362,21 +432,37 @@
   }
 
   .task-label {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 500;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .task-label {
+      font-size: 0.9rem;
+    }
   }
 
   .status-badge {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    padding: 2px 8px;
+    padding: 2px 6px;
     border-radius: 99px;
     flex-shrink: 0;
   }
+
+  @media (min-width: 768px) {
+    .status-badge {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+    }
+  }
+
   .status-badge.pending    { background: #3b3b3b; color: #aaa; }
   .status-badge.running    { background: #1e3a5f; color: #60a5fa; }
   .status-badge.completed  { background: #1a3326; color: #4ade80; }
@@ -387,15 +473,28 @@
   .progress-row {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.4rem;
+  }
+
+  @media (min-width: 640px) {
+    .progress-row {
+      gap: 0.6rem;
+    }
   }
 
   .progress-bar {
     flex: 1;
-    height: 6px;
+    height: 5px;
     background: var(--surface-2, #2a2a2a);
     border-radius: 3px;
     overflow: hidden;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .progress-bar {
+      height: 6px;
+    }
   }
 
   .progress-fill {
@@ -408,30 +507,51 @@
   .progress-fill.cancelled  { background: #fb923c; }
 
   .progress-text {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--muted);
     white-space: nowrap;
-    min-width: 50px;
+    min-width: 45px;
     text-align: right;
+  }
+
+  @media (min-width: 640px) {
+    .progress-text {
+      font-size: 0.75rem;
+      min-width: 50px;
+    }
   }
 
   /* ── Stats chips ── */
   .stats-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.3rem;
     margin-top: 0.1rem;
+  }
+
+  @media (min-width: 640px) {
+    .stats-row {
+      gap: 0.4rem;
+    }
   }
 
   .stat-chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    font-size: 0.72rem;
+    gap: 0.2rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    padding: 2px 8px;
+    padding: 2px 6px;
     border-radius: 99px;
     white-space: nowrap;
+  }
+
+  @media (min-width: 768px) {
+    .stat-chip {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      gap: 0.25rem;
+    }
   }
 
   .stat-chip.downloaded { background: #1a3326; color: #4ade80; }
@@ -453,8 +573,14 @@
   .stat-chip.errors:hover { background: #4a2020; }
 
   .chevron {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     opacity: 0.7;
+  }
+
+  @media (min-width: 768px) {
+    .chevron {
+      font-size: 0.6rem;
+    }
   }
 
   /* ── Error detail list ── */
@@ -464,34 +590,54 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.25rem;
     border-left: 2px solid #5a2020;
-    padding-left: 0.75rem;
+    padding-left: 0.6rem;
+  }
+
+  @media (min-width: 640px) {
+    .error-list {
+      gap: 0.3rem;
+      padding-left: 0.75rem;
+    }
   }
 
   .error-item {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0.08rem;
   }
 
   .error-track {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: #f87171;
   }
 
+  @media (min-width: 768px) {
+    .error-track {
+      font-size: 0.78rem;
+    }
+  }
+
   .error-track-link {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: #f87171;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.2rem;
     border-bottom: 1px solid #f8717166;
     cursor: pointer;
     transition: color 0.2s, border-color 0.2s;
+  }
+
+  @media (min-width: 768px) {
+    .error-track-link {
+      font-size: 0.78rem;
+      gap: 0.25rem;
+    }
   }
 
   .error-track-link:hover {
