@@ -1066,7 +1066,6 @@ dependencies = [
  "config 0.1.0",
  "fetcher",
  "fuzzy-matcher",
- "invidious",
  "ngrammatic",
  "rustypipe",
  "serde",
@@ -2062,18 +2061,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "invidious"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa2cff01a915c4780785828f6bec4ad5f8d03f34307d4183ca210830a8a6d88d"
-dependencies = [
- "async-trait",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
 ]
 
 [[package]]

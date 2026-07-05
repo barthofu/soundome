@@ -91,13 +91,9 @@ Required. Used for metadata fetching and source resolution. Obtain credentials a
 | `providers.spotify.client_id` | string | Spotify OAuth application client ID. | `SOUNDOME__PROVIDERS__SPOTIFY__CLIENT_ID` |
 | `providers.spotify.client_secret` | string | Spotify OAuth application client secret. | `SOUNDOME__PROVIDERS__SPOTIFY__CLIENT_SECRET` |
 
-### `[providers.youtube]` (optional)
+### YouTube / YouTube Music
 
-When this section is omitted, the default YouTube / YouTube Music integration is used directly.
-
-| Key | Type | Description | Environment variable |
-|---|---|---|---|
-| `providers.youtube.invidious_instance` | string | Base URL of an Invidious instance to use instead of direct YouTube access. | `SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE` |
+No dedicated config section. Search and download both shell out to the `yt-dlp` binary, which must be installed and available on `PATH` (see [development-setup.md](development-setup.md)). yt-dlp talks to YouTube directly and honors the shared `[proxy]` configuration below when enabled — see [../operations/youtube-search-configuration.md](../operations/youtube-search-configuration.md) for prerequisites and troubleshooting.
 
 ---
 

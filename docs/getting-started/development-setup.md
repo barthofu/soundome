@@ -7,6 +7,7 @@ This guide describes the local setup expected by the current repository.
 - Rust stable toolchain
 - `pnpm`
 - `ffmpeg`
+- `yt-dlp` (used for YouTube/YouTube Music search and download — see [../operations/youtube-search-configuration.md](../operations/youtube-search-configuration.md))
 - SQLite
 - `diesel_cli` with SQLite support
 - a local `.env` file for server and CLI boot

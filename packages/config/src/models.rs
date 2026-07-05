@@ -127,7 +127,6 @@ impl DatabaseConfig {
 #[allow(unused)]
 pub struct ProvidersConfig {
     pub spotify: Option<SpotifyConfig>,
-    pub youtube: Option<YoutubeConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -135,27 +134,6 @@ pub struct ProvidersConfig {
 pub struct SpotifyConfig {
     pub client_id: String,
     pub client_secret: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(unused)]
-pub struct YoutubeConfig {
-    #[serde(default = "YoutubeConfig::default_invidious_instance")]
-    pub invidious_instance: Option<String>,
-}
-
-impl Default for YoutubeConfig {
-    fn default() -> Self {
-        Self {
-            invidious_instance: Self::default_invidious_instance(),
-        }
-    }
-}
-
-impl YoutubeConfig {
-    fn default_invidious_instance() -> Option<String> {
-        Some("https://invidious.tiekoetter.com".to_string())
-    }
 }
 
 // ===============================================================================

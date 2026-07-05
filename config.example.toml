@@ -119,34 +119,11 @@ client_id = "your_spotify_client_id"
 client_secret = "your_spotify_client_secret"
 
 # -----------------------------------------------------------------------------
-# YouTube (optional)
-# Configures the Invidious instance used for YouTube search.
-# 
-# Default: https://invidious.tiekoetter.com
-# 
-# The default public Invidious instance (invidious.f5.si) has bot
-# protection enabled and will block requests. The default configured here
-# is reliable and allows automated requests.
-# 
-# To use a different instance:
-# [providers.youtube]
-# invidious_instance = "https://your-instance.example.com"
-# 
-# Available instances: https://docs.invidious.io/instances/
-# Choose one with:
-#   - Good uptime (90%+ in last week)
-#   - API enabled
-#   - No bot protection / anti-scraping measures
-# 
-# ENV: SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE
-# To override: SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE=https://...
-# 
-# Note: If you omit this section entirely, Soundome will use the built-in
-# default instance. You only need to configure it if you want to use a
-# different instance.
+# YouTube / YouTube Music
+# No configuration needed: Soundome shells out to the `yt-dlp` binary (must be
+# installed and on PATH) for both search and download. It talks to YouTube
+# directly and honors the shared [proxy] configuration below, if enabled.
 # -----------------------------------------------------------------------------
-# [providers.youtube]
-# invidious_instance = "https://invidious.tiekoetter.com"
 
 
 # =============================================================================

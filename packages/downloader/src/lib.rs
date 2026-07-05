@@ -4,7 +4,6 @@ pub mod youtube;
 pub mod youtube_music;
 
 use async_trait::async_trait;
-use config::Config;
 use shared::{
     errors::Error,
     models::{Platform, Reference, ReferenceType, Track},
@@ -41,13 +40,7 @@ pub trait Matcher {
 
 pub async fn search(track: &Track) -> SoundomeResult<Reference> {
     // providers
-    let youtube = youtube::Youtube::new(
-        Config::get()
-            .providers
-            .youtube
-            .as_ref()
-            .and_then(|youtube| youtube.invidious_instance.clone()),
-    );
+    let youtube = youtube::Youtube::new();
     let youtube_music = youtube_music::YoutubeMusic::new();
 
     let source = track.get_source();
@@ -121,24 +114,12 @@ pub async fn download(
 
     match source.platform {
         Platform::Spotify => {
-            let mut youtube = youtube::Youtube::new(
-                Config::get()
-                    .providers
-                    .youtube
-                    .as_ref()
-                    .and_then(|youtube| youtube.invidious_instance.clone()),
-            );
+            let mut youtube = youtube::Youtube::new();
 
             youtube.download(&url, track_title, output_dir).await
         }
         Platform::Youtube => {
-            let mut youtube = youtube::Youtube::new(
-                Config::get()
-                    .providers
-                    .youtube
-                    .as_ref()
-                    .and_then(|youtube| youtube.invidious_instance.clone()),
-            );
+            let mut youtube = youtube::Youtube::new();
             youtube.download(&url, track_title, output_dir).await
         }
         Platform::YoutubeMusic => {
@@ -149,13 +130,7 @@ pub async fn download(
             // DRM fallback: if the provider resolved to YouTube/YTMusic, use that downloader.
             match provider.platform {
                 Platform::Youtube => {
-                    let mut youtube = youtube::Youtube::new(
-                        Config::get()
-                            .providers
-                            .youtube
-                            .as_ref()
-                            .and_then(|youtube| youtube.invidious_instance.clone()),
-                    );
+                    let mut youtube = youtube::Youtube::new();
                     youtube.download(&url, track_title, output_dir).await
                 }
                 Platform::YoutubeMusic => {
@@ -176,13 +151,7 @@ pub async fn download(
 /// Returns raw results without similarity filtering so the user can pick manually.
 /// Results from YouTube Music are listed first.
 pub async fn search_youtube_candidates(track: &Track) -> SoundomeResult<Vec<Track>> {
-    let youtube = youtube::Youtube::new(
-        Config::get()
-            .providers
-            .youtube
-            .as_ref()
-            .and_then(|y| y.invidious_instance.clone()),
-    );
+    let youtube = youtube::Youtube::new();
     let youtube_music = youtube_music::YoutubeMusic::new();
 
     let mut all: Vec<Track> = Vec::new();
