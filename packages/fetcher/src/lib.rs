@@ -1,5 +1,6 @@
 pub mod soundcloud;
 pub mod spotify;
+pub mod youtube;
 pub mod youtube_music;
 
 use async_trait::async_trait;
@@ -9,6 +10,7 @@ use shared::models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track};
 use shared::types::SoundomeResult;
 use soundcloud::Soundcloud;
 use spotify::Spotify;
+use youtube::Youtube;
 use youtube_music::YoutubeMusic;
 
 #[async_trait]
@@ -37,6 +39,7 @@ pub trait Source {
 
 pub struct Fetcher {
     spotify: Option<Spotify>,
+    youtube: Option<Youtube>,
     youtube_music: Option<YoutubeMusic>,
     soundcloud: Option<Soundcloud>,
 }
@@ -52,6 +55,12 @@ impl Fetcher {
                     })
                     .ok()
             }),
+            youtube: Youtube::new()
+                .map_err(|e| {
+                    tracing::error!("Failed to initialize YouTube source: {:?}", e);
+                    e
+                })
+                .ok(),
             youtube_music: YoutubeMusic::new()
                 .map_err(|e| {
                     tracing::error!("Failed to initialize YouTube Music source: {:?}", e);
@@ -77,6 +86,10 @@ impl Source for Fetcher {
                 Some(spotify) => spotify.get_track_from_url(url).await,
                 None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
             },
+            _ if Youtube::is_valid_track_url(url) => match &self.youtube {
+                Some(youtube) => youtube.get_track_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Youtube.to_string())),
+            },
             _ if YoutubeMusic::is_valid_track_url(url) => match &self.youtube_music {
                 Some(youtube_music) => youtube_music.get_track_from_url(url).await,
                 None => Err(Error::ProviderUnavailable(
@@ -100,6 +113,10 @@ impl Source for Fetcher {
                 Some(spotify) => spotify.get_playlist_from_url(url).await,
                 None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
             },
+            _ if Youtube::is_valid_playlist_url(url) => match &self.youtube {
+                Some(youtube) => youtube.get_playlist_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Youtube.to_string())),
+            },
             _ if YoutubeMusic::is_valid_playlist_url(url) => match &self.youtube_music {
                 Some(youtube_music) => youtube_music.get_playlist_from_url(url).await,
                 None => Err(Error::ProviderUnavailable(
@@ -122,6 +139,10 @@ impl Source for Fetcher {
             _ if Spotify::is_valid_playlist_url(url) => match &self.spotify {
                 Some(spotify) => spotify.get_playlist_tracks_from_url(url).await,
                 None => Err(Error::ProviderUnavailable(Platform::Spotify.to_string())),
+            },
+            _ if Youtube::is_valid_playlist_url(url) => match &self.youtube {
+                Some(youtube) => youtube.get_playlist_tracks_from_url(url).await,
+                None => Err(Error::ProviderUnavailable(Platform::Youtube.to_string())),
             },
             _ if YoutubeMusic::is_valid_playlist_url(url) => match &self.youtube_music {
                 Some(youtube_music) => youtube_music.get_playlist_tracks_from_url(url).await,
@@ -275,16 +296,16 @@ impl Source for Fetcher {
 
     fn is_valid_track_url(url: &str) -> bool {
         Spotify::is_valid_track_url(url)
+            || Youtube::is_valid_track_url(url)
             || YoutubeMusic::is_valid_track_url(url)
             || Soundcloud::is_valid_track_url(url)
-        // || Youtube::is_valid_track_url(url)
     }
 
     fn is_valid_playlist_url(url: &str) -> bool {
         Spotify::is_valid_playlist_url(url)
+            || Youtube::is_valid_playlist_url(url)
             || YoutubeMusic::is_valid_playlist_url(url)
             || Soundcloud::is_valid_playlist_url(url)
-        // || Youtube::is_valid_playlist_url(url)
     }
 
     fn is_valid_artist_url(url: &str) -> bool {
