@@ -120,13 +120,33 @@ client_secret = "your_spotify_client_secret"
 
 # -----------------------------------------------------------------------------
 # YouTube (optional)
-# When omitted, the default YouTube / YouTube Music integration is used.
+# Configures the Invidious instance used for YouTube search.
+# 
+# Default: https://invidious.tiekoetter.com
+# 
+# The default public Invidious instance (invidious.f5.si) has bot
+# protection enabled and will block requests. The default configured here
+# is reliable and allows automated requests.
+# 
+# To use a different instance:
+# [providers.youtube]
+# invidious_instance = "https://your-instance.example.com"
+# 
+# Available instances: https://docs.invidious.io/instances/
+# Choose one with:
+#   - Good uptime (90%+ in last week)
+#   - API enabled
+#   - No bot protection / anti-scraping measures
+# 
+# ENV: SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE
+# To override: SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE=https://...
+# 
+# Note: If you omit this section entirely, Soundome will use the built-in
+# default instance. You only need to configure it if you want to use a
+# different instance.
 # -----------------------------------------------------------------------------
 # [providers.youtube]
-
-# Base URL of an Invidious instance to use instead of direct YouTube access.
-# ENV: SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE
-# invidious_instance = "https://invidious.example.com"
+# invidious_instance = "https://invidious.tiekoetter.com"
 
 
 # =============================================================================

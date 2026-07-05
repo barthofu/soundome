@@ -79,15 +79,92 @@ impl Youtube<'_> {
             .collect())
     }
 
+    /// Extract HTTP status code from HTML error response (e.g., "403 Forbidden").
+    /// Looks for patterns like <title>403 Forbidden</title> or HTTP status lines.
+    /// Returns the status line if found, otherwise None.
+    fn extract_status_from_html(html: &str) -> Option<String> {
+        // Try to extract from <title>...</title>
+        if let Some(start) = html.find("<title>") {
+            if let Some(end) = html[start..].find("</title>") {
+                let status = &html[start + 7..start + end];
+                return Some(status.to_string());
+            }
+        }
+        
+        // Try to extract from <h1>...</h1>
+        if let Some(start) = html.find("<h1>") {
+            if let Some(end) = html[start..].find("</h1>") {
+                let status = &html[start + 4..start + end];
+                return Some(status.to_string());
+            }
+        }
+        
+        None
+    }
+
     async fn get_results(&self, search_query: &str) -> SoundomeResult<Search> {
+        // TODO: the search query is interpolated raw into the querystring here;
+        // `invidious` 0.7.8 does not URL-encode `params` before building the
+        // request (see `ClientAsync::fetch`), so titles/artists containing
+        // `&`, `#`, `%`, or `+` can produce a malformed request. Revisit if
+        // this turns out to affect specific tracks.
         self.client
             .search(Some(&format!("q={}&type=video", search_query)))
             .await
             .map_err(|err| {
+                // Log the full underlying error before collapsing it into a
+                // `shared::errors::Error`, since some `InvidiousError` variants
+                // (notably `SerdeError`, which fires when the configured
+                // Invidious instance returns a non-JSON body, e.g. a rate-limit
+                // or maintenance page) carry diagnostic detail that is
+                // otherwise lost. This is a common failure mode of the
+                // library's default public instance; configuring
+                // `providers.youtube.invidious_instance` with a dedicated
+                // instance is the usual mitigation.
+                tracing::error!("Invidious search call failed: {}", err);
+
                 Error::Custom(match err {
                     InvidiousError::ApiError { message, .. } => message,
                     InvidiousError::Fetch { error } => error.to_string(),
-                    _ => "Unknown error from Invidious call".to_string(),
+                    InvidiousError::SerdeError { error, original } => {
+                        // SerdeError typically indicates the Invidious instance returned
+                        // a non-JSON response (e.g., 403 Forbidden, rate-limit page, or
+                        // maintenance page). Extract and format cleanly.
+                        if let Some(ref raw_response) = original {
+                            // Log the raw response for debugging (first 500 chars)
+                            tracing::debug!("Invidious raw response (first 500 chars): {}", 
+                                &raw_response.chars().take(500).collect::<String>());
+                        }
+                        
+                        let status = original
+                            .as_ref()
+                            .and_then(|o| Self::extract_status_from_html(o))
+                            .unwrap_or_else(|| "unknown error".to_string());
+
+                        let suggestion = if status.contains("403") {
+                            "\n\nThe Invidious instance returned 403 Forbidden. This means your request was blocked, \
+                            possibly due to bot detection or rate limiting.\n\n\
+                            Fix: Configure a different Invidious instance in config.toml:\n  \
+                            [providers.youtube]\n  \
+                            invidious_instance = \"https://invidious.tiekoetter.com/\"\n\n\
+                            Or set via environment variable:\n  \
+                            SOUNDOME__PROVIDERS__YOUTUBE__INVIDIOUS_INSTANCE=https://invidious.tiekoetter.com/\n\n\
+                            Available instances: https://docs.invidious.io/instances/"
+                        } else if status.contains("50") {
+                            "\n\nThe Invidious instance returned a server error (5xx). It may be down or overloaded.\n\
+                            Try a different instance: https://docs.invidious.io/instances/"
+                        } else {
+                            "\n\nTry configuring a different Invidious instance: https://docs.invidious.io/instances/"
+                        };
+
+                        format!(
+                            "failed to parse Invidious response from server (got: {}): {}{}",
+                            status,
+                            error,
+                            suggestion
+                        )
+                    },
+                    InvidiousError::Message { message } => message,
                 })
             })
     }

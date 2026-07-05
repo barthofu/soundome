@@ -60,8 +60,13 @@ pub async fn search(track: &Track) -> SoundomeResult<Reference> {
             // we first try to search on youtube music
             match youtube_music.search(track).await {
                 Ok(reference) => Ok(reference),
-                Err(_) => {
+                Err(e) => {
                     // if it fails, we fallback to youtube
+                    tracing::warn!(
+                        "YouTube Music search failed for '{}', falling back to YouTube: {}",
+                        track.display(),
+                        e
+                    );
                     youtube.search(track).await
                 }
             }

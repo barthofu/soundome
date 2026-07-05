@@ -72,6 +72,14 @@ if [[ "$BRANCH" != "main" ]]; then
     err "must be on the 'main' branch (currently on '$BRANCH')."
 fi
 
+# ── run tests ─────────────────────────────────────────────────────────────────
+
+say "Running tests…"
+if ! cargo test -q; then
+    err "tests failed. Fix the failures and try again."
+fi
+ok "All tests passed"
+
 # ── resolve paths and tag ─────────────────────────────────────────────────────
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -141,6 +149,10 @@ echo "────────────────────────�
 echo ""
 
 # ── commit, tag, push ─────────────────────────────────────────────────────────
+
+say "Formatting code…"
+cargo fmt --all
+ok "Code formatted"
 
 say "Staging version bump files…"
 git add "$CARGO_TOML" "${REPO_ROOT}/Cargo.lock"
