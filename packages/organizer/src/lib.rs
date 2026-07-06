@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use shared::{errors::Error, models::Track, types::SoundomeResult};
 use std::fs;
@@ -7,7 +7,7 @@ pub mod playlist_writer;
 
 /// Attempts to remove empty directories up the tree until a non-empty directory or base is reached.
 /// This is used for cleanup after moving a track file (e.g., removing empty artist/album folders).
-pub fn cleanup_empty_parent_dirs(file_path: &PathBuf, base_library_dir: &str) -> SoundomeResult<()> {
+pub fn cleanup_empty_parent_dirs(file_path: &Path, base_library_dir: &str) -> SoundomeResult<()> {
     let base_path = PathBuf::from(base_library_dir);
     let mut current = file_path.parent().map(|p| p.to_path_buf());
 
@@ -29,7 +29,10 @@ pub fn cleanup_empty_parent_dirs(file_path: &PathBuf, base_library_dir: &str) ->
             }
             Err(e) if e.kind() == std::io::ErrorKind::Other => {
                 // ENOTEMPTY or other errors — directory not empty, stop here
-                tracing::debug!("Directory not empty or error, stopping cleanup: {:?}", parent_dir);
+                tracing::debug!(
+                    "Directory not empty or error, stopping cleanup: {:?}",
+                    parent_dir
+                );
                 break;
             }
             Err(e) => {

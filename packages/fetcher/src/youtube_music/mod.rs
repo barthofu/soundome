@@ -326,7 +326,11 @@ impl Source for YoutubeMusic {
         Ok(())
     }
 
-    async fn clean_tracks_metadata(&self, _tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
+    async fn clean_tracks_metadata(
+        &self,
+        _tracks: &mut Vec<&mut Track>,
+        _on_batch: Option<&mut (dyn FnMut(usize, usize) + Send)>,
+    ) -> SoundomeResult<()> {
         Ok(())
     }
 

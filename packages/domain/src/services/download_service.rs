@@ -196,12 +196,14 @@ impl DownloadService {
 
         // Clean metadata for all new tracks
         let mut new_track_values: Vec<Track> = new_tracks.iter().map(|(_, t)| t.clone()).collect();
-        if let Err(e) = fetcher
-            .clean_tracks_metadata(&mut new_track_values.iter_mut().collect::<Vec<_>>())
-            .await
-        {
-            tracing::warn!("Failed to clean tracks title and artist name: {}", e);
-        }
+        self.clean_tracks_metadata_with_progress(
+            &fetcher,
+            conn,
+            &mut new_track_values,
+            task_id,
+            &mut stats,
+        )
+        .await;
 
         // Process each new track and link it to the playlist
         let mut new_processed_tracks = Vec::new();
@@ -365,12 +367,14 @@ impl DownloadService {
         );
 
         // Clean metadata for all new tracks
-        if let Err(e) = fetcher
-            .clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>())
-            .await
-        {
-            tracing::warn!("Failed to clean tracks title and artist name: {}", e);
-        }
+        self.clean_tracks_metadata_with_progress(
+            &fetcher,
+            conn,
+            &mut new_tracks,
+            task_id,
+            &mut stats,
+        )
+        .await;
 
         // Process each new track
         let mut new_processed_tracks = Vec::new();
@@ -521,12 +525,14 @@ impl DownloadService {
         );
 
         // Clean metadata for all new tracks
-        if let Err(e) = fetcher
-            .clean_tracks_metadata(&mut new_tracks.iter_mut().collect::<Vec<_>>())
-            .await
-        {
-            tracing::warn!("Failed to clean tracks title and artist name: {}", e);
-        }
+        self.clean_tracks_metadata_with_progress(
+            &fetcher,
+            conn,
+            &mut new_tracks,
+            task_id,
+            &mut stats,
+        )
+        .await;
 
         // Process each new track
         let mut new_processed_tracks = Vec::new();
@@ -988,6 +994,54 @@ impl DownloadService {
         Ok(candidates)
     }
 
+    /// Clean metadata for `tracks` via the fetcher, reporting live per-batch progress
+    /// into `stats.ai_curation` (persisted through `task_id`) so the frontend can show
+    /// an "AI curation in progress" indicator while SoundCloud batches are processed.
+    async fn clean_tracks_metadata_with_progress(
+        &self,
+        fetcher: &Fetcher,
+        conn: &mut SqliteConnection,
+        tracks: &mut [Track],
+        task_id: Option<i32>,
+        stats: &mut shared::models::TaskStats,
+    ) {
+        if let Some(tid) = task_id {
+            stats.ai_curation = Some(shared::models::AiCurationProgress {
+                processed: 0,
+                total: tracks.len() as i32,
+            });
+            if let Err(e) = self.task_service.update_stats(conn, tid, stats) {
+                tracing::warn!("Failed to update task stats: {}", e);
+            }
+        }
+
+        let mut on_batch = |processed: usize, total: usize| {
+            if let Some(tid) = task_id {
+                stats.ai_curation = Some(shared::models::AiCurationProgress {
+                    processed: processed as i32,
+                    total: total as i32,
+                });
+                if let Err(e) = self.task_service.update_stats(conn, tid, stats) {
+                    tracing::warn!("Failed to update AI curation progress: {}", e);
+                }
+            }
+        };
+
+        if let Err(e) = fetcher
+            .clean_tracks_metadata(
+                &mut tracks.iter_mut().collect::<Vec<_>>(),
+                Some(&mut on_batch),
+            )
+            .await
+        {
+            tracing::warn!("Failed to clean tracks title and artist name: {}", e);
+        }
+
+        if task_id.is_some() {
+            stats.ai_curation = None;
+        }
+    }
+
     async fn orchestrator_workflow(
         &self,
         conn: &mut SqliteConnection,
@@ -1316,7 +1370,7 @@ impl DownloadService {
             let base_dir = PathBuf::from(&Config::get().general.base_library_dir);
             let base_dir_str = base_dir.to_string_lossy();
             let file_path_str = file_path.to_string_lossy();
-            
+
             // Only join if the file_path doesn't already start with the base_dir
             if !file_path_str.starts_with(base_dir_str.as_ref()) {
                 file_path = base_dir.join(&file_path);
@@ -1369,7 +1423,7 @@ impl DownloadService {
             new_track.file_path = Some(file_path);
             let base_library_dir = Config::get().general.base_library_dir.clone();
             organizer::move_track_file(new_track, &base_library_dir)?;
-            
+
             // Normalize the file_path back to relative for storage in DB
             // The file_path is now absolute, so make it relative to base_library_dir
             if let Some(abs_path) = &new_track.file_path {

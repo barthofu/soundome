@@ -135,6 +135,8 @@ When Soundome downloads a SoundCloud track or syncs a SoundCloud playlist, it se
 
 This means: **AI failures are non-fatal.** The worst case is that metadata remains uncleaned and more tracks land in the validation queue.
 
+While a batch is being curated, the **Tasks** page in the web UI shows a live indicator ("Curating metadata with AI: X / Y tracks") next to the running sync task, incrementing by batch size as each chunk finishes.
+
 ## Checking that AI is active
 
 Look at the server logs when submitting a SoundCloud URL. With `logs.level = "debug"` you will see lines like:

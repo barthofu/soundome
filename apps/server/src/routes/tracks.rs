@@ -251,20 +251,26 @@ pub async fn update(
             let new_album = Album {
                 id: existing_album.as_ref().and_then(|a| a.id),
                 title: album_title.clone(),
-                artists: existing_album.as_ref().map(|a| a.artists.clone()).unwrap_or_default(),
+                artists: existing_album
+                    .as_ref()
+                    .map(|a| a.artists.clone())
+                    .unwrap_or_default(),
                 album_type: shared::models::AlbumType::Album,
                 cover: existing_album.as_ref().and_then(|a| a.cover.clone()),
                 date: existing_album.as_ref().and_then(|a| a.date.clone()),
-                references: existing_album.as_ref().map(|a| a.references.clone()).unwrap_or_default(),
+                references: existing_album
+                    .as_ref()
+                    .map(|a| a.references.clone())
+                    .unwrap_or_default(),
             };
-            
+
             // If album has an ID, update it; otherwise, create_or_ignore will handle it in create_or_update
             if let Some(album_id) = new_album.id {
                 if let Err(e) = services.album_service.update(conn, album_id, &new_album) {
                     tracing::warn!("Failed to update album: {}", e);
                 }
             }
-            
+
             track.album = Some(new_album);
         }
 

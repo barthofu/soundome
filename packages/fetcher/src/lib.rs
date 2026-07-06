@@ -28,8 +28,14 @@ pub trait Source {
 
     /// Clean metadata of a single track
     async fn clean_track_metadata(&self, track: &mut Track) -> SoundomeResult<()>;
-    /// Clean metadata (track title, artists names, etc) of multiple tracks
-    async fn clean_tracks_metadata(&self, track: &mut Vec<&mut Track>) -> SoundomeResult<()>;
+    /// Clean metadata (track title, artists names, etc) of multiple tracks.
+    /// `on_batch` is invoked after each internal batch is processed with
+    /// `(processed, total)`, so callers can surface live curation progress.
+    async fn clean_tracks_metadata(
+        &self,
+        track: &mut Vec<&mut Track>,
+        on_batch: Option<&mut (dyn FnMut(usize, usize) + Send)>,
+    ) -> SoundomeResult<()>;
 
     fn is_valid_track_url(url: &str) -> bool;
     fn is_valid_playlist_url(url: &str) -> bool;
@@ -281,11 +287,15 @@ impl Source for Fetcher {
         }
     }
 
-    async fn clean_tracks_metadata(&self, tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
+    async fn clean_tracks_metadata(
+        &self,
+        tracks: &mut Vec<&mut Track>,
+        on_batch: Option<&mut (dyn FnMut(usize, usize) + Send)>,
+    ) -> SoundomeResult<()> {
         match tracks.first() {
             Some(track) => match track.get_source_platform() {
                 Platform::SoundCloud => match &self.soundcloud {
-                    Some(soundcloud) => soundcloud.clean_tracks_metadata(tracks).await,
+                    Some(soundcloud) => soundcloud.clean_tracks_metadata(tracks, on_batch).await,
                     None => Err(Error::ProviderUnavailable(Platform::SoundCloud.to_string())),
                 },
                 _ => Ok(()),

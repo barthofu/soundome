@@ -25,6 +25,11 @@ pub struct Soundcloud {
 }
 
 impl Soundcloud {
+    /// Maximum number of tracks sent to the AI in a single curation request.
+    /// Keeping this small helps the model maintain track boundaries and avoids
+    /// "leaking" artist names across unrelated tracks in the same batch.
+    const AI_CLEANUP_BATCH_SIZE: usize = 25;
+
     const TRACK_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)(?:[a-z0-9\-_]{1,25}))\/(?:(?:(?!sets|playlist|stats|settings|logout|notifications|you|messages)(?:[a-z0-9\-_]{1,100}))(?:\/s\-[a-zA-Z0-9\-_]{1,10})?)(?:\?.*)?$";
     const PLAYLIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/sets\/[a-z0-9\-_]{1,100}(?:\?.*)?$";
     const ARTIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/?(?:\?.*)?$";
@@ -209,13 +214,15 @@ impl Soundcloud {
     pub async fn clean_tracks_title_and_artist_name(
         &self,
         tracks: &mut [&mut Track],
+        mut on_batch: Option<&mut (dyn FnMut(usize, usize) + Send)>,
     ) -> SoundomeResult<()> {
         let prompt = ai::prompts::clean_track_title_and_artist_name(false)?;
         let ai_client = ai::AIClient::new()
             .map_err(|e| Error::Internal(format!("Failed to initialize AI client: {}", e)))?;
 
-        // Process in chunks to avoid token limit issues and reduce timeout risk
-        let chunk_size = 50;
+        // Process in small chunks to avoid token limit issues, reduce timeout risk, and
+        // prevent the AI from confusing/leaking artist names across unrelated tracks.
+        let chunk_size = Self::AI_CLEANUP_BATCH_SIZE;
         let mut i = 0;
 
         while i < tracks.len() {
@@ -269,6 +276,12 @@ impl Soundcloud {
             }
 
             i += chunk_size;
+
+            // Report progress after each batch so callers can surface live curation
+            // status (e.g. "processed X / Y tracks") to the user.
+            if let Some(cb) = on_batch.as_mut() {
+                cb(end, tracks.len());
+            }
         }
 
         Ok(())
@@ -411,11 +424,16 @@ impl Source for Soundcloud {
 
     async fn clean_track_metadata(&self, track: &mut Track) -> SoundomeResult<()> {
         let mut tracks = vec![track];
-        self.clean_tracks_metadata(&mut tracks).await
+        self.clean_tracks_metadata(&mut tracks, None).await
     }
 
-    async fn clean_tracks_metadata(&self, tracks: &mut Vec<&mut Track>) -> SoundomeResult<()> {
-        self.clean_tracks_title_and_artist_name(tracks).await
+    async fn clean_tracks_metadata(
+        &self,
+        tracks: &mut Vec<&mut Track>,
+        on_batch: Option<&mut (dyn FnMut(usize, usize) + Send)>,
+    ) -> SoundomeResult<()> {
+        self.clean_tracks_title_and_artist_name(tracks, on_batch)
+            .await
     }
 
     fn is_valid_track_url(url: &str) -> bool {

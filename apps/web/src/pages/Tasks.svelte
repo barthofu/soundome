@@ -183,6 +183,15 @@
             </div>
           {/if}
 
+          {#if task.status === 'Running' && task.stats?.ai_curation}
+            <div class="ai-curation-row">
+              <span class="spinner ai-spinner"></span>
+              <span class="ai-curation-text">
+                Curating metadata with AI: {task.stats.ai_curation.processed} / {task.stats.ai_curation.total} tracks
+              </span>
+            </div>
+          {/if}
+
           {#if hasStats(task)}
             <div class="stats-row">
               {#if task.stats!.downloaded > 0}
@@ -724,6 +733,23 @@
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
     vertical-align: middle;
+  }
+
+  .ai-curation-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+  }
+
+  .ai-spinner {
+    border-color: #a78bfa55;
+    border-top-color: #a78bfa;
+  }
+
+  .ai-curation-text {
+    font-size: 0.78rem;
+    color: #a78bfa;
   }
 
   @keyframes spin {
