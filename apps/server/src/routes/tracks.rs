@@ -204,7 +204,8 @@ pub async fn update(
     let body = body.into_inner();
 
     db.run(move |conn| {
-        let mut track = services.track_service.get_by_id(conn, id)?;
+        let old_track = services.track_service.get_by_id(conn, id)?;
+        let mut track = old_track.clone();
 
         if let Some(title) = body.title {
             track.title = title;
@@ -251,6 +252,20 @@ pub async fn update(
                 references: vec![],
             });
         }
+
+        // Update file if it exists and metadata changed
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                if let Err(e) = services
+                    .download_service
+                    .update_track_file_metadata(&old_track, &mut track)
+                    .await
+                {
+                    tracing::warn!("Failed to update track file metadata: {}", e);
+                    // Don't fail the entire request if file update fails
+                }
+            })
+        });
 
         services.track_service.update(conn, id, &track)
     })
