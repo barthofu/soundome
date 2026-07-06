@@ -1225,7 +1225,9 @@ impl DownloadService {
                 }
             }
 
-            track.transpose_metadata(&matched_track);
+            // Exact match: treat the enricher result as an authoritative, high-confidence
+            // source so cleaner metadata (e.g. artist names) always replaces noisy source data.
+            track.transpose_metadata_from_source(&matched_track);
             Ok((false, None)) // no need to validate
         } else if let Match::Partial(matched_track) = best_match {
             // Partial match: keep current (source) metadata, but attach MusicBrainz IDs/URLs for later review.

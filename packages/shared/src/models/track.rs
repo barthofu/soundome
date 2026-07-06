@@ -313,8 +313,26 @@ impl Track {
         }
     }
 
-    /// Transpose metadata from an other track
+    /// Transpose metadata from another track, keeping the cautious artist-matching
+    /// behavior: an artist is only updated in place when a similar one is found in `other`,
+    /// and artists from `other` that have no match in `self` are not added.
     pub fn transpose_metadata(&mut self, other: &Track) {
+        self.transpose_metadata_impl(other, false);
+    }
+
+    /// Transpose metadata from another track, treating `other` as an authoritative,
+    /// high-confidence source (e.g. an exact match from a metadata enricher such as
+    /// MusicBrainz or Spotify).
+    ///
+    /// Unlike [`Track::transpose_metadata`], the artist list is fully replaced by
+    /// `other`'s artists: cleaner/enriched names always win over noisy source names,
+    /// even when they don't pass the similarity threshold. Existing artist ids and
+    /// references are preserved when a similar artist can still be matched.
+    pub fn transpose_metadata_from_source(&mut self, other: &Track) {
+        self.transpose_metadata_impl(other, true);
+    }
+
+    fn transpose_metadata_impl(&mut self, other: &Track, replace_artists: bool) {
         self.title = other.title.clone();
 
         if let Some(val) = &other.date {
@@ -350,27 +368,44 @@ impl Track {
             }
         }
 
-        // transpose artists
-        // Pour chaque artiste du self, si un artiste similaire existe dans other, on le transpose
         const SIMILARITY_THRESHOLD: f64 = 0.8;
-        for artist in &mut self.artists {
-            if let Some(matching_artist) = other
+
+        if replace_artists {
+            // High-confidence match: `other`'s artist list is authoritative. Rebuild the
+            // artist list from `other`, preserving existing id/references when a similar
+            // artist is already known, but always taking the (cleaner) name/icon from `other`.
+            let new_artists = other
                 .artists
                 .iter()
-                .find(|a| a.compare(artist) > SIMILARITY_THRESHOLD)
-            {
-                artist.transpose_metadata(matching_artist);
+                .map(|other_artist| {
+                    let mut artist = self
+                        .artists
+                        .iter()
+                        .find(|a| a.compare(other_artist) > SIMILARITY_THRESHOLD)
+                        .cloned()
+                        .unwrap_or_else(|| Artist {
+                            id: None,
+                            name: other_artist.name.clone(),
+                            icon: None,
+                            references: Vec::new(),
+                        });
+                    artist.transpose_metadata(other_artist);
+                    artist
+                })
+                .collect();
+            self.artists = new_artists;
+        } else {
+            // Cautious mode: for each artist of self, if a similar one exists in other, transpose it.
+            for artist in &mut self.artists {
+                if let Some(matching_artist) = other
+                    .artists
+                    .iter()
+                    .find(|a| a.compare(artist) > SIMILARITY_THRESHOLD)
+                {
+                    artist.transpose_metadata(matching_artist);
+                }
             }
         }
-
-        // TODO: really needed ? + ça induit un problème de duplication d'artistes
-        // Pour chaque artiste du other, si aucun artiste similaire n'existe dans self, on l'ajoute
-        // for other_artist in &other.artists {
-        //     let exists_in_self = self.artists.iter().any(|a| a.compare(other_artist) > 0.8);
-        //     if !exists_in_self {
-        //         self.artists.push(other_artist.clone());
-        //     }
-        // }
     }
 
     /// Transpose references from another track (add only new references)
@@ -462,5 +497,77 @@ impl Track {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn artist(name: &str) -> Artist {
+        Artist {
+            id: None,
+            name: name.to_string(),
+            icon: None,
+            references: Vec::new(),
+        }
+    }
+
+    fn track(title: &str, artists: Vec<Artist>) -> Track {
+        Track {
+            id: None,
+            needs_validation: false,
+            validation_reason: None,
+            soundome_id: None,
+            title: title.to_string(),
+            artists,
+            album: None,
+            date: None,
+            genre: None,
+            cover: None,
+            duration: None,
+            track_number: None,
+            disc_number: None,
+            label: None,
+            file_path: None,
+            references: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn transpose_metadata_from_source_replaces_noisy_artist_name() {
+        // e.g. SoundCloud's noisy artist name vs. Spotify's clean one
+        let mut self_track = track("Some Song", vec![artist("Artist A (Official)")]);
+        let other_track = track("Some Song", vec![artist("Artist Alpha")]);
+
+        self_track.transpose_metadata_from_source(&other_track);
+
+        assert_eq!(self_track.artists.len(), 1);
+        assert_eq!(self_track.artists[0].name, "Artist Alpha");
+    }
+
+    #[test]
+    fn transpose_metadata_cautious_keeps_noisy_artist_name_when_not_similar() {
+        let mut self_track = track("Some Song", vec![artist("Artist A (Official)")]);
+        let other_track = track("Some Song", vec![artist("Artist Alpha")]);
+
+        self_track.transpose_metadata(&other_track);
+
+        assert_eq!(self_track.artists.len(), 1);
+        assert_eq!(self_track.artists[0].name, "Artist A (Official)");
+    }
+
+    #[test]
+    fn transpose_metadata_from_source_replaces_title_and_metadata() {
+        let mut self_track = track("Noisy Title", vec![artist("Artist A")]);
+        let mut other_track = track("Clean Title", vec![artist("Artist A")]);
+        other_track.genre = Some("Pop".to_string());
+        other_track.label = Some("Some Label".to_string());
+
+        self_track.transpose_metadata_from_source(&other_track);
+
+        assert_eq!(self_track.title, "Clean Title");
+        assert_eq!(self_track.genre, Some("Pop".to_string()));
+        assert_eq!(self_track.label, Some("Some Label".to_string()));
     }
 }
