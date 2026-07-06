@@ -25,6 +25,7 @@ For each track to import:
 
 5. Download the audio.
    5.1. Find a provider and download the file into the staging directory.
+   5.2. If a SoundCloud download fails because the track is DRM-protected, and the track already carries a Spotify metadata reference (attached during step 4), automatically retry through the same Spotify → YouTube/YouTube Music matching flow used for Spotify-sourced tracks, keeping SoundCloud as the recorded source. If no Spotify reference is available or the retry also fails, fall back to manual validation (see `soundcloud_drm_protected` in [../guides/validation.md](../guides/validation.md)).
 
 6. Deduplicate by content and quality.
    6.1. If an existing track matches by name, artists, year, or durable metadata identifiers, compare audio quality.

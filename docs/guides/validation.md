@@ -8,7 +8,7 @@ When Soundome cannot confidently determine the correct metadata for a track, it 
 |---|---|
 | `metadata_partial_match` | Enrichment found a likely match but the similarity score was below the exact-match threshold. The metadata may be mostly correct but uncertain. |
 | `metadata_no_match` | No enrichment provider returned any usable match. The track uses whatever metadata the source provided. |
-| `soundcloud_drm_protected` | SoundCloud's API refused to provide a download URL. No audio file has been staged yet. |
+| `soundcloud_drm_protected` | SoundCloud's API refused to provide a download URL. Soundome already tried an automatic fallback (downloading via a known Spotify metadata match through YouTube/YouTube Music) — this reason means that fallback was unavailable or also failed. No audio file has been staged yet. |
 
 ## The Validations page
 

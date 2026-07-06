@@ -1060,14 +1060,25 @@ impl DownloadService {
         let file_path_opt = match self.download_track(&mut track).await {
             Ok(path) => Some(path),
             Err(Error::SoundCloudDrmProtected(_)) => {
-                tracing::warn!(
-                    "SoundCloud track is DRM protected — marking for manual YouTube selection"
-                );
-                if !track.needs_validation {
-                    track.needs_validation = true;
-                    track.validation_reason = Some("soundcloud_drm_protected".to_string());
+                tracing::warn!("SoundCloud track is DRM protected");
+
+                // Before falling back to manual validation, check whether a Spotify metadata
+                // reference is already attached (e.g. from enrichment) and, if so, retry
+                // automatically via the existing Spotify → YouTube/YouTube Music matching
+                // flow instead of immediately requiring manual YouTube selection.
+                match self.try_download_via_spotify_match(&mut track).await {
+                    Some(path) => Some(path),
+                    None => {
+                        tracing::warn!(
+                            "No usable Spotify match — marking for manual YouTube selection"
+                        );
+                        if !track.needs_validation {
+                            track.needs_validation = true;
+                            track.validation_reason = Some("soundcloud_drm_protected".to_string());
+                        }
+                        None
+                    }
                 }
-                None
             }
             Err(e) => return Err(e),
         };
@@ -1281,6 +1292,78 @@ impl DownloadService {
         track.file_path = file_path.clone().into();
 
         Ok(file_path)
+    }
+
+    /// When a SoundCloud download fails as DRM-protected, check whether the track already
+    /// carries a Spotify `Metadata` reference (typically attached during enrichment in
+    /// `enrich_metada`, since Spotify is one of the tagger metadata providers). If so, retry
+    /// via the existing Spotify → YouTube/YouTube Music matching flow (`downloader::search`'s
+    /// `Platform::Spotify` branch) instead of immediately requiring manual YouTube selection.
+    ///
+    /// The track's `Source` reference is left untouched — SoundCloud is still where the user
+    /// asked Soundome to import from. Only the resolved `Provider` reference and staged
+    /// `file_path` are attached, and only on success.
+    ///
+    /// Returns `Some(path)` when the fallback download succeeded. Returns `None` when there is
+    /// no Spotify metadata reference, or the fallback search/download itself failed, so the
+    /// caller can fall back to the existing manual validation flow unchanged.
+    async fn try_download_via_spotify_match(&self, track: &mut Track) -> Option<PathBuf> {
+        let spotify_ref = track
+            .references
+            .iter()
+            .find(|r| r.ref_type == ReferenceType::Metadata && r.platform == Platform::Spotify)?
+            .clone();
+
+        tracing::info!(
+            "DRM-protected SoundCloud track has a known Spotify reference ({:?}) — retrying via Spotify matching flow",
+            spotify_ref.external_url
+        );
+
+        // Reuse `downloader::search`'s existing Spotify matching flow (YouTube Music, falling
+        // back to YouTube) by presenting the Spotify reference as the `Source` on a throwaway
+        // probe. `track`'s own `Source` reference (SoundCloud) is not modified.
+        let mut probe = track.clone();
+        probe
+            .references
+            .retain(|r| r.ref_type != ReferenceType::Source);
+        probe.references.push(Reference {
+            id: None,
+            ref_type: ReferenceType::Source,
+            platform: Platform::Spotify,
+            external_id: spotify_ref.external_id,
+            external_url: spotify_ref.external_url,
+        });
+
+        let provider_ref = match downloader::search(&probe).await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("Spotify-match fallback search found no candidate: {}", e);
+                return None;
+            }
+        };
+        tracing::info!(
+            "Spotify-match fallback resolved a download URL from {:?}: {:?}",
+            provider_ref.platform,
+            provider_ref.external_url
+        );
+
+        // Download using the real (SoundCloud) source reference — `downloader::download`
+        // already supports pairing a SoundCloud source with a YouTube/YouTube Music provider,
+        // the same dispatch used by the manual DRM-fallback validation flow in
+        // `finalize_validated_track`.
+        let source_ref = track.get_source()?;
+        let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
+        match downloader::download(&source_ref, &provider_ref, &track.title, staging_dir).await {
+            Ok(path) => {
+                track.file_path = Some(path.clone());
+                track.references.push(provider_ref);
+                Some(path)
+            }
+            Err(e) => {
+                tracing::warn!("Spotify-match fallback download failed: {}", e);
+                None
+            }
+        }
     }
 
     /// Simple deduplication based on comparition of title and artist(s) against existing tracks in DB

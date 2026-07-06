@@ -73,11 +73,13 @@ When AI is disabled, metadata passes through uncleaned. The enrichment step (Mus
 
 ## DRM-protected tracks
 
-Some SoundCloud tracks are protected and cannot be downloaded by `scdl`. When this happens:
+Some SoundCloud tracks are protected and cannot be downloaded by `scdl`. When this happens, Soundome first attempts an automatic recovery before falling back to manual validation:
 
-- The track is saved to your database as pending validation
-- The **Validations** page shows it with the reason `soundcloud_drm_protected`
-- The audio file has not been downloaded yet — there is no staged file
+1. **Automatic Spotify-match retry.** If the track already carries a Spotify metadata reference (for example attached during MusicBrainz/Spotify enrichment, which runs before the download attempt), Soundome automatically retries the download through the same Spotify → YouTube/YouTube Music matching flow used for Spotify-sourced tracks. The track's source stays SoundCloud; only the resolved provider (YouTube or YouTube Music) and the staged file are affected. When this succeeds, the track proceeds through the normal pipeline (tag, organize, persist) with no manual step required.
+2. **Manual fallback.** If no Spotify metadata reference is available, or the automatic retry also fails, the track falls back to manual validation as before:
+   - The track is saved to your database as pending validation
+   - The **Validations** page shows it with the reason `soundcloud_drm_protected`
+   - The audio file has not been downloaded yet — there is no staged file
 
 **To resolve a DRM-protected track manually:**
 
