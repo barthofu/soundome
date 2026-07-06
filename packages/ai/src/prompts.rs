@@ -25,6 +25,8 @@ pub fn clean_track_title_and_artist_name(single_track: bool) -> SoundomeResult<S
         - Capitalize artist names and titles properly.
         - Return the cleaned data in the same format as the input, with the same `id` values.
 
+        {{ if single_track }}{{ else }}IMPORTANT: Each object in the array is a fully independent track. Every `id` is its own isolated context: never reuse, borrow, or infer an artist name from another track's `title` or `artists` field, even if names look similar or repeat. Base every extracted artist strictly on the `title` and `artists` of that same `id` only. Cross-track artist leakage is a critical error.{{ endif }}
+
         For some context, this data is sourced from SoundCloud, where titles often include extra information and the artist field may not always reflect the actual track artist.
         "#;
 

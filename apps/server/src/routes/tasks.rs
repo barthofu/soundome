@@ -30,6 +30,17 @@ pub struct TaskStatsDto {
     pub skipped: i32,
     /// Per-track failures that did not abort the whole sync.
     pub errors: Vec<TaskTrackErrorDto>,
+    /// Live progress of an in-flight AI metadata curation phase, if one is running.
+    pub ai_curation: Option<AiCurationProgressDto>,
+}
+
+/// Live progress of an AI metadata curation batch loop (title/artist cleanup).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct AiCurationProgressDto {
+    /// Number of tracks processed so far across completed batches.
+    pub processed: i32,
+    /// Total number of tracks to curate in this phase.
+    pub total: i32,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -61,6 +72,10 @@ impl TaskDto {
                     provider_url: e.provider_url,
                 })
                 .collect(),
+            ai_curation: s.ai_curation.map(|a| AiCurationProgressDto {
+                processed: a.processed,
+                total: a.total,
+            }),
         });
         Some(Self {
             id: task.id?,

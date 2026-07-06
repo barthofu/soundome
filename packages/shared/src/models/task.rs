@@ -35,6 +35,19 @@ pub struct TaskStats {
     /// Tracks saved as needs_validation, with details for display and navigation.
     #[serde(default)]
     pub to_validate_tracks: Vec<TaskTrackValidation>,
+    /// Live progress of an in-flight AI metadata curation phase (e.g. SoundCloud batch
+    /// cleanup), if one is currently running. `None` once the phase completes.
+    #[serde(default)]
+    pub ai_curation: Option<AiCurationProgress>,
+}
+
+/// Live progress of an AI metadata curation batch loop (title/artist cleanup).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiCurationProgress {
+    /// Number of tracks processed so far across completed batches.
+    pub processed: i32,
+    /// Total number of tracks to curate in this phase.
+    pub total: i32,
 }
 
 /// One entry per track saved as "needs_validation" during a sync.

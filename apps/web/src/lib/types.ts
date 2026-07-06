@@ -91,6 +91,12 @@ export interface TaskStatsDto {
   skipped: number;
   errors: TaskTrackErrorDto[];
   to_validate_tracks: TaskTrackValidationDto[];
+  ai_curation: AiCurationProgressDto | null;
+}
+
+export interface AiCurationProgressDto {
+  processed: number;
+  total: number;
 }
 
 export interface TaskDto {
