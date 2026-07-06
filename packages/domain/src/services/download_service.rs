@@ -1293,6 +1293,100 @@ impl DownloadService {
         Ok(())
     }
 
+    /// Re-tag and reorganize a track file if its metadata (especially artist or album) has changed.
+    /// This is used when a user edits track metadata via the API.
+    ///
+    /// Returns true if the file was moved to a new location.
+    pub async fn update_track_file_metadata(
+        &self,
+        old_track: &Track,
+        new_track: &mut Track,
+    ) -> SoundomeResult<bool> {
+        // Check if the track has a file to update
+        let mut file_path = match &old_track.file_path {
+            Some(path) => path.clone(),
+            None => {
+                tracing::debug!("Track has no file, skipping file update");
+                return Ok(false);
+            }
+        };
+
+        // Resolve relative paths by joining with base_library_dir, but avoid duplication
+        if !file_path.is_absolute() {
+            let base_dir = PathBuf::from(&Config::get().general.base_library_dir);
+            let base_dir_str = base_dir.to_string_lossy();
+            let file_path_str = file_path.to_string_lossy();
+            
+            // Only join if the file_path doesn't already start with the base_dir
+            if !file_path_str.starts_with(base_dir_str.as_ref()) {
+                file_path = base_dir.join(&file_path);
+            }
+            tracing::debug!("Resolved path to: {:?}", file_path);
+        }
+
+        // Check if file still exists
+        if !file_path.exists() {
+            tracing::warn!(
+                "Track file does not exist at {:?}, skipping file update",
+                file_path
+            );
+            return Ok(false);
+        }
+
+        // Check if artist, album, or title metadata has changed
+        let artist_names_changed = old_track
+            .artists
+            .iter()
+            .map(|a| a.name.clone())
+            .collect::<Vec<_>>()
+            != new_track
+                .artists
+                .iter()
+                .map(|a| a.name.clone())
+                .collect::<Vec<_>>();
+
+        let album_changed = old_track.album.as_ref().map(|a| a.title.clone())
+            != new_track.album.as_ref().map(|a| a.title.clone());
+
+        let title_changed = old_track.title != new_track.title;
+
+        let location_changed = artist_names_changed || album_changed || title_changed;
+
+        // Re-tag the file with new metadata
+        tracing::info!("Re-tagging file with updated metadata");
+        tagger::file::tag_file_with_track(&file_path, new_track)?;
+
+        // If any location-affecting metadata changed (artist, album, or title), reorganize the file.
+        // This is safer than renaming directly because the organizer handles path normalization.
+        if location_changed {
+            tracing::info!(
+                "Metadata changed (artist={}, album={}, title={}), reorganizing file",
+                artist_names_changed,
+                album_changed,
+                title_changed
+            );
+            // Update the file_path in new_track to the resolved absolute path before organizing
+            new_track.file_path = Some(file_path);
+            let base_library_dir = Config::get().general.base_library_dir.clone();
+            organizer::move_track_file(new_track, &base_library_dir)?;
+            
+            // Normalize the file_path back to relative for storage in DB
+            // The file_path is now absolute, so make it relative to base_library_dir
+            if let Some(abs_path) = &new_track.file_path {
+                let base_path = std::path::PathBuf::from(&base_library_dir);
+                if let Ok(rel_path) = abs_path.strip_prefix(&base_path) {
+                    let rel_path_str = format!("./{}", rel_path.to_string_lossy());
+                    new_track.file_path = Some(std::path::PathBuf::from(rel_path_str));
+                    tracing::debug!("Normalized path to relative: {:?}", new_track.file_path);
+                }
+            }
+            Ok(true)
+        } else {
+            tracing::debug!("File location unchanged, no reorganization needed");
+            Ok(false)
+        }
+    }
+
     /// Save the track in the database
     async fn save_track(
         &self,

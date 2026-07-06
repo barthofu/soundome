@@ -203,8 +203,9 @@ pub async fn update(
     let services = Arc::clone(services);
     let body = body.into_inner();
 
-    db.run(move |conn| {
-        let mut track = services.track_service.get_by_id(conn, id)?;
+    db.run(move |conn| -> shared::types::SoundomeResult<Track> {
+        let old_track = services.track_service.get_by_id(conn, id)?;
+        let mut track = old_track.clone();
 
         if let Some(title) = body.title {
             track.title = title;
@@ -229,30 +230,59 @@ pub async fn update(
         }
 
         if let Some(names) = body.artists {
-            track.artists = names
-                .into_iter()
-                .map(|name| Artist {
+            // Deduplicate artist names and reuse or create Artist records
+            let mut artists = Vec::new();
+            for name in names {
+                let artist = Artist {
                     id: None,
                     name,
                     icon: None,
                     references: vec![],
-                })
-                .collect();
+                };
+                let saved = services.artist_service.create_or_ignore(conn, &artist)?;
+                artists.push(saved);
+            }
+            track.artists = artists;
         }
 
         if let Some(album_title) = body.album_title {
-            track.album = Some(Album {
-                id: track.album.as_ref().and_then(|a| a.id),
-                title: album_title,
-                artists: track.album.map(|a| a.artists).unwrap_or_default(),
+            // Preserve album ID and other metadata, updating the title
+            let existing_album = track.album.clone();
+            let new_album = Album {
+                id: existing_album.as_ref().and_then(|a| a.id),
+                title: album_title.clone(),
+                artists: existing_album.as_ref().map(|a| a.artists.clone()).unwrap_or_default(),
                 album_type: shared::models::AlbumType::Album,
-                cover: None,
-                date: None,
-                references: vec![],
-            });
+                cover: existing_album.as_ref().and_then(|a| a.cover.clone()),
+                date: existing_album.as_ref().and_then(|a| a.date.clone()),
+                references: existing_album.as_ref().map(|a| a.references.clone()).unwrap_or_default(),
+            };
+            
+            // If album has an ID, update it; otherwise, create_or_ignore will handle it in create_or_update
+            if let Some(album_id) = new_album.id {
+                if let Err(e) = services.album_service.update(conn, album_id, &new_album) {
+                    tracing::warn!("Failed to update album: {}", e);
+                }
+            }
+            
+            track.album = Some(new_album);
         }
 
-        services.track_service.update(conn, id, &track)
+        // Update file if it exists and metadata changed
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                if let Err(e) = services
+                    .download_service
+                    .update_track_file_metadata(&old_track, &mut track)
+                    .await
+                {
+                    tracing::warn!("Failed to update track file metadata: {}", e);
+                    // Don't fail the entire request if file update fails
+                }
+            })
+        });
+
+        services.track_service.create_or_update(conn, &track)
     })
     .await
     .and_then(|track| {
