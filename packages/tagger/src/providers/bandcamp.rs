@@ -96,7 +96,38 @@ impl TagProvider for Bandcamp {
 // Mappers
 // ================================================================================================
 
+/// Bandcamp's search results frequently format a track's `name` as `"<band_name> - <title>"`
+/// (common on single/track pages), but Soundome already keeps the artist in `Track.artists`
+/// and never wants it duplicated inside `Track.title`.
+///
+/// Strip a leading `"<band_name> - "` prefix (also accepting en/em dash variants), but only
+/// when the prefix matches the known band name exactly (case-insensitive, whitespace
+/// tolerant). This keeps the cleanup deterministic and safe: a title that legitimately
+/// contains " - " for another reason (e.g. "Title - Extended Mix") is left untouched, since
+/// its prefix will not match the band name.
+fn strip_band_name_prefix(title: &str, band_name: &str) -> String {
+    let band_name = band_name.trim();
+    if band_name.is_empty() {
+        return title.to_string();
+    }
+
+    for separator in [" - ", " – ", " — "] {
+        if let Some((prefix, rest)) = title.split_once(separator) {
+            let rest = rest.trim();
+            if !rest.is_empty() && prefix.trim().to_lowercase() == band_name.to_lowercase() {
+                return rest.to_string();
+            }
+        }
+    }
+
+    title.to_string()
+}
+
 fn search_result_to_track(item: bandcamp::SearchResultItemTrack) -> Track {
+    // Curate the "<band_name> - <title>" convention before it ever reaches Track.title —
+    // see `strip_band_name_prefix` for why this is safe to do unconditionally here.
+    let title = strip_band_name_prefix(&item.name, &item.band_name);
+
     let album = item.album_name.as_ref().map(|album_title| Album {
         id: None,
         title: album_title.clone(),
@@ -128,7 +159,7 @@ fn search_result_to_track(item: bandcamp::SearchResultItemTrack) -> Track {
         needs_validation: false,
         validation_reason: None,
         soundome_id: None,
-        title: item.name,
+        title,
         artists: vec![Artist {
             id: None,
             name: item.band_name,
@@ -157,5 +188,70 @@ fn search_result_to_track(item: bandcamp::SearchResultItemTrack) -> Track {
             external_id: Some(item.track_id.to_string()),
             external_url: Some(item.url.item_url),
         }],
+    }
+}
+
+// ================================================================================================
+// Tests
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strips_exact_band_name_prefix() {
+        assert_eq!(
+            strip_band_name_prefix("Boards of Canada - Roygbiv", "Boards of Canada"),
+            "Roygbiv"
+        );
+    }
+
+    #[test]
+    fn strips_prefix_case_insensitively_and_trims_whitespace() {
+        assert_eq!(
+            strip_band_name_prefix("  boards OF canada   -   Roygbiv  ", "Boards of Canada"),
+            "Roygbiv"
+        );
+    }
+
+    #[test]
+    fn strips_en_and_em_dash_variants() {
+        assert_eq!(strip_band_name_prefix("Artist – Title", "Artist"), "Title");
+        assert_eq!(strip_band_name_prefix("Artist — Title", "Artist"), "Title");
+    }
+
+    #[test]
+    fn leaves_title_untouched_when_prefix_does_not_match_band_name() {
+        // The " - " here is part of the title itself (e.g. a remix tag), not the artist name.
+        assert_eq!(
+            strip_band_name_prefix("Roygbiv - Extended Mix", "Boards of Canada"),
+            "Roygbiv - Extended Mix"
+        );
+    }
+
+    #[test]
+    fn leaves_title_untouched_when_there_is_no_separator() {
+        assert_eq!(
+            strip_band_name_prefix("Roygbiv", "Boards of Canada"),
+            "Roygbiv"
+        );
+    }
+
+    #[test]
+    fn leaves_title_untouched_when_band_name_is_empty() {
+        assert_eq!(
+            strip_band_name_prefix("Boards of Canada - Roygbiv", ""),
+            "Boards of Canada - Roygbiv"
+        );
+    }
+
+    #[test]
+    fn leaves_title_untouched_when_remainder_would_be_empty() {
+        // Defensive: never collapse a title down to nothing.
+        assert_eq!(
+            strip_band_name_prefix("Boards of Canada - ", "Boards of Canada"),
+            "Boards of Canada - "
+        );
     }
 }

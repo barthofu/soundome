@@ -1,6 +1,5 @@
 # Todo
 
-- [ ] Add local files ingestion
 - [ ] Add "search song" feature to download a single track by name/artist/album
 
 - [ ] voir pour renommer les bails de "tag" et "tagger" en "metadata"
