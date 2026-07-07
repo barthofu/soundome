@@ -137,6 +137,7 @@ mod tests {
     #[test]
     fn test_write_m3u8_basic() {
         let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_path_buf();
         let playlist = make_playlist("My Playlist");
         let tracks = vec![
             make_track(
@@ -153,7 +154,7 @@ mod tests {
             ),
         ];
 
-        let path = write_m3u8(&playlist, &tracks, dir.path()).unwrap();
+        let path = write_m3u8(&playlist, &tracks, &dir_path).unwrap();
         assert_eq!(path.file_name().unwrap(), "My Playlist.m3u8");
 
         let content = std::fs::read_to_string(&path).unwrap();
@@ -167,6 +168,7 @@ mod tests {
     #[test]
     fn test_write_m3u8_skips_unfinalized_and_needs_validation() {
         let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_path_buf();
         let playlist = make_playlist("Test");
 
         let mut needs_val = make_track("Draft", "Artist", None, Some("/library/draft.flac"));
@@ -176,7 +178,7 @@ mod tests {
 
         let good = make_track("Good", "Artist", Some(60_000), Some("/library/good.flac"));
 
-        let path = write_m3u8(&playlist, &[needs_val, no_path, good], dir.path()).unwrap();
+        let path = write_m3u8(&playlist, &[needs_val, no_path, good], &dir_path).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(!content.contains("Draft"));
         assert!(!content.contains("No Path"));
@@ -192,10 +194,11 @@ mod tests {
     #[test]
     fn test_write_m3u8_unknown_duration() {
         let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_path_buf();
         let playlist = make_playlist("NoDuration");
         let tracks = vec![make_track("Song", "Artist", None, Some("/lib/song.flac"))];
 
-        let path = write_m3u8(&playlist, &tracks, dir.path()).unwrap();
+        let path = write_m3u8(&playlist, &tracks, &dir_path).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("#EXTINF:-1,Artist - Song\n"));
     }
