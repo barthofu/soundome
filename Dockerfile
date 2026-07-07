@@ -15,27 +15,33 @@ FROM base AS libs
     # yt-dlp: use the musl standalone binary for the target architecture.
     # The plain "yt-dlp" release is a Python zipapp and requires Python, which
     # is not present in Alpine.  The musllinux builds are fully self-contained.
-    RUN case "$TARGETARCH" in \
+    RUN set -e; \
+        case "$TARGETARCH" in \
           amd64) YTDLP_BIN="yt-dlp_musllinux" ;; \
           arm64) YTDLP_BIN="yt-dlp_musllinux_aarch64" ;; \
           *) echo "Unsupported architecture: $TARGETARCH" && exit 1 ;; \
-        esac \
-        && curl -L -o /yt-dlp \
-             "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/${YTDLP_BIN}" \
-        && chmod +x /yt-dlp
+        esac; \
+        curl -L -f -o /yt-dlp \
+             "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/${YTDLP_BIN}"; \
+        chmod +x /yt-dlp
 
     # ffmpeg: static build for the target architecture.
-    RUN case "$TARGETARCH" in \
+    RUN set -e; \
+        case "$TARGETARCH" in \
           amd64) FFMPEG_ARCH="amd64" ;; \
           arm64) FFMPEG_ARCH="arm64" ;; \
           *) echo "Unsupported architecture: $TARGETARCH" && exit 1 ;; \
-        esac \
-        && curl -L -o /tmp/ffmpeg.tar.xz \
-             "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${FFMPEG_ARCH}-static.tar.xz" \
-        && tar -xf /tmp/ffmpeg.tar.xz -C /tmp --strip-components=1 \
-        && mv /tmp/ffmpeg /ffmpeg \
-        && chmod +x /ffmpeg \
-        && rm /tmp/ffmpeg.tar.xz  
+        esac; \
+        FFMPEG_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${FFMPEG_ARCH}-static.tar.xz"; \
+        echo "Downloading ffmpeg from: $FFMPEG_URL"; \
+        curl -L -f -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL"; \
+        echo "Extracting ffmpeg archive..."; \
+        tar -xf /tmp/ffmpeg.tar.xz -C /tmp --strip-components=1; \
+        echo "Setting up ffmpeg binary..."; \
+        mv /tmp/ffmpeg /ffmpeg; \
+        chmod +x /ffmpeg; \
+        rm /tmp/ffmpeg.tar.xz; \
+        echo "ffmpeg setup complete"  
 
 # ==================
 # == web builder ===
