@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use walkdir::WalkDir;
 
-use crate::utils::{cancellation::CancellationRegistry, database::Db, error::Error};
+use crate::utils::{
+    cancellation::CancellationRegistry, database::Db, error::Error,
+    task_executor::TaskExecutor,
+};
 
 // ================================================================================================
 // DTOs
@@ -73,62 +76,6 @@ pub struct IngestFilesResponse {
     /// Absolute path of the directory that was listed.
     pub ingest_dir: String,
     pub files: Vec<IngestFileEntry>,
-}
-
-// ================================================================================================
-// Helpers
-// ================================================================================================
-
-/// Spawn a background OS thread that runs `ingest_local_dir` for the given task.
-fn spawn_ingest_dir_task(
-    services: Arc<ServiceLayer>,
-    task_id: i32,
-    ingest_dir: PathBuf,
-    registry: Arc<CancellationRegistry>,
-) {
-    let db_url = Config::get().database.url.clone();
-
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to build background tokio runtime for ingest_dir");
-
-        rt.block_on(async move {
-            let conn = &mut database::init_connection(&db_url);
-
-            if let Err(e) = services.task_service.set_running(conn, task_id) {
-                tracing::error!("Failed to set ingest task {} as running: {}", task_id, e);
-            }
-
-            match services
-                .download_service
-                .ingest_local_dir(conn, &ingest_dir, task_id)
-                .await
-            {
-                Ok(()) => {
-                    if let Err(e) = services.task_service.set_completed(conn, task_id) {
-                        tracing::error!(
-                            "Failed to mark ingest task {} as completed: {}",
-                            task_id,
-                            e
-                        );
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Ingest dir task {} failed: {}", task_id, e);
-                    if let Err(e2) = services
-                        .task_service
-                        .set_failed(conn, task_id, &e.to_string())
-                    {
-                        tracing::error!("Failed to mark ingest task {} as failed: {}", task_id, e2);
-                    }
-                }
-            }
-
-            registry.remove(task_id);
-        });
-    });
 }
 
 // ================================================================================================
@@ -314,15 +261,20 @@ pub async fn list_ingest_files() -> Result<Json<IngestFilesResponse>, Error> {
 /// Start a background task that ingests all audio files in `ingest_dir`.
 ///
 /// Returns a `task_id` immediately. Poll `GET /api/tasks/:id` for progress and stats.
+///
+/// **Concurrency**: dispatched through the shared serial executor — will wait
+/// in queue behind any playlist/artist/album sync currently in progress.
 #[openapi(tag = "library")]
 #[post("/library/ingest/all")]
 pub async fn ingest_all(
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
     registry: &rocket::State<Arc<CancellationRegistry>>,
+    executor: &rocket::State<Arc<TaskExecutor>>,
 ) -> Result<Json<serde_json::Value>, Error> {
     let services = Arc::clone(services);
     let registry = Arc::clone(registry);
+    let executor = Arc::clone(executor);
     let ingest_dir = Config::get().general.ingest_dir.clone();
 
     let services_for_db = services.clone();
@@ -337,9 +289,11 @@ pub async fn ingest_all(
         .map_err(Error::from)?;
 
     let task_id = task.id.expect("created task must have an id");
+    // Ingest currently has no cancellation checkpoint, but we register a flag
+    // anyway to keep the registry consistent (and future-proof for cancellation).
     let _cancel_flag = registry.register(task_id);
 
-    spawn_ingest_dir_task(services, task_id, PathBuf::from(ingest_dir), registry);
+    executor.enqueue_ingest_dir(task_id, PathBuf::from(ingest_dir));
 
     Ok(Json(serde_json::json!({ "task_id": task_id })))
 }

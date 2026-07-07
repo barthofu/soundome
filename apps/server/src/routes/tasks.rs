@@ -7,7 +7,10 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use shared::models::{Task, TaskStatus, TaskType};
 
-use crate::utils::{cancellation::CancellationRegistry, database::Db, error::CustomError};
+use crate::utils::{
+    cancellation::CancellationRegistry, database::Db, error::CustomError,
+    task_executor::TaskExecutor,
+};
 
 // ================================================================================================
 // DTOs
@@ -141,7 +144,7 @@ pub async fn get_by_id(
         })
 }
 
-/// Retry a failed or interrupted task. Resets progress to 0 and re-spawns the background job.
+/// Retry a failed or interrupted task. Resets progress to 0 and re-enqueues the background job.
 /// Already-downloaded tracks will be skipped automatically.
 #[openapi]
 #[post("/tasks/<id>/retry")]
@@ -150,10 +153,11 @@ pub async fn retry(
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
     registry: &rocket::State<Arc<CancellationRegistry>>,
+    executor: &rocket::State<Arc<TaskExecutor>>,
 ) -> Result<Json<TaskDto>, crate::utils::error::Error> {
     let services = Arc::clone(services);
-    let services_for_spawn = services.clone();
     let registry = Arc::clone(registry);
+    let executor = Arc::clone(executor);
 
     let task = db
         .run(move |conn| {
@@ -196,31 +200,13 @@ pub async fn retry(
     let cancel_flag = registry.register(task_id);
     match task.task_type {
         TaskType::SyncPlaylist => {
-            super::download::spawn_playlist_sync_task(
-                services_for_spawn,
-                task_id,
-                url,
-                cancel_flag,
-                registry,
-            );
+            executor.enqueue_playlist_sync(task_id, url, cancel_flag);
         }
         TaskType::SyncArtist => {
-            super::download::spawn_artist_sync_task(
-                services_for_spawn,
-                task_id,
-                url,
-                cancel_flag,
-                registry,
-            );
+            executor.enqueue_artist_sync(task_id, url, cancel_flag);
         }
         TaskType::SyncAlbum => {
-            super::download::spawn_album_sync_task(
-                services_for_spawn,
-                task_id,
-                url,
-                cancel_flag,
-                registry,
-            );
+            executor.enqueue_album_sync(task_id, url, cancel_flag);
         }
         _ => {
             return Err(crate::utils::error::Error::Custom(CustomError {
