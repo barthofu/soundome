@@ -262,7 +262,11 @@ impl Source for Youtube {
 
     fn is_valid_playlist_url(url: &str) -> bool {
         // YouTube playlists have ?list=... parameter
-        url.contains("youtube.com") && url.contains("list=") && url.len() > 30 // Basic sanity check
+        // Exclude music.youtube.com (handled by YoutubeMusic source)
+        url.contains("youtube.com")
+            && !url.contains("music.youtube.com")
+            && url.contains("list=")
+            && url.len() > 30 // Basic sanity check
     }
 
     fn is_valid_artist_url(_url: &str) -> bool {
