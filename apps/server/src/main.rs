@@ -10,7 +10,9 @@ use rocket_okapi::{
 };
 
 use shared::{init_globals, utils::logs::init_logger};
-use soundome_server::utils::{cancellation::CancellationRegistry, database::Db};
+use soundome_server::utils::{
+    cancellation::CancellationRegistry, database::Db, task_executor::TaskExecutor,
+};
 use soundome_server::{
     middlewares::cors::Cors,
     routes::{self, errors},
@@ -61,16 +63,23 @@ fn rocket() -> _ {
 
     let services = Arc::new(ServiceLayer::new(repositories));
     let cancellation_registry = Arc::new(CancellationRegistry::new());
+    // Start the serial task executor (single background worker). Every job that
+    // needs the shared SQLite DB or long-running network I/O must be enqueued
+    // here, so at most one runs at a time. See `utils/task_executor.rs`.
+    let task_executor = Arc::new(TaskExecutor::start(
+        services.clone(),
+        cancellation_registry.clone(),
+    ));
 
     // Recover tasks that were Running when the server stopped (crash / restart).
-    // Reset them to Pending and re-spawn the background jobs.
+    // Reset them to Pending and re-enqueue them on the executor.
     {
         let db_url = Config::get().database.url.clone();
         let conn = &mut database::init_connection(&db_url);
         match services.task_service.get_stale_running(conn) {
             Ok(stale_tasks) if !stale_tasks.is_empty() => {
                 tracing::warn!(
-                    "Found {} stale Running task(s) from previous run, re-launching",
+                    "Found {} stale Running task(s) from previous run, re-enqueueing",
                     stale_tasks.len()
                 );
                 for task in stale_tasks {
@@ -97,34 +106,16 @@ fn rocket() -> _ {
                     }
 
                     let cancel_flag = cancellation_registry.register(task_id);
-                    tracing::info!("Re-launching stale task {} for URL {}", task_id, url);
+                    tracing::info!("Re-enqueueing stale task {} for URL {}", task_id, url);
                     match task.task_type {
                         shared::models::TaskType::SyncArtist => {
-                            soundome_server::routes::download::spawn_artist_sync_task(
-                                services.clone(),
-                                task_id,
-                                url,
-                                cancel_flag,
-                                cancellation_registry.clone(),
-                            );
+                            task_executor.enqueue_artist_sync(task_id, url, cancel_flag);
                         }
                         shared::models::TaskType::SyncAlbum => {
-                            soundome_server::routes::download::spawn_album_sync_task(
-                                services.clone(),
-                                task_id,
-                                url,
-                                cancel_flag,
-                                cancellation_registry.clone(),
-                            );
+                            task_executor.enqueue_album_sync(task_id, url, cancel_flag);
                         }
                         _ => {
-                            soundome_server::routes::download::spawn_playlist_sync_task(
-                                services.clone(),
-                                task_id,
-                                url,
-                                cancel_flag,
-                                cancellation_registry.clone(),
-                            );
+                            task_executor.enqueue_playlist_sync(task_id, url, cancel_flag);
                         }
                     }
                 }
@@ -139,6 +130,7 @@ fn rocket() -> _ {
         let db_url = Config::get().database.url.clone();
         let services_for_scheduler = services.clone();
         let registry_for_scheduler = cancellation_registry.clone();
+        let executor_for_scheduler = task_executor.clone();
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(60));
 
@@ -188,17 +180,11 @@ fn rocket() -> _ {
                 };
                 let cancel_flag = registry_for_scheduler.register(task_id);
                 tracing::info!(
-                    "Scheduler: triggering sync for schedule {} (url={})",
+                    "Scheduler: enqueueing sync for schedule {} (url={})",
                     schedule_id,
                     url
                 );
-                soundome_server::routes::download::spawn_playlist_sync_task(
-                    services_for_scheduler.clone(),
-                    task_id,
-                    url,
-                    cancel_flag,
-                    registry_for_scheduler.clone(),
-                );
+                executor_for_scheduler.enqueue_playlist_sync(task_id, url, cancel_flag);
             }
         });
     }
@@ -233,6 +219,7 @@ fn rocket() -> _ {
         .attach(Db::fairing())
         .manage(services)
         .manage(cancellation_registry)
+        .manage(task_executor)
         .register("/", catchers![errors::default])
         .mount(
             "/api",
