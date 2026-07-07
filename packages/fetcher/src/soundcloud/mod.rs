@@ -28,7 +28,7 @@ impl Soundcloud {
     /// Maximum number of tracks sent to the AI in a single curation request.
     /// Keeping this small helps the model maintain track boundaries and avoids
     /// "leaking" artist names across unrelated tracks in the same batch.
-    const AI_CLEANUP_BATCH_SIZE: usize = 25;
+    const AI_CLEANUP_BATCH_SIZE: usize = 10;
 
     const TRACK_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)(?:[a-z0-9\-_]{1,25}))\/(?:(?:(?!sets|playlist|stats|settings|logout|notifications|you|messages)(?:[a-z0-9\-_]{1,100}))(?:\/s\-[a-zA-Z0-9\-_]{1,10})?)(?:\?.*)?$";
     const PLAYLIST_REGEX: &str = r"^https:\/\/soundcloud\.com\/(?:(?!sets|stats|groups|upload|you|mobile|stream|messages|discover|notifications|terms-of-use|people|pages|jobs|settings|logout|charts|imprint|popular)[a-z0-9\-_]{1,25})\/sets\/[a-z0-9\-_]{1,100}(?:\?.*)?$";
@@ -247,26 +247,79 @@ impl Soundcloud {
                 simplified_tracks.len()
             );
             let processed_tracks = ai_client
-                .generate_with_data(&prompt, simplified_tracks)
+                .generate_with_data(&prompt, simplified_tracks.clone())
                 .await
                 .map_err(|e| Error::Internal(format!("AI processing failed: {}", e)))?;
 
             tracing::info!("Processed tracks: {:#?}", processed_tracks);
 
-            for (i, processed_track) in processed_tracks.iter().enumerate() {
-                chunk[i].title = processed_track.title.clone();
-                chunk[i].artists = processed_track
+            // Index AI output by `id` so we're immune to reordering, drops, or
+            // duplicates in the response. Anything the AI didn't return keeps
+            // its original metadata (safer than a positional mis-assignment).
+            let mut by_id: std::collections::HashMap<String, &SimplifiedTrack> =
+                std::collections::HashMap::with_capacity(processed_tracks.len());
+            for processed in &processed_tracks {
+                by_id.insert(processed.id.clone(), processed);
+            }
+
+            for (idx, input) in simplified_tracks.iter().enumerate() {
+                let processed = match by_id.get(&input.id) {
+                    Some(p) => *p,
+                    None => {
+                        tracing::warn!(
+                            "AI curation dropped track id={} (title={:?}); keeping original metadata",
+                            input.id,
+                            input.title
+                        );
+                        continue;
+                    }
+                };
+
+                // Validate every proposed artist name is actually present in the
+                // input title or input artists. This is the hard guardrail against
+                // cross-track leakage (e.g. "ZadernaS" quietly becoming "Mylacid").
+                let validated_artists: Vec<String> = processed
                     .artists
+                    .iter()
+                    .filter(|name| Self::artist_name_is_supported(name, input))
+                    .cloned()
+                    .collect();
+
+                let final_artists = if validated_artists.is_empty() {
+                    tracing::warn!(
+                        "AI curation for track id={} produced no valid artist name (proposed={:?}); falling back to original artists",
+                        input.id,
+                        processed.artists
+                    );
+                    input.artists.clone()
+                } else {
+                    if validated_artists.len() != processed.artists.len() {
+                        let rejected: Vec<&String> = processed
+                            .artists
+                            .iter()
+                            .filter(|name| !validated_artists.contains(name))
+                            .collect();
+                        tracing::warn!(
+                            "AI curation for track id={} proposed unsupported artist name(s) {:?}; dropping them",
+                            input.id,
+                            rejected
+                        );
+                    }
+                    validated_artists
+                };
+
+                chunk[idx].title = processed.title.clone();
+                chunk[idx].artists = final_artists
                     .iter()
                     .enumerate()
                     .map(|(j, name)| Artist {
                         id: None,
                         name: name.clone(),
-                        icon: chunk[i]
+                        icon: chunk[idx]
                             .artists
                             .get(j)
                             .and_then(|artist| artist.icon.clone()),
-                        references: chunk[i]
+                        references: chunk[idx]
                             .artists
                             .get(j)
                             .map(|artist| artist.references.clone())
@@ -285,6 +338,27 @@ impl Soundcloud {
         }
 
         Ok(())
+    }
+
+    /// Returns true when `name` appears (after normalization) as a substring
+    /// of either the input title or one of the input artists for the same track.
+    /// This is a hard guardrail: the AI is only allowed to keep or split names
+    /// that were already there, never to invent or borrow from another track.
+    fn artist_name_is_supported(name: &str, input: &SimplifiedTrack) -> bool {
+        let normalized_name = shared::utils::string::normalize_string(name);
+        // A completely empty normalization (e.g. an emoji-only name) can't be
+        // usefully validated — reject it defensively.
+        if normalized_name.trim().is_empty() {
+            return false;
+        }
+        let normalized_title = shared::utils::string::normalize_string(&input.title);
+        if normalized_title.contains(&normalized_name) {
+            return true;
+        }
+        input
+            .artists
+            .iter()
+            .any(|a| shared::utils::string::normalize_string(a).contains(&normalized_name))
     }
 }
 
@@ -512,5 +586,44 @@ mod tests {
             Soundcloud::is_valid_artist_url(url),
             "Should accept artist URL with trailing slash and params"
         );
+    }
+
+    fn simplified(title: &str, artists: &[&str]) -> shared::models::SimplifiedTrack {
+        shared::models::SimplifiedTrack {
+            id: "id1".to_string(),
+            title: title.to_string(),
+            artists: artists.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn artist_name_supported_when_present_in_title() {
+        let input = simplified("GRÄV - Habits Sales & VYRAX", &["Habits_Sales"]);
+        // Both "Habits Sales" and "VYRAX" come from the title and must be accepted.
+        assert!(Soundcloud::artist_name_is_supported("Habits Sales", &input));
+        assert!(Soundcloud::artist_name_is_supported("VYRAX", &input));
+    }
+
+    #[test]
+    fn artist_name_supported_when_present_in_uploader() {
+        let input = simplified("Some Title", &["Habits_Sales"]);
+        // Normalization strips the underscore, so the AI-cleaned "Habits Sales"
+        // still resolves to the uploader username.
+        assert!(Soundcloud::artist_name_is_supported("Habits Sales", &input));
+    }
+
+    #[test]
+    fn artist_name_rejected_when_not_present_anywhere() {
+        let input = simplified("Zorven - Some Track feat. ZadernaS", &["Zorven"]);
+        // "Mylacid" is a name from a different track in the same batch — reject.
+        assert!(!Soundcloud::artist_name_is_supported("Mylacid", &input));
+    }
+
+    #[test]
+    fn artist_name_rejected_for_empty_normalization() {
+        let input = simplified("Zorven - Some Track", &["Zorven"]);
+        // Emoji-only or whitespace-only names cannot be validated.
+        assert!(!Soundcloud::artist_name_is_supported("🎵", &input));
+        assert!(!Soundcloud::artist_name_is_supported("   ", &input));
     }
 }
