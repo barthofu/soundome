@@ -339,14 +339,16 @@ impl ArtistRepository for DieselArtistRepository {
             shared::errors::Error::Database(format!("Failed to get all resources: {}", err))
         })?;
 
-        let references: Vec<ArtistRefEntity> =
-            schema::artist_ref::table.load(conn).map_err(|err| {
-                shared::errors::Error::Database(format!("Failed to get all resources: {}", err))
-            })?;
-
         Ok(artists
             .into_iter()
-            .map(|artist| ArtistEntity::convert_to_domain(artist, references.clone()))
+            .map(|artist| {
+                let references: Vec<ArtistRefEntity> = schema::artist_ref::table
+                    .filter(schema::artist_ref::artist_id.eq(artist.id))
+                    .load(conn)
+                    .unwrap_or_default();
+
+                ArtistEntity::convert_to_domain(artist, references)
+            })
             .collect())
     }
 

@@ -348,24 +348,21 @@ impl Soundcloud {
         // Normalize by removing spaces, underscores, and dashes to allow flexible matching
         // (e.g. "Habits Sales" == "Habits_Sales" == "Habits-Sales").
         let normalize_for_comparison = |s: &str| -> String {
-            shared::utils::string::normalize_string(s)
-                .replace(' ', "")
-                .replace('_', "")
-                .replace('-', "")
+            shared::utils::string::normalize_string(s).replace([' ', '_', '-'], "")
         };
-        
+
         let normalized_name = normalize_for_comparison(name);
         // A completely empty normalization (e.g. an emoji-only name) can't be
         // usefully validated — reject it defensively.
         if normalized_name.is_empty() {
             return false;
         }
-        
+
         let normalized_title = normalize_for_comparison(&input.title);
         if normalized_title.contains(&normalized_name) {
             return true;
         }
-        
+
         input
             .artists
             .iter()
