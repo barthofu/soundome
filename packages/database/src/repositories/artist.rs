@@ -157,8 +157,15 @@ impl ArtistRepository for DieselArtistRepository {
                 err
             ))
         })?;
-        // insert current
+        // Deduplicate artist_ids while preserving order: multiple upstream artist
+        // entries (e.g. after AI curation) can resolve to the same DB row via
+        // case-insensitive `create_or_ignore`, which would otherwise trigger a
+        // UNIQUE constraint violation on (track_id, artist_id).
+        let mut seen = std::collections::HashSet::with_capacity(artist_ids.len());
         for artist_id in artist_ids {
+            if !seen.insert(*artist_id) {
+                continue;
+            }
             let rel = ArtistTrackEntity {
                 track_id,
                 artist_id: *artist_id,
@@ -216,8 +223,12 @@ impl ArtistRepository for DieselArtistRepository {
                 err
             ))
         })?;
-        // insert current
+        // Deduplicate artist_ids: see comment in `set_track_artists`.
+        let mut seen = std::collections::HashSet::with_capacity(artist_ids.len());
         for artist_id in artist_ids {
+            if !seen.insert(*artist_id) {
+                continue;
+            }
             let rel = ArtistAlbumEntity {
                 album_id,
                 artist_id: *artist_id,
