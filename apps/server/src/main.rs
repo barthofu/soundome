@@ -71,8 +71,13 @@ fn rocket() -> _ {
         cancellation_registry.clone(),
     ));
 
-    // Recover tasks that were Running when the server stopped (crash / restart).
-    // Reset them to Pending and re-enqueue them on the executor.
+    // Automatic recovery of stale tasks (Pending/Running from previous run) is disabled.
+    // Stale tasks can be retried manually via the /api/tasks/{id}/retry endpoint or the UI.
+    // This ensures operators have full control over task resumption and prevents unexpected
+    // behavior after server restarts.
+    //
+    // To re-enable automatic recovery, uncomment the block below and recompile:
+    /*
     {
         let db_url = Config::get().database.url.clone();
         let conn = &mut database::init_connection(&db_url);
@@ -124,6 +129,7 @@ fn rocket() -> _ {
             Err(e) => tracing::error!("Failed to check for stale tasks at boot: {}", e),
         }
     }
+    */
 
     // Spawn the background sync scheduler (checks every 60 seconds)
     {
