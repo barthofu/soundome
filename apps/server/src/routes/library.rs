@@ -10,8 +10,7 @@ use tokio::runtime::Handle;
 use walkdir::WalkDir;
 
 use crate::utils::{
-    cancellation::CancellationRegistry, database::Db, error::Error,
-    task_executor::TaskExecutor,
+    cancellation::CancellationRegistry, database::Db, error::Error, task_executor::TaskExecutor,
 };
 
 // ================================================================================================

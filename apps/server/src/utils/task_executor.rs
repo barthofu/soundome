@@ -102,12 +102,7 @@ impl TaskExecutor {
     }
 
     /// Enqueue a playlist sync. Non-blocking.
-    pub fn enqueue_playlist_sync(
-        &self,
-        task_id: i32,
-        url: String,
-        cancel_flag: Arc<AtomicBool>,
-    ) {
+    pub fn enqueue_playlist_sync(&self, task_id: i32, url: String, cancel_flag: Arc<AtomicBool>) {
         self.send(QueuedJob::PlaylistSync {
             task_id,
             url,
@@ -145,10 +140,7 @@ impl TaskExecutor {
     /// resolves once the worker has processed the job. Awaiting this receiver
     /// naturally blocks the HTTP handler until the queue reaches this job,
     /// which is the intended behavior — no download ever bypasses the queue.
-    pub fn enqueue_single_track(
-        &self,
-        url: String,
-    ) -> oneshot::Receiver<SoundomeResult<Track>> {
+    pub fn enqueue_single_track(&self, url: String) -> oneshot::Receiver<SoundomeResult<Track>> {
         let (responder, rx) = oneshot::channel();
         self.send(QueuedJob::SingleTrack { url, responder });
         rx
@@ -245,11 +237,7 @@ async fn run_job(
     }
 }
 
-fn mark_running(
-    services: &Arc<ServiceLayer>,
-    conn: &mut diesel::SqliteConnection,
-    task_id: i32,
-) {
+fn mark_running(services: &Arc<ServiceLayer>, conn: &mut diesel::SqliteConnection, task_id: i32) {
     if let Err(e) = services.task_service.set_running(conn, task_id) {
         tracing::error!("Failed to set task {} as running: {}", task_id, e);
     }

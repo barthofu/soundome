@@ -2,6 +2,17 @@
 
 This document captures the intended end-to-end workflow for the two main ingestion paths that already shape the codebase: importing from a source URL and importing from a local file.
 
+## Concurrency model
+
+Every download-related job — single track, playlist sync, artist sync, album sync, and ingest-dir batch — is dispatched through a **shared serial task executor**. Only **one** job runs at a time; additional jobs sit in a FIFO queue as tasks in status `Pending` until the worker picks them up. The queue holds regardless of whether the job was triggered from an API route, from the retry endpoint, from the scheduler, or from boot-time stale-task recovery.
+
+Rationale:
+- Prevents SQLite `database is locked` errors caused by two writers racing for the exclusive DB lock.
+- Keeps external API usage (Spotify, SoundCloud, YouTube, MusicBrainz…) well below rate-limit thresholds by never fanning out.
+- Prevents `yt-dlp` / `ffmpeg` from stepping on each other on limited-resource hosts.
+
+Implementation: `apps/server/src/utils/task_executor.rs` — see also `TaskStatus::Pending` (in queue) and `TaskStatus::Running` (currently executing).
+
 ## Import a track from a source URL
 
 For each track to import:
