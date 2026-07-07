@@ -345,20 +345,31 @@ impl Soundcloud {
     /// This is a hard guardrail: the AI is only allowed to keep or split names
     /// that were already there, never to invent or borrow from another track.
     fn artist_name_is_supported(name: &str, input: &SimplifiedTrack) -> bool {
-        let normalized_name = shared::utils::string::normalize_string(name);
+        // Normalize by removing spaces, underscores, and dashes to allow flexible matching
+        // (e.g. "Habits Sales" == "Habits_Sales" == "Habits-Sales").
+        let normalize_for_comparison = |s: &str| -> String {
+            shared::utils::string::normalize_string(s)
+                .replace(' ', "")
+                .replace('_', "")
+                .replace('-', "")
+        };
+        
+        let normalized_name = normalize_for_comparison(name);
         // A completely empty normalization (e.g. an emoji-only name) can't be
         // usefully validated — reject it defensively.
-        if normalized_name.trim().is_empty() {
+        if normalized_name.is_empty() {
             return false;
         }
-        let normalized_title = shared::utils::string::normalize_string(&input.title);
+        
+        let normalized_title = normalize_for_comparison(&input.title);
         if normalized_title.contains(&normalized_name) {
             return true;
         }
+        
         input
             .artists
             .iter()
-            .any(|a| shared::utils::string::normalize_string(a).contains(&normalized_name))
+            .any(|a| normalize_for_comparison(a).contains(&normalized_name))
     }
 }
 
