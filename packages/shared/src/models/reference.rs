@@ -54,11 +54,17 @@ pub enum Platform {
 impl Platform {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
+        // Normalize away underscores: DB/repository code round-trips this value
+        // through `Platform::X.as_ref().to_lowercase()` (e.g. `YoutubeMusic` ->
+        // "youtubemusic", no separator), while some call sites still pass the
+        // historical snake_case spelling ("youtube_music"). Stripping `_` lets
+        // both forms (and the raw PascalCase variant name) resolve correctly
+        // instead of silently falling back to `Unknown`.
+        match s.to_lowercase().replace('_', "").as_str() {
             "spotify" => Platform::Spotify,
             "soundcloud" => Platform::SoundCloud,
             "musicbrainz" => Platform::MusicBrainz,
-            "youtube_music" => Platform::YoutubeMusic,
+            "youtubemusic" => Platform::YoutubeMusic,
             "youtube" => Platform::Youtube,
             "bandcamp" => Platform::Bandcamp,
             _ => Platform::Unknown,

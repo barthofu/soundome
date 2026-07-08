@@ -28,11 +28,12 @@ pub enum TrackSource {
 impl TrackSource {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(source: &str) -> Self {
-        match source.to_lowercase().as_str() {
+        // See `Platform::from_str` for why underscores are stripped before matching.
+        match source.to_lowercase().replace('_', "").as_str() {
             "local" => TrackSource::Local,
             "spotify" => TrackSource::Spotify,
             "youtube" => TrackSource::Youtube,
-            "youtube_music" => TrackSource::YoutubeMusic,
+            "youtubemusic" => TrackSource::YoutubeMusic,
             "soundcloud" => TrackSource::SoundCloud,
             _ => TrackSource::Unknown,
         }
@@ -54,9 +55,10 @@ pub enum TrackProvider {
 impl TrackProvider {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(provider: &str) -> Self {
-        match provider.to_lowercase().as_str() {
+        // See `Platform::from_str` for why underscores are stripped before matching.
+        match provider.to_lowercase().replace('_', "").as_str() {
             "youtube" => TrackProvider::Youtube,
-            "youtube_music" => TrackProvider::YoutubeMusic,
+            "youtubemusic" => TrackProvider::YoutubeMusic,
             "soundcloud" => TrackProvider::SoundCloud,
             _ => TrackProvider::Unknown,
         }
