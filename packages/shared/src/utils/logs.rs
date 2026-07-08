@@ -27,7 +27,7 @@ pub fn init_logger() {
         };
 
         format!(
-            "warn,soundome={level},server={level},domain={level},shared={level},\
+            "warn,rustypipe=error,soundome={level},server={level},domain={level},shared={level},\
              config={level},database={level},downloader={level},fetcher={level},\
              tagger={level},organizer={level},ai={level}{reqwest}",
             level = soundome_level,
