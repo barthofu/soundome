@@ -162,12 +162,24 @@ impl Source for YoutubeMusic {
         let playlist_id = self
             .get_playlist_id_from_url(_url)
             .ok_or(Error::InvalidUrl(_url.to_string()))?;
-        let playlist = self
+        let mut playlist = self
             .client
             .query()
             .music_playlist(playlist_id)
             .await
             .map_err(|_| Error::NotFound("Youtube Music playlist".to_string()))?;
+
+        // Fetch all tracks using extend_limit to avoid 100-track limit
+        playlist
+            .tracks
+            .extend_limit(self.client.query(), 10000)
+            .await
+            .map_err(|e| Error::Custom(format!("Failed to fetch all playlist tracks: {}", e)))?;
+
+        tracing::info!(
+            "Fetched {} tracks from YouTube Music playlist",
+            playlist.tracks.items.len()
+        );
 
         let tracks = join_all(
             playlist

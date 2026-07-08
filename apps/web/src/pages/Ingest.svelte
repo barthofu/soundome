@@ -641,12 +641,14 @@
     margin-top: 0.6rem;
   }
 
+  /*
   @media (min-width: 640px) {
     .task-stats {
       gap: 0.5rem;
       margin-top: 0.75rem;
     }
   }
+  */
 
   .task-header {
     display: flex;

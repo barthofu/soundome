@@ -56,12 +56,34 @@ pub struct TaskDto {
     pub total: Option<i32>,
     pub error: Option<String>,
     pub stats: Option<TaskStatsDto>,
+    /// Platform/source inferred from payload URL (e.g. "soundcloud", "spotify")
+    pub source_platform: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
 
 impl TaskDto {
+    fn extract_platform_from_url(url: &str) -> Option<String> {
+        if url.contains("soundcloud.com") {
+            Some("soundcloud".to_string())
+        } else if url.contains("spotify.com") {
+            Some("spotify".to_string())
+        } else if url.contains("youtube.com") || url.contains("youtu.be") {
+            Some("youtube".to_string())
+        } else if url.contains("music.youtube.com") {
+            Some("youtube_music".to_string())
+        } else {
+            None
+        }
+    }
+
     fn from_task(task: Task) -> Option<Self> {
+        // Extract URL from payload to determine source platform
+        let source_platform = serde_json::from_str::<serde_json::Value>(&task.payload)
+            .ok()
+            .and_then(|v| v.get("url").and_then(|u| u.as_str()).map(|s| s.to_string()))
+            .and_then(|url| Self::extract_platform_from_url(&url));
+
         let stats = task.stats.map(|s| TaskStatsDto {
             downloaded: s.downloaded,
             to_validate: s.to_validate,
@@ -89,6 +111,7 @@ impl TaskDto {
             total: task.total,
             error: task.error,
             stats,
+            source_platform,
             created_at: task.created_at.map(|t| t.to_string()),
             updated_at: task.updated_at.map(|t| t.to_string()),
         })

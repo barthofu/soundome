@@ -183,7 +183,7 @@
             </div>
           {/if}
 
-          {#if task.status === 'Running' && task.stats?.ai_curation}
+          {#if task.status === 'Running' && task.stats?.ai_curation && task.source_platform === 'soundcloud'}
             <div class="ai-curation-row">
               <span class="spinner ai-spinner"></span>
               <span class="ai-curation-text">

@@ -108,6 +108,8 @@ export interface TaskDto {
   total: number | null;
   error: string | null;
   stats: TaskStatsDto | null;
+  /** Platform/source inferred from task payload (e.g. "soundcloud", "spotify", "youtube") */
+  source_platform: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
