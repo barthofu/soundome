@@ -19,6 +19,7 @@ rustypipe = "0.11.4"
 rsoundcloud = { version = "0.2.6" }
 # rsoundcloud = { path = "../../../rsoundcloud" } # for local testing purposes
 
+tokio = { version = "1.44.2", features = ["sync"] }
 futures = "0.3.31"
 async-trait = "0.1.88"
 fancy-regex = "0.14.0"

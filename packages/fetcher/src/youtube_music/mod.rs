@@ -15,6 +15,8 @@ use shared::{
     models::{Album, Artist, Platform, Playlist, PlaylistTrack, Track},
     types::SoundomeResult,
 };
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 use crate::Source;
 
@@ -28,15 +30,48 @@ impl YoutubeMusic {
         r"^https://music\.youtube\.com/(?:playlist|watch)\?.*\blist=([^#&?]+)";
     const ARTIST_REGEX: &str = r"^https:\/\/music\.youtube\.com\/channel\/([A-Za-z0-9_-]+)$";
 
+    /// Caps how many tracks are enriched (per-track artist/album lookups) at the
+    /// same time. Firing every track at once (previously via `join_all`) meant
+    /// hundreds of simultaneous requests for large playlists, which is enough to
+    /// make YouTube Music rate-limit/return malformed responses (surfaced as
+    /// rustypipe retry warnings, error reports, and even a panic in rustypipe's
+    /// internal visitor-data refresh under load).
+    const MAX_CONCURRENT_ENRICHMENT: usize = 5;
+
+    /// Helper to apply concurrency limits to a batch of track enrichment futures.
+    /// Uses a Semaphore to limit concurrent requests while preserving order.
+    async fn enrich_tracks_with_limit<'a>(
+        &'a self,
+        tracks: impl Iterator<Item = TrackItem>,
+    ) -> Vec<Track> {
+        let semaphore = Arc::new(Semaphore::new(Self::MAX_CONCURRENT_ENRICHMENT));
+        let futures = tracks.map(|track| {
+            let semaphore = Arc::clone(&semaphore);
+            async move {
+                let _permit = semaphore.acquire().await.unwrap();
+                self.get_complete_track_from_music_track(track).await
+            }
+        });
+        join_all(futures).await
+    }
+
     pub fn new() -> SoundomeResult<Self> {
         let client = match Config::get().proxy.as_ref() {
             Some(proxy_config) if proxy_config.enabled => {
                 let reqwest_client = HttpClientBuilder::get_reqwest_client_builder()?;
                 RustyPipe::builder()
+                    // Skip writing `rustypipe_reports/*.json` files to disk. YT Music
+                    // playlists routinely include tracks with partial metadata (no
+                    // album, no artist channel id), which rustypipe treats as
+                    // WRN-level report-worthy events even though Soundome already
+                    // handles the resulting `None` gracefully. See also the WARN
+                    // filter in `shared::utils::logs::init_logger`.
+                    .no_reporter()
                     .build_with_client(reqwest_client)
                     .expect("Failed to create RustyPipe client with proxy")
             }
             _ => RustyPipe::builder()
+                .no_reporter()
                 .build()
                 .expect("Failed to create RustyPipe client"),
         };
@@ -52,22 +87,27 @@ impl YoutubeMusic {
     async fn get_complete_track_from_music_track(&self, track: TrackItem) -> Track {
         let mut artists: Vec<MusicArtist> = Vec::new();
         for artist in track.artists.iter() {
-            let artist = self
-                .client
-                .query()
-                .music_artist(&artist.id.clone().unwrap_or("".to_string()), false)
-                .await
-                .ok();
-            if let Some(artist) = artist {
+            // Some tracks (e.g. fetched from a playlist) carry an artist without a
+            // channel id. Calling `music_artist` with an empty id always fails on
+            // YT's side ("invalid data from YT: no header"), so skip the lookup
+            // instead of letting rustypipe retry and write an error report for a
+            // request that can never succeed.
+            let Some(artist_id) = artist.id.as_deref().filter(|id| !id.is_empty()) else {
+                continue;
+            };
+            if let Ok(artist) = self.client.query().music_artist(artist_id, false).await {
                 artists.push(artist);
             }
         }
-        let album = self
-            .client
-            .query()
-            .music_album(&track.album.as_ref().map_or("", |album| &album.id))
-            .await
-            .ok();
+
+        // Same reasoning as above: an absent/empty album id always fails
+        // `music_album`, so only issue the request when there is an id to look up.
+        let album = match track.album.as_ref().map(|album| album.id.as_str()) {
+            Some(album_id) if !album_id.is_empty() => {
+                self.client.query().music_album(album_id).await.ok()
+            }
+            _ => None,
+        };
 
         convert_track(track, artists, album)
     }
@@ -126,14 +166,9 @@ impl Source for YoutubeMusic {
             .await
             .map_err(mappers::convert_error)?;
 
-        let tracks = join_all(
-            results
-                .items
-                .items
-                .iter()
-                .map(|track| self.get_complete_track_from_music_track(track.clone())),
-        )
-        .await;
+        let tracks = self
+            .enrich_tracks_with_limit(results.items.items.iter().cloned())
+            .await;
         Ok(tracks)
     }
 
@@ -181,14 +216,9 @@ impl Source for YoutubeMusic {
             playlist.tracks.items.len()
         );
 
-        let tracks = join_all(
-            playlist
-                .tracks
-                .items
-                .iter()
-                .map(|track| self.get_complete_track_from_music_track(track.clone())),
-        )
-        .await;
+        let tracks = self
+            .enrich_tracks_with_limit(playlist.tracks.items.iter().cloned())
+            .await;
 
         Ok(tracks
             .iter()
@@ -239,13 +269,9 @@ impl Source for YoutubeMusic {
 
             match album {
                 Ok(album) => {
-                    let tracks = join_all(
-                        album
-                            .tracks
-                            .into_iter()
-                            .map(|track| self.get_complete_track_from_music_track(track)),
-                    )
-                    .await;
+                    let tracks = self
+                        .enrich_tracks_with_limit(album.tracks.into_iter())
+                        .await;
                     all_tracks.extend(tracks);
                 }
                 Err(e) => {
@@ -324,13 +350,9 @@ impl Source for YoutubeMusic {
             .await
             .map_err(|_| Error::NotFound(format!("Youtube Music album from {}", url)))?;
 
-        let tracks = join_all(
-            album
-                .tracks
-                .into_iter()
-                .map(|track| self.get_complete_track_from_music_track(track)),
-        )
-        .await;
+        let tracks = self
+            .enrich_tracks_with_limit(album.tracks.into_iter())
+            .await;
         Ok(tracks)
     }
 
