@@ -68,10 +68,12 @@ impl TaskDto {
             Some("soundcloud".to_string())
         } else if url.contains("spotify.com") {
             Some("spotify".to_string())
+        } else if url.contains("music.youtube.com") {
+            // Must be checked before the plain "youtube.com" branch below, since
+            // "music.youtube.com" also contains "youtube.com" as a substring.
+            Some("youtube_music".to_string())
         } else if url.contains("youtube.com") || url.contains("youtu.be") {
             Some("youtube".to_string())
-        } else if url.contains("music.youtube.com") {
-            Some("youtube_music".to_string())
         } else {
             None
         }

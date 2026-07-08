@@ -105,15 +105,17 @@ impl DownloadService {
                     "Could not fetch playlist metadata ({}), using URL as name",
                     e
                 );
-                // Extract platform from URL for better fallback naming
+                // Extract platform from URL for better fallback naming. "music.youtube.com"
+                // must be checked before the plain "youtube.com" branch, since it also
+                // contains "youtube.com" as a substring.
                 let (platform, name) = if url.contains("spotify.com") {
                     (shared::models::Platform::Spotify, url.to_string())
                 } else if url.contains("soundcloud.com") {
                     (shared::models::Platform::SoundCloud, url.to_string())
-                } else if url.contains("youtube.com") || url.contains("youtu.be") {
-                    (shared::models::Platform::Youtube, url.to_string())
                 } else if url.contains("music.youtube.com") {
                     (shared::models::Platform::YoutubeMusic, url.to_string())
+                } else if url.contains("youtube.com") || url.contains("youtu.be") {
+                    (shared::models::Platform::Youtube, url.to_string())
                 } else {
                     (shared::models::Platform::Unknown, url.to_string())
                 };

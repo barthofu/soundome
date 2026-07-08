@@ -40,8 +40,8 @@ impl YoutubeMusic {
 
     /// Helper to apply concurrency limits to a batch of track enrichment futures.
     /// Uses a Semaphore to limit concurrent requests while preserving order.
-    async fn enrich_tracks_with_limit<'a>(
-        &'a self,
+    async fn enrich_tracks_with_limit(
+        &self,
         tracks: impl Iterator<Item = TrackItem>,
     ) -> Vec<Track> {
         let semaphore = Arc::new(Semaphore::new(Self::MAX_CONCURRENT_ENRICHMENT));

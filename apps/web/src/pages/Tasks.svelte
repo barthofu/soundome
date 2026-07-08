@@ -190,6 +190,11 @@
                 Curating metadata with AI: {task.stats.ai_curation.processed} / {task.stats.ai_curation.total} tracks
               </span>
             </div>
+          {:else if task.status === 'Running' && (task.stats?.downloaded ?? 0) === 0}
+            <div class="fetching-row">
+              <span class="spinner fetch-spinner"></span>
+              <span class="fetching-text">Fetching tracks…</span>
+            </div>
           {/if}
 
           {#if hasStats(task)}
@@ -750,6 +755,23 @@
   .ai-curation-text {
     font-size: 0.78rem;
     color: #a78bfa;
+  }
+
+  .fetching-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+  }
+
+  .fetch-spinner {
+    border-color: #60a5fa55;
+    border-top-color: #60a5fa;
+  }
+
+  .fetching-text {
+    font-size: 0.78rem;
+    color: #60a5fa;
   }
 
   @keyframes spin {
