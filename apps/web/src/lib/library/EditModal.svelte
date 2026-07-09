@@ -163,17 +163,37 @@
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 class="file-input"
                 onchange={handleFileInput}
-                disabled={lib.imageUploading}
+                disabled={lib.imageUploading || lib.thumbnailFetching}
               />
             </div>
             <label class="field-label url-field">
               Image URL
-              <input
-                type="url"
-                value={lib.albumDraft.cover ?? ''}
-                oninput={(e) => { lib.albumDraft.cover = (e.currentTarget as HTMLInputElement).value || undefined; }}
-                placeholder="https://…"
-              />
+              <div class="url-input-row">
+                <input
+                  type="url"
+                  value={lib.albumDraft.cover ?? ''}
+                  oninput={(e) => { lib.albumDraft.cover = (e.currentTarget as HTMLInputElement).value || undefined; }}
+                  placeholder="https://…"
+                />
+                <button
+                  type="button"
+                  class="btn-fetch-thumbnail"
+                  onclick={() => lib.fetchThumbnailFromReferences()}
+                  disabled={lib.imageUploading || lib.thumbnailFetching || lib.editState.item.references.length === 0}
+                  title="Fetch cover from this album's references (Spotify, SoundCloud, YouTube Music)"
+                >
+                  {lib.thumbnailFetching ? '…' : '⤓ From references'}
+                </button>
+                <button
+                  type="button"
+                  class="btn-clear-thumbnail"
+                  onclick={() => { lib.albumDraft.cover = undefined; }}
+                  disabled={lib.imageUploading || lib.thumbnailFetching || !lib.albumDraft.cover}
+                  title="Remove cover image"
+                >
+                  ✕
+                </button>
+              </div>
             </label>
           </div>
         </div>
@@ -224,17 +244,37 @@
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 class="file-input"
                 onchange={handleFileInput}
-                disabled={lib.imageUploading}
+                disabled={lib.imageUploading || lib.thumbnailFetching}
               />
             </div>
             <label class="field-label url-field">
               Photo URL
-              <input
-                type="url"
-                value={lib.artistDraft.icon ?? ''}
-                oninput={(e) => { lib.artistDraft.icon = (e.currentTarget as HTMLInputElement).value || undefined; }}
-                placeholder="https://…"
-              />
+              <div class="url-input-row">
+                <input
+                  type="url"
+                  value={lib.artistDraft.icon ?? ''}
+                  oninput={(e) => { lib.artistDraft.icon = (e.currentTarget as HTMLInputElement).value || undefined; }}
+                  placeholder="https://…"
+                />
+                <button
+                  type="button"
+                  class="btn-fetch-thumbnail"
+                  onclick={() => lib.fetchThumbnailFromReferences()}
+                  disabled={lib.imageUploading || lib.thumbnailFetching || lib.editState.item.references.length === 0}
+                  title="Fetch photo from this artist's references (Spotify, SoundCloud, YouTube Music)"
+                >
+                  {lib.thumbnailFetching ? '…' : '⤓ From references'}
+                </button>
+                <button
+                  type="button"
+                  class="btn-clear-thumbnail"
+                  onclick={() => { lib.artistDraft.icon = undefined; }}
+                  disabled={lib.imageUploading || lib.thumbnailFetching || !lib.artistDraft.icon}
+                  title="Remove photo"
+                >
+                   ✕
+                </button>
+              </div>
             </label>
           </div>
         </div>
@@ -296,6 +336,39 @@
 
   .image-row { display: flex; align-items: flex-start; gap: 0.75rem; }
   .url-field { flex: 1; min-width: 0; }
+
+  .url-input-row { display: flex; gap: 0.4rem; }
+  .url-input-row input { flex: 1; min-width: 0; }
+
+  .btn-fetch-thumbnail {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 0.75rem;
+    padding: 0 0.6rem;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .btn-fetch-thumbnail:hover:not(:disabled) { background: var(--surface-2); }
+  .btn-fetch-thumbnail:disabled { opacity: 0.45; cursor: default; }
+
+  .btn-clear-thumbnail {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 0 0.4rem;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .btn-clear-thumbnail:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+  .btn-clear-thumbnail:disabled { opacity: 0.3; cursor: default; }
 
   .image-drop-zone {
     position: relative; width: 100px; height: 100px;

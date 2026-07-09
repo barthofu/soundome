@@ -71,7 +71,9 @@ Tabbed view for browsing and editing the entire library.
 **Edit modal**
 
 - Available for tracks, albums, and artists
-- Supports cover/photo upload by file picker or drag-and-drop
+- Supports cover/photo upload by file picker, drag-and-drop, or a direct image URL (albums/artists)
+- Albums and artists have a **Fetch from references** button next to the image URL field: it re-queries whichever of the entity's existing references point to a supported provider (Spotify, SoundCloud, YouTube Music) and, on the first match, saves the returned image as the cover/icon. Disabled when there are no references yet; shows an error if none of them resolve to an image.
+- **References panel**: add a reference by picking a `ref_type` (Source/Provider/Metadata/Reference) and pasting a link — the platform and external id are inferred automatically from the URL. An **Advanced** disclosure allows overriding the inferred platform or setting an id-only reference (no URL), for platforms whose URLs don't embed a stable id (SoundCloud, Bandcamp).
 - `Enter` saves, `Esc` cancels
 
 ### Validations

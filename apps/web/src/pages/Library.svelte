@@ -82,6 +82,41 @@
     {/each}
   </div>
 
+  {#if (lib.tab === 'artists' || lib.tab === 'albums') && (lib.batchFetchingArtists || lib.batchFetchingAlbums || lib.batchFetchResult)}
+    <div class="batch-tools">
+      {#if lib.tab === 'artists'}
+        <button
+          class="btn-batch"
+          onclick={() => lib.batchFetchArtistIconsAction()}
+          disabled={lib.batchFetchingArtists}
+        >
+          {#if lib.batchFetchingArtists}
+            ⏳ Fetching icons…
+          {:else}
+            🖼️ Fetch all artist photos from references
+          {/if}
+        </button>
+      {:else if lib.tab === 'albums'}
+        <button
+          class="btn-batch"
+          onclick={() => lib.batchFetchAlbumCoversAction()}
+          disabled={lib.batchFetchingAlbums}
+        >
+          {#if lib.batchFetchingAlbums}
+            ⏳ Fetching covers…
+          {:else}
+            🖼️ Fetch all album covers from references
+          {/if}
+        </button>
+      {/if}
+      {#if lib.batchFetchResult}
+        <span class="batch-result">
+          {lib.batchFetchResult.count} fetched · {lib.batchFetchResult.skipped} not found
+        </span>
+      {/if}
+    </div>
+  {/if}
+
   {#if lib.drillArtist || lib.drillAlbum || lib.drillArtistId || lib.drillAlbumId}
     <nav class="breadcrumb">
       <button class="crumb-btn" onclick={lib.backToRoot}>
@@ -307,6 +342,46 @@
       font-size: 0.68rem;
       padding: 0 0.35rem;
     }
+  }
+
+  .batch-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface-2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .btn-batch {
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.9rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+
+  .btn-batch:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  .btn-batch:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .batch-result {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-left: auto;
   }
 
   .breadcrumb { 

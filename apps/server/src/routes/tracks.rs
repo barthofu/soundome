@@ -50,24 +50,54 @@ pub fn reference_to_dto(r: Reference) -> ReferenceDto {
 }
 
 /// Body for manually adding a reference to any entity.
+///
+/// `platform` and `external_id` are optional: when omitted (or blank/"Unknown"),
+/// they are inferred from `external_url` — see `Reference::infer_platform_and_id`.
+/// This lets the web UI's "Add reference" form ask for just a `ref_type` and a link,
+/// while still accepting explicit values for edge cases inference can't cover
+/// (e.g. SoundCloud/Bandcamp, whose URLs don't embed a stable id).
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct AddReferenceBody {
     /// One of: Source, Provider, Metadata, Reference
     pub ref_type: String,
-    /// One of: Spotify, SoundCloud, MusicBrainz, YoutubeMusic, Youtube, Bandcamp, Unknown
-    pub platform: String,
+    /// One of: Spotify, SoundCloud, MusicBrainz, YoutubeMusic, Youtube, Bandcamp, Unknown.
+    /// Optional — inferred from `external_url` when absent.
+    #[serde(default)]
+    pub platform: Option<String>,
+    #[serde(default)]
     pub external_id: Option<String>,
+    #[serde(default)]
     pub external_url: Option<String>,
 }
 
 impl AddReferenceBody {
     pub fn into_reference(self) -> Reference {
+        let external_url = self.external_url.filter(|u| !u.trim().is_empty());
+
+        // Best-effort inference from the URL, used whenever the caller does not pin
+        // `platform`/`external_id` explicitly (the common case: the UI only asks for a link).
+        let inferred = external_url
+            .as_deref()
+            .map(Reference::infer_platform_and_id);
+
+        let platform = self
+            .platform
+            .filter(|p| !p.trim().is_empty() && !p.eq_ignore_ascii_case("unknown"))
+            .map(|p| Platform::from_str(&p))
+            .or_else(|| inferred.as_ref().map(|(platform, _)| platform.clone()))
+            .unwrap_or(Platform::Unknown);
+
+        let external_id = self
+            .external_id
+            .filter(|id| !id.trim().is_empty())
+            .or_else(|| inferred.and_then(|(_, id)| id));
+
         Reference {
             id: None,
             ref_type: ReferenceType::from_str(&self.ref_type),
-            platform: Platform::from_str(&self.platform),
-            external_id: self.external_id,
-            external_url: self.external_url,
+            platform,
+            external_id,
+            external_url,
         }
     }
 }

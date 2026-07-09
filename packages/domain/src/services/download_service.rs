@@ -996,6 +996,97 @@ impl DownloadService {
         Ok(candidates)
     }
 
+    // ============================================================================================
+    // == Thumbnail-from-references (manual edit UI)
+    // ============================================================================================
+
+    /// Best-effort: resolve an artist's photo by re-querying whichever of its existing
+    /// references point to a provider that exposes artist images (Spotify, SoundCloud,
+    /// YouTube Music), then persist the first image found as the artist's `icon`.
+    ///
+    /// Used by the manual edit UI's "Fetch from references" action. Returns `Ok(None)`
+    /// (not an error) when no reference resolves to an image, so the caller can tell
+    /// "nothing found" apart from a network or database failure.
+    pub async fn fetch_artist_icon_from_references(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+    ) -> SoundomeResult<Option<Artist>> {
+        let mut artist = self.artist_service.get_by_id(conn, artist_id)?;
+        let fetcher = Fetcher::new().await;
+
+        let mut found_icon = None;
+        for reference in &artist.references {
+            let Some(url) = reference.external_url.as_deref() else {
+                continue;
+            };
+            if !Fetcher::is_valid_artist_url(url) {
+                continue;
+            }
+            match fetcher.get_artist_from_url(url).await {
+                Ok(fetched) if fetched.icon.is_some() => {
+                    found_icon = fetched.icon;
+                    break;
+                }
+                Ok(_) => {}
+                Err(e) => tracing::debug!(
+                    "fetch_artist_icon_from_references: reference {} did not resolve: {}",
+                    url,
+                    e
+                ),
+            }
+        }
+
+        let Some(icon) = found_icon else {
+            return Ok(None);
+        };
+
+        artist.icon = Some(icon);
+        let saved = self.artist_service.update(conn, artist_id, &artist)?;
+        Ok(Some(saved))
+    }
+
+    /// Same idea as `fetch_artist_icon_from_references`, but resolves and persists an
+    /// album's `cover` instead.
+    pub async fn fetch_album_cover_from_references(
+        &self,
+        conn: &mut SqliteConnection,
+        album_id: i32,
+    ) -> SoundomeResult<Option<Album>> {
+        let mut album = self.album_service.get_by_id(conn, album_id)?;
+        let fetcher = Fetcher::new().await;
+
+        let mut found_cover = None;
+        for reference in &album.references {
+            let Some(url) = reference.external_url.as_deref() else {
+                continue;
+            };
+            if !Fetcher::is_valid_album_url(url) {
+                continue;
+            }
+            match fetcher.get_album_from_url(url).await {
+                Ok(fetched) if fetched.cover.is_some() => {
+                    found_cover = fetched.cover;
+                    break;
+                }
+                Ok(_) => {}
+                Err(e) => tracing::debug!(
+                    "fetch_album_cover_from_references: reference {} did not resolve: {}",
+                    url,
+                    e
+                ),
+            }
+        }
+
+        let Some(cover) = found_cover else {
+            return Ok(None);
+        };
+
+        album.cover = Some(cover);
+        let saved = self.album_service.update(conn, album_id, &album)?;
+        Ok(Some(saved))
+    }
+
     /// Clean metadata for `tracks` via the fetcher, reporting live per-batch progress
     /// into `stats.ai_curation` (persisted through `task_id`) so the frontend can show
     /// an "AI curation in progress" indicator while SoundCloud batches are processed.

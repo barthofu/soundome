@@ -9,16 +9,21 @@
 
   let { references, onAdd, onDelete }: Props = $props();
 
-  // Form state
+  // Form state — the primary flow is just "type" + "link": platform and id are
+  // inferred server-side straight from the link (see `Reference::infer_platform_and_id`).
+  // "Advanced" is only needed to override the inferred platform or to add a
+  // reference that has no URL at all (id-only), e.g. a SoundCloud/Bandcamp id
+  // grabbed from elsewhere.
   let formOpen = $state(false);
+  let advancedOpen = $state(false);
   let saving = $state(false);
   let refType = $state('Metadata');
-  let platform = $state('Unknown');
+  let link = $state('');
+  let platformOverride = $state('Auto');
   let externalId = $state('');
-  let externalUrl = $state('');
 
   const REF_TYPES = ['Source', 'Provider', 'Metadata', 'Reference'] as const;
-  const PLATFORMS = ['Spotify', 'SoundCloud', 'MusicBrainz', 'YoutubeMusic', 'Youtube', 'Bandcamp', 'Unknown'] as const;
+  const PLATFORM_OVERRIDES = ['Auto', 'Spotify', 'SoundCloud', 'MusicBrainz', 'YoutubeMusic', 'Youtube', 'Bandcamp', 'Unknown'] as const;
 
   function platformLabel(p: string): string {
     const map: Record<string, string> = {
@@ -29,6 +34,7 @@
       bandcamp: 'Bandcamp',
       spotify: 'Spotify',
       unknown: 'Unknown',
+      auto: 'Auto (from link)',
     };
     return map[p.toLowerCase()] ?? p;
   }
@@ -57,21 +63,27 @@
 
   function resetForm() {
     refType = 'Metadata';
-    platform = 'Unknown';
+    link = '';
+    platformOverride = 'Auto';
     externalId = '';
-    externalUrl = '';
+    advancedOpen = false;
     formOpen = false;
   }
 
   async function handleAdd() {
-    if (!externalId.trim() && !externalUrl.trim()) return;
+    const trimmedLink = link.trim();
+    const trimmedId = externalId.trim();
+    if (!trimmedLink && !trimmedId) return;
     saving = true;
     try {
       await onAdd({
         ref_type: refType,
-        platform,
-        external_id: externalId.trim() || null,
-        external_url: externalUrl.trim() || null,
+        // Only sent when "Advanced" was opened and set to something other than
+        // "Auto" — otherwise the backend infers the platform (and id, when
+        // possible) directly from the link.
+        platform: advancedOpen && platformOverride !== 'Auto' ? platformOverride : null,
+        external_id: trimmedId || null,
+        external_url: trimmedLink || null,
       });
       resetForm();
     } catch (err) {
@@ -102,7 +114,7 @@
   {#if formOpen}
     <div class="ref-form">
       <div class="ref-form-row">
-        <label class="ref-field">
+        <label class="ref-field ref-field-type">
           Type
           <select bind:value={refType}>
             {#each REF_TYPES as t}
@@ -110,36 +122,46 @@
             {/each}
           </select>
         </label>
-        <label class="ref-field">
-          Platform
-          <select bind:value={platform}>
-            {#each PLATFORMS as p}
-              <option value={p}>{platformLabel(p)}</option>
-            {/each}
-          </select>
+        <label class="ref-field ref-field-link">
+          Link
+          <input
+            bind:value={link}
+            type="url"
+            placeholder="https://… (platform & id are inferred automatically)"
+          />
         </label>
       </div>
-      <label class="ref-field">
-        External ID
-        <input
-          bind:value={externalId}
-          placeholder="e.g. spotify track id"
-        />
-      </label>
-      <label class="ref-field">
-        External URL
-        <input
-          bind:value={externalUrl}
-          type="url"
-          placeholder="https://…"
-        />
-      </label>
+
+      <button type="button" class="btn-toggle-advanced" onclick={() => (advancedOpen = !advancedOpen)}>
+        {advancedOpen ? '▾' : '▸'} Advanced (override platform or set an id without a link)
+      </button>
+
+      {#if advancedOpen}
+        <div class="ref-form-row">
+          <label class="ref-field">
+            Platform
+            <select bind:value={platformOverride}>
+              {#each PLATFORM_OVERRIDES as p}
+                <option value={p}>{platformLabel(p)}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="ref-field">
+            External ID
+            <input
+              bind:value={externalId}
+              placeholder="e.g. spotify track id"
+            />
+          </label>
+        </div>
+      {/if}
+
       <div class="ref-form-actions">
         <button class="btn-cancel-ref" onclick={resetForm} disabled={saving}>Cancel</button>
         <button
           class="btn-save-ref"
           onclick={handleAdd}
-          disabled={saving || (!externalId.trim() && !externalUrl.trim())}
+          disabled={saving || (!link.trim() && !externalId.trim())}
         >
           {saving ? '…' : 'Save'}
         </button>
@@ -226,6 +248,9 @@
 
   .ref-form-row { display: flex; gap: 0.5rem; }
 
+  .ref-field-type { flex: 0 0 auto; min-width: 8rem; }
+  .ref-field-link { flex: 2; }
+
   .ref-field {
     display: flex;
     flex-direction: column;
@@ -248,6 +273,18 @@
   }
   .ref-field input:focus,
   .ref-field select:focus { outline: none; border-color: var(--accent); }
+
+  .btn-toggle-advanced {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.72rem;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-toggle-advanced:hover { color: var(--text); }
 
   .ref-form-actions {
     display: flex;

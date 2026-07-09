@@ -3,6 +3,8 @@ import {
   getAlbums, updateAlbum, deleteAlbum,
   getArtists, updateArtist, deleteArtist, mergeArtists,
   uploadArtistImage, uploadAlbumImage, uploadTrackImage,
+  fetchArtistIconFromReferences, fetchAlbumCoverFromReferences,
+  batchFetchArtistIcons, batchFetchAlbumCovers,
   getPlaylists, getPlaylistTracks, deletePlaylist,
   addEntityReference, deleteEntityReference,
 } from '../api';
@@ -109,9 +111,14 @@ function createLibraryStore() {
   let editState: EditState = $state(null);
   let editSaving = $state(false);
   let imageUploading = $state(false);
+  let thumbnailFetching = $state(false);
   let trackDraft: UpdateTrackBody = $state({});
   let albumDraft: UpdateAlbumBody = $state({});
   let artistDraft: UpdateArtistBody = $state({});
+
+  let batchFetchingArtists = $state(false);
+  let batchFetchingAlbums = $state(false);
+  let batchFetchResult: { count: number; skipped: number } | null = $state(null);
 
   let hoveredItem: HoveredItem = $state(null);
 
@@ -378,6 +385,75 @@ function createLibraryStore() {
     }
   }
 
+  /**
+   * Best-effort: ask the backend to resolve a thumbnail from the currently edited
+   * entity's existing references (Spotify, SoundCloud, YouTube Music) and persist it.
+   * Only supported for artists (icon) and albums (cover) — the button that triggers
+   * this is hidden for tracks in the edit modal.
+   */
+  async function fetchThumbnailFromReferences() {
+    if (!editState) return;
+    const state = editState;
+    thumbnailFetching = true;
+    try {
+      if (state.type === 'artist') {
+        const { url } = await fetchArtistIconFromReferences(state.item.id);
+        const updated = { ...state.item, icon: url };
+        artists = artists.map(a => a.id === state.item.id ? updated : a);
+        editState = { type: 'artist', item: updated };
+        artistDraft.icon = url;
+      } else if (state.type === 'album') {
+        const { url } = await fetchAlbumCoverFromReferences(state.item.id);
+        const updated = { ...state.item, cover: url };
+        albums = albums.map(a => a.id === state.item.id ? updated : a);
+        editState = { type: 'album', item: updated };
+        albumDraft.cover = url;
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      thumbnailFetching = false;
+    }
+  }
+
+  /**
+   * Batch fetch: for each artist without an icon, try to resolve one from its
+   * existing references. Refreshes the artist list after completion.
+   */
+  async function batchFetchArtistIconsAction() {
+    batchFetchingArtists = true;
+    batchFetchResult = null;
+    try {
+      const result = await batchFetchArtistIcons();
+      batchFetchResult = result;
+      // Refresh artists list to reflect the batch updates
+      await loadArtists();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      batchFetchingArtists = false;
+    }
+  }
+
+  /**
+   * Batch fetch: for each album without a cover, try to resolve one from its
+   * existing references. Refreshes the album list after completion.
+   */
+  async function batchFetchAlbumCoversAction() {
+    batchFetchingAlbums = true;
+    batchFetchResult = null;
+    try {
+      const result = await batchFetchAlbumCovers();
+      batchFetchResult = result;
+      // Refresh albums list to reflect the batch updates
+      await loadAlbums();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      batchFetchingAlbums = false;
+    }
+  }
+
   // ── Delete handlers ────────────────────────────────────────────────────────
   async function handleDeleteTrack(id: number) {
     if (!confirm('Delete this track from the library?')) return;
@@ -585,9 +661,14 @@ function createLibraryStore() {
     get editState() { return editState; }, set editState(v: EditState) { editState = v; },
     get editSaving() { return editSaving; },
     get imageUploading() { return imageUploading; },
+    get thumbnailFetching() { return thumbnailFetching; },
     get trackDraft() { return trackDraft; },
     get albumDraft() { return albumDraft; },
     get artistDraft() { return artistDraft; },
+
+    get batchFetchingArtists() { return batchFetchingArtists; },
+    get batchFetchingAlbums() { return batchFetchingAlbums; },
+    get batchFetchResult() { return batchFetchResult; },
 
     get hoveredItem() { return hoveredItem; }, set hoveredItem(v: HoveredItem) { hoveredItem = v; },
 
@@ -602,7 +683,8 @@ function createLibraryStore() {
     drillIntoPlaylist,
     loadTracks, loadAlbums, loadArtists, loadPlaylists,
     startEditTrack, startEditAlbum, startEditArtist,
-    openEditForHovered, saveEdit, uploadImage,
+    openEditForHovered, saveEdit, uploadImage, fetchThumbnailFromReferences,
+    batchFetchArtistIconsAction, batchFetchAlbumCoversAction,
     handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist, handleDeletePlaylist,
     toggleArtistSelection, clearArtistSelection, startMergePicking, cancelMergePicking, pickMergeTarget,
     fmtDuration, isRemote,

@@ -8,8 +8,10 @@ use rocket::{
     post,
     serde::json::Json,
 };
+use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::Serialize;
+use tracing;
 
 use crate::utils::{database::Db, error::CustomError};
 
@@ -21,6 +23,14 @@ use crate::utils::{database::Db, error::CustomError};
 pub struct ImageResponse {
     /// Relative URL of the stored image, e.g. `/images/artists/42.jpg`.
     pub url: String,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct BatchThumbnailResult {
+    /// Number of entities that now have an image (fetch succeeded)
+    pub count: i32,
+    /// Number of entities that have no image after attempting to fetch
+    pub skipped: i32,
 }
 
 // ================================================================================================
@@ -196,4 +206,208 @@ pub async fn upload_track_image(
             message: e.to_string(),
         })
     })
+}
+
+/// Try to resolve an artist's photo from its existing references (Spotify, SoundCloud,
+/// YouTube Music) and persist it as the artist's icon.
+///
+/// Best-effort: returns `404` when none of the artist's references resolve to an
+/// image, so the frontend can tell "nothing found" apart from a network/DB error.
+#[openapi]
+#[post("/artists/<id>/fetch-icon")]
+pub async fn fetch_artist_icon(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<ImageResponse>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    let updated = db
+        .run(move |conn| {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(
+                    services
+                        .download_service
+                        .fetch_artist_icon_from_references(conn, id),
+                )
+            })
+        })
+        .await
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: e.to_string(),
+            })
+        })?;
+
+    match updated.and_then(|artist| artist.icon) {
+        Some(url) => Ok(Json(ImageResponse { url })),
+        None => Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::NotFound,
+            code: "NoThumbnailFound".to_string(),
+            message: "No thumbnail could be resolved from the current references".to_string(),
+        })),
+    }
+}
+
+/// Try to resolve an album's cover from its existing references (Spotify, SoundCloud,
+/// YouTube Music) and persist it as the album's cover.
+///
+/// Best-effort: returns `404` when none of the album's references resolve to an
+/// image, so the frontend can tell "nothing found" apart from a network/DB error.
+#[openapi]
+#[post("/albums/<id>/fetch-cover")]
+pub async fn fetch_album_cover(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<ImageResponse>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    let updated = db
+        .run(move |conn| {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(
+                    services
+                        .download_service
+                        .fetch_album_cover_from_references(conn, id),
+                )
+            })
+        })
+        .await
+        .map_err(|e| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: e.to_string(),
+            })
+        })?;
+
+    match updated.and_then(|album| album.cover) {
+        Some(url) => Ok(Json(ImageResponse { url })),
+        None => Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::NotFound,
+            code: "NoThumbnailFound".to_string(),
+            message: "No thumbnail could be resolved from the current references".to_string(),
+        })),
+    }
+}
+
+// ================================================================================================
+// Batch thumbnail fetch
+// ================================================================================================
+
+#[openapi]
+#[post("/batch/fetch-artist-icons")]
+pub async fn batch_fetch_artist_icons(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<BatchThumbnailResult>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    let result = db
+        .run(move |conn| {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    // Fetch all artists
+                    let artists = services.artist_service.get_all(conn).map_err(|e| {
+                        crate::utils::error::Error::Custom(CustomError {
+                            status: Status::InternalServerError,
+                            code: "Internal".to_string(),
+                            message: e.to_string(),
+                        })
+                    })?;
+
+                    let mut count = 0;
+                    let mut skipped = 0;
+
+                    // Try to fetch icon for each artist without one
+                    for artist in artists {
+                        if artist.icon.is_some() {
+                            continue;
+                        }
+
+                        match services
+                            .download_service
+                            .fetch_artist_icon_from_references(conn, artist.id.unwrap_or(-1))
+                            .await
+                        {
+                            Ok(Some(_)) => count += 1,
+                            Ok(None) => skipped += 1,
+                            Err(e) => {
+                                tracing::debug!(
+                                    "batch_fetch_artist_icons: failed for artist {}: {}",
+                                    artist.id.unwrap_or(-1),
+                                    e
+                                );
+                                skipped += 1;
+                            }
+                        }
+                    }
+
+                    Ok::<_, crate::utils::error::Error>(BatchThumbnailResult { count, skipped })
+                })
+            })
+        })
+        .await?;
+
+    Ok(Json(result))
+}
+
+#[openapi]
+#[post("/batch/fetch-album-covers")]
+pub async fn batch_fetch_album_covers(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<BatchThumbnailResult>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+
+    let result = db
+        .run(move |conn| {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    // Fetch all albums
+                    let albums = services.album_service.get_all(conn).map_err(|e| {
+                        crate::utils::error::Error::Custom(CustomError {
+                            status: Status::InternalServerError,
+                            code: "Internal".to_string(),
+                            message: e.to_string(),
+                        })
+                    })?;
+
+                    let mut count = 0;
+                    let mut skipped = 0;
+
+                    // Try to fetch cover for each album without one
+                    for album in albums {
+                        if album.cover.is_some() {
+                            continue;
+                        }
+
+                        match services
+                            .download_service
+                            .fetch_album_cover_from_references(conn, album.id.unwrap_or(-1))
+                            .await
+                        {
+                            Ok(Some(_)) => count += 1,
+                            Ok(None) => skipped += 1,
+                            Err(e) => {
+                                tracing::debug!(
+                                    "batch_fetch_album_covers: failed for album {}: {}",
+                                    album.id.unwrap_or(-1),
+                                    e
+                                );
+                                skipped += 1;
+                            }
+                        }
+                    }
+
+                    Ok::<_, crate::utils::error::Error>(BatchThumbnailResult { count, skipped })
+                })
+            })
+        })
+        .await?;
+
+    Ok(Json(result))
 }

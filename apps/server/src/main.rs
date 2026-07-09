@@ -266,6 +266,7 @@ fn rocket() -> _ {
                 routes::albums::get_references,
                 routes::albums::add_reference,
                 routes::albums::delete_reference,
+                routes::images::fetch_album_cover,
                 routes::artists::get_all,
                 routes::artists::get,
                 routes::artists::update,
@@ -274,6 +275,7 @@ fn rocket() -> _ {
                 routes::artists::get_references,
                 routes::artists::add_reference,
                 routes::artists::delete_reference,
+                routes::images::fetch_artist_icon,
                 routes::playlists::get_all,
                 routes::playlists::get_tracks,
                 routes::playlists::export,
@@ -292,6 +294,8 @@ fn rocket() -> _ {
                 routes::images::upload_artist_image,
                 routes::images::upload_album_image,
                 routes::images::upload_track_image,
+                routes::images::batch_fetch_artist_icons,
+                routes::images::batch_fetch_album_covers,
             ],
         )
         .mount("/", routes![routes::metrics::metrics])

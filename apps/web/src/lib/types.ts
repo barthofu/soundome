@@ -19,7 +19,8 @@ export interface ReferenceDto {
 
 export interface AddReferenceBody {
   ref_type: string;
-  platform: string;
+  /** Optional — inferred server-side from `external_url` when omitted. */
+  platform?: string | null;
   external_id?: string | null;
   external_url?: string | null;
 }

@@ -290,6 +290,67 @@ export async function uploadTrackImage(id: number, file: File): Promise<ImageRes
   return uploadImage(`${BASE}/tracks/${id}/image`, file);
 }
 
+/**
+ * Best-effort: resolve an artist's photo from its existing references (Spotify,
+ * SoundCloud, YouTube Music) and persist it as the artist's icon.
+ * Throws when no reference resolves to an image (404) or on network/DB error.
+ */
+export async function fetchArtistIconFromReferences(id: number): Promise<ImageResponse> {
+  const res = await fetch(`${BASE}/artists/${id}/fetch-icon`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+/**
+ * Best-effort: resolve an album's cover from its existing references (Spotify,
+ * SoundCloud, YouTube Music) and persist it as the album's cover.
+ * Throws when no reference resolves to an image (404) or on network/DB error.
+ */
+export async function fetchAlbumCoverFromReferences(id: number): Promise<ImageResponse> {
+  const res = await fetch(`${BASE}/albums/${id}/fetch-cover`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export type BatchThumbnailResult = {
+  count: number;
+  skipped: number;
+};
+
+/**
+ * Batch fetch: for each artist without an icon, try to resolve one from its
+ * existing references (Spotify, SoundCloud, YouTube Music).
+ * Returns the number of artists now with an icon and the number that remain without.
+ */
+export async function batchFetchArtistIcons(): Promise<BatchThumbnailResult> {
+  const res = await fetch(`${BASE}/batch/fetch-artist-icons`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+/**
+ * Batch fetch: for each album without a cover, try to resolve one from its
+ * existing references (Spotify, SoundCloud, YouTube Music).
+ * Returns the number of albums now with a cover and the number that remain without.
+ */
+export async function batchFetchAlbumCovers(): Promise<BatchThumbnailResult> {
+  const res = await fetch(`${BASE}/batch/fetch-album-covers`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
 // ================================================================================================
 // Library — Playlists
 // ================================================================================================
