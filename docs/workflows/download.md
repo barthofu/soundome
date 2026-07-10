@@ -18,7 +18,8 @@ Implementation: `apps/server/src/utils/task_executor.rs` — see also `TaskStatu
 For each track to import:
 
 1. URL-level deduplication.
-   1.1. If a track reference with the same `external_url` already exists in the database, skip the track.
+   1.1. Curate the submitted URL first: strip known tracking/share query parameters (e.g. `si`, `utm_*`) via `fetcher::curate_source_url`, while preserving parameters that are load-bearing for a platform (e.g. YouTube's `v`/`list`). This runs for every `*_from_url` entry point in `DownloadService` (track, playlist, artist, album), so two submissions of the same link that only differ by tracking noise resolve to the identical `external_url`/`source_url`.
+   1.2. If a track reference with the same (curated) `external_url` already exists in the database, skip the track.
 
 2. Fetch source metadata.
    2.1. Extract track metadata from the source platform, such as Spotify, SoundCloud, or YouTube.

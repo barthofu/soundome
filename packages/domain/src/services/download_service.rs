@@ -6,7 +6,7 @@ use std::{
 
 use config::Config;
 use diesel::SqliteConnection;
-use fetcher::{Fetcher, Source};
+use fetcher::{curate_source_url, Fetcher, Source};
 use shared::models::ReferenceType;
 use shared::{
     errors::Error,
@@ -57,6 +57,12 @@ impl DownloadService {
         url: &str,
         conn: &mut SqliteConnection,
     ) -> SoundomeResult<Track> {
+        // Strip tracking/share query params (e.g. `si`, `utm_*`) so two submissions
+        // of the same link that only differ by tracking noise dedupe correctly
+        // against the `external_url` check right below.
+        let curated_url = curate_source_url(url);
+        let url = curated_url.as_str();
+
         tracing::info!("===========\nDownloading track from {:?}\n------", url);
 
         // Check if track already exists in DB
@@ -89,6 +95,13 @@ impl DownloadService {
         task_id: Option<i32>,
         cancel_flag: Option<Arc<AtomicBool>>,
     ) -> SoundomeResult<Vec<Track>> {
+        // Strip tracking/share query params so two syncs of "the same" playlist
+        // link (e.g. with vs without `?si=...&utm_source=...`) curate to the same
+        // `source_url` instead of `PlaylistService::upsert` creating a duplicate
+        // playlist row.
+        let curated_url = curate_source_url(url);
+        let url = curated_url.as_str();
+
         tracing::info!(
             "====================\nDownloading playlist from {:?}\n---------",
             url
@@ -301,6 +314,11 @@ impl DownloadService {
         task_id: Option<i32>,
         cancel_flag: Option<Arc<AtomicBool>>,
     ) -> SoundomeResult<Vec<Track>> {
+        // Strip tracking/share query params for consistency with the other
+        // `*_from_url` entry points (see `sync_playlist_from_url`).
+        let curated_url = curate_source_url(url);
+        let url = curated_url.as_str();
+
         tracing::info!(
             "====================\nSyncing artist from {:?}\n---------",
             url
@@ -456,6 +474,11 @@ impl DownloadService {
         task_id: Option<i32>,
         cancel_flag: Option<Arc<AtomicBool>>,
     ) -> SoundomeResult<Vec<Track>> {
+        // Strip tracking/share query params for consistency with the other
+        // `*_from_url` entry points (see `sync_playlist_from_url`).
+        let curated_url = curate_source_url(url);
+        let url = curated_url.as_str();
+
         tracing::info!(
             "====================\nSyncing album from {:?}\n---------",
             url

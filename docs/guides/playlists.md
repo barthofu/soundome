@@ -14,6 +14,8 @@ Paste a playlist URL in the **Download** field and press Enter. Soundome detects
 | SoundCloud | `soundcloud.com/<artist>/sets/<playlist>` |
 | YouTube Music | `music.youtube.com/playlist?list=...` |
 
+Soundome curates the submitted link before syncing: tracking/share query parameters such as `?si=...`, `utm_source=...`, `utm_medium=...`, or `utm_campaign=...` are stripped automatically (while parameters a platform actually needs, like YouTube's `v`/`list`, are kept). This means pasting the "same" playlist link with or without those parameters is recognized as the same playlist and re-syncs the existing entry instead of creating a duplicate.
+
 The sync runs in the background. You can monitor progress in the **Tasks** tab: it shows the number of tracks downloaded, skipped (already in library), flagged for validation, and any errors.
 
 ## What happens during sync

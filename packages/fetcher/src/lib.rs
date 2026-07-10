@@ -13,6 +13,66 @@ use spotify::Spotify;
 use youtube::Youtube;
 use youtube_music::YoutubeMusic;
 
+/// Returns true when `key` is a known tracking/share-referral query parameter
+/// (e.g. SoundCloud/Spotify/YouTube Music's `si` share id, or `utm_*` marketing
+/// tags appended by browsers and social apps when a link is copied or shared).
+///
+/// This denylist is intentionally conservative: it only flags parameters we
+/// know are never load-bearing, so it never risks dropping something a
+/// platform actually needs (e.g. YouTube's `v`/`list`, which are never on
+/// this list). Not exhaustive — extend it if a new tracking parameter shows
+/// up in practice.
+fn is_tracking_query_param(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    key.starts_with("utm_")
+        || matches!(
+            key.as_str(),
+            "si" | "feature" | "fbclid" | "gclid" | "igshid"
+        )
+}
+
+/// Curates a user-submitted source URL by stripping known tracking/share
+/// query parameters (see [`is_tracking_query_param`]), leaving the rest of
+/// the URL — including platform-essential parameters such as YouTube's
+/// `v`/`list` — untouched.
+///
+/// This must run before a URL is used for `Source`/`Metadata` deduplication
+/// or persisted as a `Playlist::source_url` / `Reference::external_url`:
+/// two links that only differ by tracking noise (e.g. with vs without
+/// `?si=...&utm_source=...`) need to curate to the exact same string,
+/// otherwise `PlaylistService::upsert` and `TrackRepository::get_by_url`
+/// treat them as different resources and create duplicates (see
+/// `docs/workflows/download.md` — "URL-level deduplication").
+///
+/// ```
+/// assert_eq!(
+///     fetcher::curate_source_url(
+///         "https://open.spotify.com/track/3vJQ0UFRHmNpZK8h7UmU1S?si=5ff30389104c4f19"
+///     ),
+///     "https://open.spotify.com/track/3vJQ0UFRHmNpZK8h7UmU1S"
+/// );
+/// ```
+pub fn curate_source_url(url: &str) -> String {
+    let Some((base, query)) = url.split_once('?') else {
+        return url.to_string();
+    };
+
+    let kept: Vec<&str> = query
+        .split('&')
+        .filter(|pair| !pair.is_empty())
+        .filter(|pair| {
+            let key = pair.split('=').next().unwrap_or(pair);
+            !is_tracking_query_param(key)
+        })
+        .collect();
+
+    if kept.is_empty() {
+        base.to_string()
+    } else {
+        format!("{base}?{}", kept.join("&"))
+    }
+}
+
 #[async_trait]
 pub trait Source {
     async fn get_track_from_url(&self, url: &str) -> SoundomeResult<Track>;
@@ -328,5 +388,59 @@ impl Source for Fetcher {
         Spotify::is_valid_album_url(url)
             || YoutubeMusic::is_valid_album_url(url)
             || Soundcloud::is_valid_album_url(url)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn curates_soundcloud_playlist_url_with_tracking_params() {
+        let url = "https://soundcloud.com/barthohm/sets/mentalcore?si=65669e64fec14d98b019534cd73d55c7&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing";
+        assert_eq!(
+            curate_source_url(url),
+            "https://soundcloud.com/barthohm/sets/mentalcore"
+        );
+    }
+
+    #[test]
+    fn curates_spotify_track_url_with_share_id() {
+        let url = "https://open.spotify.com/track/3vJQ0UFRHmNpZK8h7UmU1S?si=5ff30389104c4f19";
+        assert_eq!(
+            curate_source_url(url),
+            "https://open.spotify.com/track/3vJQ0UFRHmNpZK8h7UmU1S"
+        );
+    }
+
+    #[test]
+    fn same_track_with_and_without_tracking_params_curates_identically() {
+        let clean = "https://open.spotify.com/track/3vJQ0UFRHmNpZK8h7UmU1S";
+        let dirty = "https://open.spotify.com/track/3vJQ0UFRHmNpZK8h7UmU1S?si=5ff30389104c4f19";
+        assert_eq!(curate_source_url(clean), curate_source_url(dirty));
+    }
+
+    #[test]
+    fn keeps_essential_youtube_query_param_and_drops_tracking() {
+        let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=abc123";
+        assert_eq!(
+            curate_source_url(url),
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        );
+    }
+
+    #[test]
+    fn keeps_essential_youtube_music_playlist_param_and_drops_tracking() {
+        let url = "https://music.youtube.com/playlist?list=PLxyz123&si=abc123";
+        assert_eq!(
+            curate_source_url(url),
+            "https://music.youtube.com/playlist?list=PLxyz123"
+        );
+    }
+
+    #[test]
+    fn leaves_url_without_query_string_untouched() {
+        let url = "https://soundcloud.com/barthohm";
+        assert_eq!(curate_source_url(url), url);
     }
 }
