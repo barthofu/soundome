@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use shared::{errors::Error, models::Track, types::SoundomeResult};
+use shared::{errors::Error, models::Track, types::SoundomeResult, utils::fs::sanitize_filename};
 use std::fs;
 
 pub mod playlist_writer;
@@ -64,18 +64,18 @@ pub fn move_track_file(track: &mut Track, base_library_dir: &str) -> SoundomeRes
         .unwrap_or("mp3");
 
     // Build the new filename using the current track title and the original extension
-    let new_file_name = format!("{}.{}", track.title, file_extension);
+    let new_file_name = format!("{}.{}", sanitize_filename(&track.title), file_extension);
 
     let artist_folder_name = track
         .artists
         .first()
-        .map(|artist| artist.name.clone())
+        .map(|artist| sanitize_filename(&artist.name))
         .unwrap_or("Unknown Artist".to_string());
 
     let album_folder_name = track
         .album
         .as_ref()
-        .map(|album| album.title.clone())
+        .map(|album| sanitize_filename(&album.title))
         .unwrap_or("Unknown Album".to_string());
 
     let target_folder = PathBuf::from(base_library_dir)

@@ -13,6 +13,7 @@ use shared::{
     models::{Album, AlbumType, Artist, Platform, Playlist, Reference, TaskTrackValidation, Track},
     types::SoundomeResult,
     utils::enums::Match,
+    utils::fs::sanitize_filename,
 };
 use uuid::Uuid;
 
@@ -966,7 +967,13 @@ impl DownloadService {
                 .ok_or_else(|| Error::Custom(format!("track {} has no source reference", id)))?;
 
             let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
-            downloader::download(&source_ref, &provider_ref, &track.title, staging_dir).await?
+            downloader::download(
+                &source_ref,
+                &provider_ref,
+                &sanitize_filename(&track.title),
+                staging_dir,
+            )
+            .await?
         };
         track.file_path = Some(file_path.clone());
         self.process_track_file(&mut track, &file_path).await?;
@@ -1400,7 +1407,7 @@ impl DownloadService {
                 .get_source()
                 .ok_or(Error::Custom("track source not defined".to_string()))?,
             &provider_ref,
-            &track.title,
+            &sanitize_filename(&track.title),
             staging_dir,
         )
         .await?;
@@ -1469,7 +1476,14 @@ impl DownloadService {
         // `finalize_validated_track`.
         let source_ref = track.get_source()?;
         let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
-        match downloader::download(&source_ref, &provider_ref, &track.title, staging_dir).await {
+        match downloader::download(
+            &source_ref,
+            &provider_ref,
+            &sanitize_filename(&track.title),
+            staging_dir,
+        )
+        .await
+        {
             Ok(path) => {
                 track.file_path = Some(path.clone());
                 track.references.push(provider_ref);

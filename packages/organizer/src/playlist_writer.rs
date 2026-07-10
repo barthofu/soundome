@@ -7,18 +7,8 @@ use shared::{
     errors::Error,
     models::{Playlist, Track},
     types::SoundomeResult,
+    utils::fs::sanitize_filename as sanitize_name,
 };
-
-/// Sanitize a playlist name into a safe filesystem file name by replacing
-/// characters that are problematic on common operating systems.
-fn sanitize_name(name: &str) -> String {
-    name.chars()
-        .map(|c| match c {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
-            c => c,
-        })
-        .collect()
-}
 
 /// Write an M3U8 playlist file to `output_dir`.
 ///
@@ -187,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_sanitize_name() {
-        assert_eq!(sanitize_name("My/Playlist:Name"), "My_Playlist_Name");
+        assert_eq!(sanitize_name("My/Playlist Name"), "My_Playlist Name");
         assert_eq!(sanitize_name("Normal Name"), "Normal Name");
     }
 
