@@ -34,7 +34,10 @@ FROM base AS libs
         esac; \
         FFMPEG_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${FFMPEG_ARCH}-static.tar.xz"; \
         echo "Downloading ffmpeg from: $FFMPEG_URL"; \
-        curl -L -f -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL"; \
+        curl --http1.1 -L -f --retry 3 --retry-delay 2 \
+             -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" \
+             -H "Accept: application/octet-stream" \
+             -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL"; \
         echo "Extracting ffmpeg archive..."; \
         tar -xf /tmp/ffmpeg.tar.xz -C /tmp --strip-components=1; \
         echo "Setting up ffmpeg binary..."; \
