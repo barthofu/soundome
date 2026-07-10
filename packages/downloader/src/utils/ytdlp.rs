@@ -3,7 +3,15 @@ use serde_json::Value;
 use shared::{errors::Error, http::ProxyRotator, types::SoundomeResult};
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::{io::AsyncReadExt, process::Command};
+
+/// Max attempts (including the first) for transient failures such as
+/// rate limiting / bot-detection 403s from YouTube. These are known to be
+/// intermittent: the same URL can fail on one run and succeed on the next
+/// (see docs/operations/youtube-search-configuration.md).
+const MAX_ATTEMPTS: u32 = 3;
+const RETRY_BASE_DELAY: Duration = Duration::from_secs(2);
 
 pub async fn download_with_ytdlp(
     url: &str,
@@ -15,9 +23,7 @@ pub async fn download_with_ytdlp(
         .ok_or(Error::InvalidPath(base_library_dir.clone()))?;
     let output_path = format!("{}/{}.%(ext)s", base_library_dir, file_name);
 
-    let args = build_download_args(url, &output_path);
-    tracing::info!("Running yt-dlp with args: {:?}", args);
-    let stdout = run_ytdlp(&args).await?;
+    let stdout = run_ytdlp_with_retry(|| build_download_args(url, &output_path)).await?;
 
     // Parse JSON output
     let value: Value = serde_json::from_slice(&stdout)?;
@@ -97,16 +103,17 @@ pub async fn search_with_ytdlp(
 ) -> SoundomeResult<Vec<YtDlpSearchResult>> {
     let search_spec = format!("ytsearch{}:{}", limit, query);
 
-    let mut args = vec![
-        search_spec,
-        "--dump-json".to_string(),
-        "--skip-download".to_string(),
-        "--flat-playlist".to_string(),
-    ];
-    append_proxy_arg(&mut args);
-
-    tracing::info!("Running yt-dlp search with args: {:?}", args);
-    let stdout = run_ytdlp(&args).await?;
+    let stdout = run_ytdlp_with_retry(|| {
+        let mut args = vec![
+            search_spec.clone(),
+            "--dump-json".to_string(),
+            "--skip-download".to_string(),
+            "--flat-playlist".to_string(),
+        ];
+        append_proxy_arg(&mut args);
+        args
+    })
+    .await?;
 
     // In `--dump-json --flat-playlist` mode yt-dlp prints one JSON object per
     // line (one per search result), not a single JSON document/array.
@@ -131,6 +138,57 @@ pub async fn search_with_ytdlp(
         .collect();
 
     Ok(results)
+}
+
+/// Runs `yt-dlp` via `run_ytdlp`, retrying on transient failures (rate
+/// limiting / bot-detection 403s) with a short backoff.
+///
+/// `build_args` is called fresh on every attempt so that a rotating proxy
+/// (see `ProxyRotator`) can pick a different upstream IP on retry instead of
+/// repeating the same request that just got rate-limited.
+async fn run_ytdlp_with_retry<F>(mut build_args: F) -> SoundomeResult<Vec<u8>>
+where
+    F: FnMut() -> Vec<String>,
+{
+    let mut attempt = 1;
+    loop {
+        let args = build_args();
+        tracing::info!("Running yt-dlp with args (attempt {}): {:?}", attempt, args);
+
+        match run_ytdlp(&args).await {
+            Ok(stdout) => return Ok(stdout),
+            Err(Error::ExitCode { code, stderr })
+                if attempt < MAX_ATTEMPTS && is_transient_error(&stderr) =>
+            {
+                let delay = RETRY_BASE_DELAY * attempt;
+                tracing::warn!(
+                    "yt-dlp failed with a transient error (exit code {}), retrying in {:?} (attempt {}/{}): {}",
+                    code,
+                    delay,
+                    attempt,
+                    MAX_ATTEMPTS,
+                    stderr.trim()
+                );
+                tokio::time::sleep(delay).await;
+                attempt += 1;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+/// Heuristic: does this yt-dlp stderr look like a transient rate-limit / bot
+/// detection failure rather than a permanent one (removed video, DRM, region
+/// lock, etc.)? These are known to be intermittent for the exact same URL
+/// (see docs/operations/youtube-search-configuration.md).
+fn is_transient_error(stderr: &str) -> bool {
+    let lower = stderr.to_lowercase();
+    lower.contains("403")
+        || lower.contains("429")
+        || lower.contains("too many requests")
+        || lower.contains("rate-limit")
+        || lower.contains("rate limit")
+        || lower.contains("sign in to confirm")
 }
 
 /// Spawn `yt-dlp` with the given args and return its captured stdout.

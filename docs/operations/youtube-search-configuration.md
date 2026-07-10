@@ -36,8 +36,8 @@ yt-dlp --version
 Soundome surfaces `yt-dlp`'s captured stderr in the error message (`Error::ExitCode { code, stderr }`). Common causes:
 
 - **Outdated yt-dlp**: update it (`pip install -U yt-dlp`) — YouTube extraction breakages are usually fixed within days upstream.
-- **Rate limiting / bot detection**: configure a proxy (see above) or retry later.
-- **Region-locked or removed video**: expected failure, not a configuration issue.
+- **Rate limiting / bot detection**: this is the most common cause of *intermittent* 403s (the same URL fails on one run and succeeds on the next, or succeeds when run manually). Soundome automatically retries transient-looking failures (stderr containing `403`, `429`, "too many requests", "rate limit", or "sign in to confirm") up to `MAX_ATTEMPTS` times with a short backoff before giving up — see `run_ytdlp_with_retry` in `packages/downloader/src/utils/ytdlp.rs`. Each retry rebuilds the yt-dlp args, so a rotating proxy (`ProxyRotator` with `RoundRobin`/`Random` strategy) will pick a different upstream IP on retry. If failures persist after retries, configure a proxy (see above) or retry later.
+- **Region-locked or removed video**: expected failure, not a configuration issue, and is not retried.
 
 ### No search results / no match found
 
