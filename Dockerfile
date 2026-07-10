@@ -22,7 +22,7 @@ FROM base AS libs
           *) echo "Unsupported architecture: $TARGETARCH" && exit 1 ;; \
         esac; \
         curl -L -f -o /yt-dlp \
-             "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/${YTDLP_BIN}"; \
+             "https://github.com/yt-dlp/yt-dlp/releases/download/2026.07.04/${YTDLP_BIN}"; \
         chmod +x /yt-dlp
 
     # ffmpeg: static build for the target architecture.
