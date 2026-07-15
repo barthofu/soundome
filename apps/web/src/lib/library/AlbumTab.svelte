@@ -1,6 +1,14 @@
 <script lang="ts">
   import { lib } from './store.svelte';
   import TrackTable from './TrackTable.svelte';
+  import SortDropdown from './SortDropdown.svelte';
+
+  const albumSortOptions = [
+    { value: 'title', label: 'Title' },
+    { value: 'date', label: 'Date' },
+    { value: 'artist', label: 'Artist' },
+    { value: 'track_count', label: 'Tracks' },
+  ];
 </script>
 
 {#snippet coverWrap(src: string | null | undefined, alt: string)}
@@ -51,6 +59,13 @@
 {:else}
   <div class="toolbar">
     <input class="search" placeholder="Search albums or artists… (S)" bind:value={lib.albumSearch} />
+    <SortDropdown
+      value={lib.albumsSortBy}
+      direction={lib.albumsSortDir}
+      options={albumSortOptions}
+      onChange={(val) => lib.albumsSortBy = val as any}
+      onDirectionChange={(dir) => lib.albumsSortDir = dir}
+    />
     <div class="view-toggle">
       <button class:active={lib.albumsView === 'list'} onclick={() => (lib.albumsView = 'list')} title="List">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">

@@ -19,6 +19,10 @@ import type {
 export type Tab = 'artists' | 'albums' | 'tracks' | 'playlists';
 export type ViewMode = 'list' | 'grid';
 export type TrackFilter = 'all' | 'ok' | 'pending';
+export type SortDirection = 'asc' | 'desc';
+export type ArtistSortBy = 'name' | 'track_count' | 'album_count';
+export type AlbumSortBy = 'title' | 'date' | 'artist' | 'track_count';
+export type TrackSortBy = 'title' | 'artist' | 'album' | 'date' | 'duration';
 export type EditState =
   | { type: 'track'; item: LibraryTrackDto }
   | { type: 'album'; item: LibraryAlbumDto }
@@ -39,6 +43,68 @@ function _editDistance(a: string, b: string): number {
     }
   }
   return dp[n];
+}
+
+// ── Sorting helpers ──────────────────────────────────────────────────────────
+function sortArtists(list: LibraryArtistDto[], by: ArtistSortBy, dir: SortDirection, tracks: LibraryTrackDto[], albums: LibraryAlbumDto[]): LibraryArtistDto[] {
+  const sorted = [...list].sort((a, b) => {
+    let cmp = 0;
+    if (by === 'name') {
+      cmp = a.name.localeCompare(b.name);
+    } else if (by === 'track_count') {
+      const aCount = tracks.filter(t => t.artists.some(ar => ar.id === a.id)).length;
+      const bCount = tracks.filter(t => t.artists.some(ar => ar.id === b.id)).length;
+      cmp = aCount - bCount;
+    } else if (by === 'album_count') {
+      const aCount = albums.filter(al => al.artists.some(ar => ar.id === a.id)).length;
+      const bCount = albums.filter(al => al.artists.some(ar => ar.id === b.id)).length;
+      cmp = aCount - bCount;
+    }
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  return sorted;
+}
+
+function sortAlbums(list: LibraryAlbumDto[], by: AlbumSortBy, dir: SortDirection, tracks: LibraryTrackDto[]): LibraryAlbumDto[] {
+  const sorted = [...list].sort((a, b) => {
+    let cmp = 0;
+    if (by === 'title') {
+      cmp = a.title.localeCompare(b.title);
+    } else if (by === 'date') {
+      cmp = (a.date ?? '').localeCompare(b.date ?? '');
+    } else if (by === 'artist') {
+      const aArtist = a.artists.map(x => x.name).join(', ');
+      const bArtist = b.artists.map(x => x.name).join(', ');
+      cmp = aArtist.localeCompare(bArtist);
+    } else if (by === 'track_count') {
+      const aCount = tracks.filter(t => t.album?.id === a.id).length;
+      const bCount = tracks.filter(t => t.album?.id === b.id).length;
+      cmp = aCount - bCount;
+    }
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  return sorted;
+}
+
+function sortTracks(list: LibraryTrackDto[], by: TrackSortBy, dir: SortDirection): LibraryTrackDto[] {
+  const sorted = [...list].sort((a, b) => {
+    let cmp = 0;
+    if (by === 'title') {
+      cmp = a.title.localeCompare(b.title);
+    } else if (by === 'artist') {
+      const aArtist = a.artists.map(x => x.name).join(', ');
+      const bArtist = b.artists.map(x => x.name).join(', ');
+      cmp = aArtist.localeCompare(bArtist);
+    } else if (by === 'album') {
+      cmp = (a.album?.title ?? '').localeCompare(b.album?.title ?? '');
+    } else if (by === 'date') {
+      cmp = (a.date ?? '').localeCompare(b.date ?? '');
+    } else if (by === 'duration') {
+      cmp = (a.duration ?? 0) - (b.duration ?? 0);
+    }
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  return sorted;
 }
 
 export function areSimilarArtistNames(a: string, b: string): boolean {
@@ -69,6 +135,14 @@ function createLibraryStore() {
   let tracksView: ViewMode = $state('list');
   let albumsView: ViewMode = $state('grid');
   let artistsView: ViewMode = $state('grid');
+
+  // Sort state
+  let artistsSortBy: ArtistSortBy = $state('name');
+  let artistsSortDir: SortDirection = $state('asc');
+  let albumsSortBy: AlbumSortBy = $state('title');
+  let albumsSortDir: SortDirection = $state('asc');
+  let tracksSortBy: TrackSortBy = $state('title');
+  let tracksSortDir: SortDirection = $state('asc');
 
   let tracks: LibraryTrackDto[] = $state([]);
   let tracksLoaded = $state(false);
@@ -180,15 +254,17 @@ function createLibraryStore() {
     if (q) list = list.filter(t => t.title.toLowerCase().includes(q) || t.artists.some(a => a.name.toLowerCase().includes(q)));
     if (trackFilter === 'ok') list = list.filter(t => !t.needs_validation);
     if (trackFilter === 'pending') list = list.filter(t => t.needs_validation);
-    return list;
+    return sortTracks(list, tracksSortBy, tracksSortDir);
   });
   let filteredAlbums = $derived.by(() => {
-    const q = albumSearch.trim().toLowerCase(); if (!q) return albums;
-    return albums.filter(a => a.title.toLowerCase().includes(q) || a.artists.some(ar => ar.name.toLowerCase().includes(q)));
+    const q = albumSearch.trim().toLowerCase();
+    let list = !q ? albums : albums.filter(a => a.title.toLowerCase().includes(q) || a.artists.some(ar => ar.name.toLowerCase().includes(q)));
+    return sortAlbums(list, albumsSortBy, albumsSortDir, tracks);
   });
   let filteredArtists = $derived.by(() => {
-    const q = artistSearch.trim().toLowerCase(); if (!q) return artists;
-    return artists.filter(a => a.name.toLowerCase().includes(q));
+    const q = artistSearch.trim().toLowerCase();
+    let list = !q ? artists : artists.filter(a => a.name.toLowerCase().includes(q));
+    return sortArtists(list, artistsSortBy, artistsSortDir, tracks, albums);
   });
   let filteredPlaylists = $derived.by(() => {
     const q = playlistSearch.trim().toLowerCase(); if (!q) return playlists;
@@ -611,6 +687,13 @@ function createLibraryStore() {
     get tracksView() { return tracksView; }, set tracksView(v: ViewMode) { tracksView = v; },
     get albumsView() { return albumsView; }, set albumsView(v: ViewMode) { albumsView = v; },
     get artistsView() { return artistsView; }, set artistsView(v: ViewMode) { artistsView = v; },
+
+    get artistsSortBy() { return artistsSortBy; }, set artistsSortBy(v: ArtistSortBy) { artistsSortBy = v; },
+    get artistsSortDir() { return artistsSortDir; }, set artistsSortDir(v: SortDirection) { artistsSortDir = v; },
+    get albumsSortBy() { return albumsSortBy; }, set albumsSortBy(v: AlbumSortBy) { albumsSortBy = v; },
+    get albumsSortDir() { return albumsSortDir; }, set albumsSortDir(v: SortDirection) { albumsSortDir = v; },
+    get tracksSortBy() { return tracksSortBy; }, set tracksSortBy(v: TrackSortBy) { tracksSortBy = v; },
+    get tracksSortDir() { return tracksSortDir; }, set tracksSortDir(v: SortDirection) { tracksSortDir = v; },
 
     get tracks() { return tracks; }, set tracks(v: LibraryTrackDto[]) { tracks = v; },
     get tracksLoaded() { return tracksLoaded; },

@@ -1,6 +1,15 @@
 <script lang="ts">
   import { lib } from './store.svelte';
   import TrackTable from './TrackTable.svelte';
+  import SortDropdown from './SortDropdown.svelte';
+
+  const trackSortOptions = [
+    { value: 'title', label: 'Title' },
+    { value: 'artist', label: 'Artist' },
+    { value: 'album', label: 'Album' },
+    { value: 'date', label: 'Date' },
+    { value: 'duration', label: 'Duration' },
+  ];
 </script>
 
 {#snippet coverWrap(src: string | null | undefined, alt: string)}
@@ -32,6 +41,13 @@
         Needs review{#if lib.pendingCount > 0}&nbsp;<span class="mini-badge">{lib.pendingCount}</span>{/if}
       </button>
     </div>
+    <SortDropdown
+      value={lib.tracksSortBy}
+      direction={lib.tracksSortDir}
+      options={trackSortOptions}
+      onChange={(val) => lib.tracksSortBy = val as any}
+      onDirectionChange={(dir) => lib.tracksSortDir = dir}
+    />
     <div class="view-toggle">
       <button class:active={lib.tracksView === 'list'} onclick={() => (lib.tracksView = 'list')} title="List">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">

@@ -1,8 +1,15 @@
 <script lang="ts">
   import { lib } from './store.svelte';
   import TrackTable from './TrackTable.svelte';
+  import SortDropdown from './SortDropdown.svelte';
 
   function musicIcon() { return '\u266B'; } // unused, inline SVGs below
+
+  const artistSortOptions = [
+    { value: 'name', label: 'Name' },
+    { value: 'track_count', label: 'Tracks' },
+    { value: 'album_count', label: 'Albums' },
+  ];
 </script>
 
 {#snippet coverWrap(src: string | null | undefined, alt: string)}
@@ -160,6 +167,13 @@
         <span class="similar-badge">{lib.similarArtistIds.size}</span>
       {/if}
     </button>
+    <SortDropdown
+      value={lib.artistsSortBy}
+      direction={lib.artistsSortDir}
+      options={artistSortOptions}
+      onChange={(val) => lib.artistsSortBy = val as any}
+      onDirectionChange={(dir) => lib.artistsSortDir = dir}
+    />
     <div class="view-toggle">
       <button class:active={lib.artistsView === 'list'} onclick={() => (lib.artistsView = 'list')} title="List">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
