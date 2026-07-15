@@ -4112,7 +4112,7 @@ dependencies = [
 
 [[package]]
 name = "soundome-server"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "config 0.1.0",
  "database",

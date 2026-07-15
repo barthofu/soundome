@@ -1,6 +1,6 @@
 {
   "name": "soundome",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "",
   "scripts": {
     "dev": "concurrently \"pnpm web:dev\" \"pnpm server:dev\"",
