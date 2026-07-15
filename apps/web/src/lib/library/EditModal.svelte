@@ -1,6 +1,7 @@
 <script lang="ts">
   import { lib } from './store.svelte';
   import ReferencesPanel from './ReferencesPanel.svelte';
+  import ArtistMultiSelect from './ArtistMultiSelect.svelte';
 
   let dialogEl: HTMLDialogElement | undefined = $state(undefined);
 
@@ -87,10 +88,9 @@
             oninput={(e) => { lib.trackDraft.title = (e.currentTarget as HTMLInputElement).value; }} />
         </label>
         <label class="field-label">Artists
-          <input
-            value={lib.trackDraft.artists?.join(', ') ?? ''}
-            oninput={(e) => { lib.trackDraft.artists = (e.currentTarget as HTMLInputElement).value.split(',').map(s => s.trim()).filter(Boolean); }}
-            placeholder="Artist 1, Artist 2"
+          <ArtistMultiSelect
+            value={lib.trackDraft.artists ?? []}
+            onChange={(names) => { lib.trackDraft.artists = names; }}
           />
         </label>
         <label class="field-label">Album
