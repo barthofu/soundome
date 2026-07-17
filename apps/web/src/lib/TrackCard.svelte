@@ -1,6 +1,8 @@
 <script lang="ts">
   import { getMatchCandidates, getYoutubeCandidates } from './api';
   import type { PendingValidationDto, PatchValidationBody, MatchCandidateDto } from './types';
+  import { lib } from './library/store.svelte';
+  import ArtistMultiSelect from './library/ArtistMultiSelect.svelte';
 
   interface Props {
     track: PendingValidationDto;
@@ -21,7 +23,7 @@
 
   // editable copies — reset whenever we open the form
   let editTitle = $state('');
-  let editArtists = $state('');
+  let editArtists = $state<string[]>([]);
   let editAlbum = $state('');
   let editGenre = $state('');
   let editDate = $state('');
@@ -32,7 +34,7 @@
   // Initialize edit fields from track and react to track changes
   $effect(() => {
     editTitle = track.title;
-    editArtists = track.artists.map((a) => a.name).join(', ');
+    editArtists = track.artists.map((a) => a.name);
     editAlbum = track.album?.title ?? '';
     editGenre = track.genre ?? '';
     editDate = track.date ?? '';
@@ -67,7 +69,7 @@
 
   function startEdit() {
     editTitle = track.title;
-    editArtists = track.artists.map((a) => a.name).join(', ');
+    editArtists = track.artists.map((a) => a.name);
     editAlbum = track.album?.title ?? '';
     editGenre = track.genre ?? '';
     editDate = track.date ?? '';
@@ -86,13 +88,9 @@
         const t = editTitle.trim();
         if (t && t !== track.title) patch.title = t;
 
-        const rawArtists = editArtists
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
         const origArtists = track.artists.map((a) => a.name);
-        if (JSON.stringify(rawArtists) !== JSON.stringify(origArtists) && rawArtists.length > 0)
-          patch.artists = rawArtists;
+        if (JSON.stringify(editArtists) !== JSON.stringify(origArtists) && editArtists.length > 0)
+          patch.artists = editArtists;
 
         const al = editAlbum.trim();
         if (al !== (track.album?.title ?? '')) patch.album_title = al || undefined;
@@ -231,10 +229,13 @@
            <label for="edit-title">Title</label>
            <input id="edit-title" bind:value={editTitle} placeholder="Title" />
          </div>
-         <div class="field">
-           <label for="edit-artists">Artists <span class="hint">comma-separated</span></label>
-           <input id="edit-artists" bind:value={editArtists} placeholder="Artist 1, Artist 2" />
-         </div>
+          <div class="field">
+            <label for="edit-artists">Artists</label>
+            <ArtistMultiSelect
+              value={editArtists}
+              onChange={(names) => { editArtists = names; }}
+            />
+          </div>
          <div class="field">
            <label for="edit-album">Album</label>
            <input id="edit-album" bind:value={editAlbum} placeholder="Album title" />
