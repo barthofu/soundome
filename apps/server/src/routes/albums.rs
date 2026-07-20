@@ -59,6 +59,14 @@ pub struct UpdateAlbumBody {
     pub cover: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct MergeAlbumsBody {
+    /// Album IDs to merge into `target_id`. These will be deleted after the merge.
+    pub source_ids: Vec<i32>,
+    /// The album to keep.
+    pub target_id: i32,
+}
+
 // ================================================================================================
 // Routes
 // ================================================================================================
@@ -170,6 +178,51 @@ pub async fn delete(
                 message: err.to_string(),
             })
         })
+}
+
+#[openapi]
+#[post("/albums/merge", format = "application/json", data = "<body>")]
+pub async fn merge(
+    body: Json<MergeAlbumsBody>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<AlbumDto>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    let body = body.into_inner();
+
+    if body.source_ids.is_empty() {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BadRequest".to_string(),
+            message: "source_ids must not be empty".to_string(),
+        }));
+    }
+    if body.source_ids.contains(&body.target_id) {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BadRequest".to_string(),
+            message: "target_id must not appear in source_ids".to_string(),
+        }));
+    }
+
+    db.run(move |conn| {
+        services
+            .album_service
+            .merge_into(conn, &body.source_ids, body.target_id)
+    })
+    .await
+    .and_then(|album| {
+        AlbumDto::from_album(album)
+            .ok_or_else(|| shared::errors::Error::Database("Album has no id".to_string()))
+    })
+    .map(Json)
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
 }
 
 // ================================================================================================

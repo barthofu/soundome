@@ -263,6 +263,7 @@ fn rocket() -> _ {
                 routes::albums::get,
                 routes::albums::update,
                 routes::albums::delete,
+                routes::albums::merge,
                 routes::albums::get_references,
                 routes::albums::add_reference,
                 routes::albums::delete_reference,

@@ -414,4 +414,97 @@ impl AlbumRepository for DieselAlbumRepository {
             })?;
         Ok(())
     }
+
+    fn merge_into(
+        &self,
+        conn: &mut SqliteConnection,
+        source_ids: &[i32],
+        target_id: i32,
+    ) -> SoundomeResult<()> {
+        conn.transaction(|conn| {
+            // --- Re-point tracks (direct FK on track.album_id) --------------------------
+            for &src in source_ids {
+                diesel::update(schema::track::table.filter(schema::track::album_id.eq(src)))
+                    .set(schema::track::album_id.eq(target_id))
+                    .execute(conn)
+                    .map_err(|e| {
+                        shared::errors::Error::Database(format!(
+                            "merge: repoint track.album_id: {e}"
+                        ))
+                    })?;
+            }
+
+            // --- Re-point artist_albums ---------------------------------------------------
+            // PK is (album_id, artist_id); avoid inserting a duplicate combo for the target.
+            let target_artist_ids: Vec<i32> = schema::artist_albums::table
+                .filter(schema::artist_albums::album_id.eq(target_id))
+                .select(schema::artist_albums::artist_id)
+                .load(conn)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!(
+                        "merge: load target album artists: {e}"
+                    ))
+                })?;
+
+            for &src in source_ids {
+                let src_artist_ids: Vec<i32> = schema::artist_albums::table
+                    .filter(schema::artist_albums::album_id.eq(src))
+                    .select(schema::artist_albums::artist_id)
+                    .load(conn)
+                    .map_err(|e| {
+                        shared::errors::Error::Database(format!(
+                            "merge: load source album artists: {e}"
+                        ))
+                    })?;
+
+                for artist_id in src_artist_ids {
+                    if !target_artist_ids.contains(&artist_id) {
+                        diesel::insert_into(schema::artist_albums::table)
+                            .values(crate::entities::ArtistAlbumEntity {
+                                album_id: target_id,
+                                artist_id,
+                            })
+                            .execute(conn)
+                            .map_err(|e| {
+                                shared::errors::Error::Database(format!(
+                                    "merge: insert artist_album: {e}"
+                                ))
+                            })?;
+                    }
+                }
+                diesel::delete(
+                    schema::artist_albums::table.filter(schema::artist_albums::album_id.eq(src)),
+                )
+                .execute(conn)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!(
+                        "merge: delete source artist_albums: {e}"
+                    ))
+                })?;
+            }
+
+            // --- Move album_refs -----------------------------------------------------------
+            for &src in source_ids {
+                diesel::update(
+                    schema::album_ref::table.filter(schema::album_ref::album_id.eq(src)),
+                )
+                .set(schema::album_ref::album_id.eq(target_id))
+                .execute(conn)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!("merge: move album_ref: {e}"))
+                })?;
+            }
+
+            // --- Delete source albums --------------------------------------------------------
+            for &src in source_ids {
+                diesel::delete(schema::album::table.filter(schema::album::id.eq(src)))
+                    .execute(conn)
+                    .map_err(|e| {
+                        shared::errors::Error::Database(format!("merge: delete source album: {e}"))
+                    })?;
+            }
+
+            Ok(())
+        })
+    }
 }

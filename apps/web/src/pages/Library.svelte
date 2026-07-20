@@ -36,10 +36,16 @@
       } else if (e.key === 'Escape') {
         if (lib.mergePicking) { e.preventDefault(); lib.cancelMergePicking(); }
         else if (lib.selectedArtistIds.size > 0) { e.preventDefault(); lib.clearArtistSelection(); }
+        else if (lib.albumMergePicking) { e.preventDefault(); lib.cancelAlbumMergePicking(); }
+        else if (lib.selectedAlbumIds.size > 0) { e.preventDefault(); lib.clearAlbumSelection(); }
       } else if (e.key === 'm' && lib.tab === 'artists' && lib.selectedArtistIds.size >= 2) {
         e.preventDefault();
         if (lib.mergePicking) lib.cancelMergePicking();
         else lib.startMergePicking();
+      } else if (e.key === 'm' && lib.tab === 'albums' && lib.selectedAlbumIds.size >= 2) {
+        e.preventDefault();
+        if (lib.albumMergePicking) lib.cancelAlbumMergePicking();
+        else lib.startAlbumMergePicking();
       }
     }
     document.addEventListener('keydown', onKeydown);

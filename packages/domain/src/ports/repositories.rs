@@ -107,6 +107,13 @@ pub trait AlbumRepository: Send + Sync {
     fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()>;
     // /// Find an album by unique fields (e.g. title + artists + date)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, album: &Album) -> SoundomeResult<Option<Album>>;
+    /// Merge all source albums into `target_id`: re-point tracks, artist relations, and references, then delete sources.
+    fn merge_into(
+        &self,
+        conn: &mut SqliteConnection,
+        source_ids: &[i32],
+        target_id: i32,
+    ) -> SoundomeResult<()>;
 }
 
 pub trait ArtistRepository: Send + Sync {

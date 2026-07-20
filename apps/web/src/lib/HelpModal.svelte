@@ -66,8 +66,8 @@
           <tr><td><kbd>S</kbd></td><td>Focus the search field</td></tr>
           <tr><td><kbd>E</kbd></td><td>Edit the item under the cursor</td></tr>
           <tr><td><kbd>⌫ Backspace</kbd></td><td>Go up one level (album → artist → list)</td></tr>
-          <tr><td><kbd>Shift</kbd> + click</td><td>Select an artist for merge</td></tr>
-          <tr><td><kbd>M</kbd></td><td>Start merge (requires ≥ 2 artists selected)</td></tr>
+          <tr><td><kbd>Shift</kbd> + click</td><td>Select an artist or album for merge</td></tr>
+          <tr><td><kbd>M</kbd></td><td>Start merge (requires ≥ 2 artists or albums selected)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Cancel merge / clear selection</td></tr>
         </tbody>
       </table>
@@ -103,7 +103,7 @@
         <li>Playlist URLs queue a background sync task — follow progress in <strong>Tasks</strong>.</li>
         <li>Tracks marked <span class="badge-warn">review</span> in the recent-downloads list are waiting in <strong>Validations</strong>.</li>
         <li>In the Validations page, <strong>Show matches</strong> fetches alternative metadata candidates when the reason is a partial match.</li>
-        <li>In Library → Artists, the <strong>Similar</strong> filter highlights artists whose names are close — useful for spotting duplicates before merging.</li>
+        <li>In Library → Artists or Albums, the <strong>Similar</strong> filter highlights items whose names/titles are close — useful for spotting duplicates before merging.</li>
         <li>Full API docs are available at <a href="/swagger" target="_blank" rel="noopener noreferrer">/swagger</a>.</li>
       </ul>
     </section>

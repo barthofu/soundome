@@ -92,6 +92,16 @@ impl AlbumService {
         self.album_repo.delete_reference(conn, ref_id)
     }
 
+    pub fn merge_into(
+        &self,
+        conn: &mut SqliteConnection,
+        source_ids: &[i32],
+        target_id: i32,
+    ) -> SoundomeResult<shared::models::Album> {
+        self.album_repo.merge_into(conn, source_ids, target_id)?;
+        self.album_repo.get_by_id(conn, target_id)
+    }
+
     // Custom
 
     #[allow(dead_code)]

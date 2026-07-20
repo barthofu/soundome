@@ -1,6 +1,6 @@
 import {
   getTracks, updateTrack, deleteTrack,
-  getAlbums, updateAlbum, deleteAlbum,
+  getAlbums, updateAlbum, deleteAlbum, mergeAlbums,
   getArtists, updateArtist, deleteArtist, mergeArtists,
   uploadArtistImage, uploadAlbumImage, uploadTrackImage,
   fetchArtistIconFromReferences, fetchAlbumCoverFromReferences,
@@ -117,6 +117,11 @@ export function areSimilarArtistNames(a: string, b: string): boolean {
   return dist <= 2 || (maxLen >= 8 && dist / maxLen <= 0.2);
 }
 
+// ── Album title similarity helper (mirrors artist name similarity) ───────────
+export function areSimilarAlbumNames(a: string, b: string): boolean {
+  return areSimilarArtistNames(a, b);
+}
+
 function createLibraryStore() {
   const _initHash = (() => {
     const raw = location.hash.replace('#', '');
@@ -202,6 +207,12 @@ function createLibraryStore() {
   let mergeSaving = $state(false);
   let similarFilterActive = $state(false);
 
+  // ── Album selection / merge state ──────────────────────────────────────────
+  let selectedAlbumIds: Set<number> = $state(new Set());
+  let albumMergePicking = $state(false);
+  let albumMergeSaving = $state(false);
+  let albumSimilarFilterActive = $state(false);
+
   // ── Derived ────────────────────────────────────────────────────────────────
   let drillArtist = $derived(
     drillArtistId != null ? (artists.find(a => a.id === drillArtistId) ?? null) : null
@@ -283,6 +294,18 @@ function createLibraryStore() {
     }
     return ids;
   });
+  let similarAlbumIds = $derived.by(() => {
+    const ids = new Set<number>();
+    for (let i = 0; i < albums.length; i++) {
+      for (let j = i + 1; j < albums.length; j++) {
+        if (areSimilarAlbumNames(albums[i].title, albums[j].title)) {
+          ids.add(albums[i].id);
+          ids.add(albums[j].id);
+        }
+      }
+    }
+    return ids;
+  });
 
   // ── URL navigation ─────────────────────────────────────────────────────────
   function buildHash(t: Tab, artistId?: number, albumId?: number, playlistId?: number): string {
@@ -318,7 +341,7 @@ function createLibraryStore() {
     drillAlbumId = (p[2] === 'album' && p[3]) ? (parseInt(p[3]) || null) : null;
     drillPlaylistId = null;
   }
-  function switchTab(t: Tab) { navigate(t); clearArtistSelection(); }
+  function switchTab(t: Tab) { navigate(t); clearArtistSelection(); clearAlbumSelection(); }
   function clearDrill() { navigate(tab); }
 
   function handleRefresh() {
@@ -621,6 +644,44 @@ function createLibraryStore() {
     }
   }
 
+  // ── Album selection helpers ────────────────────────────────────────────────
+  function toggleAlbumSelection(id: number) {
+    const next = new Set(selectedAlbumIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selectedAlbumIds = next;
+    if (selectedAlbumIds.size < 2) albumMergePicking = false;
+  }
+  function clearAlbumSelection() {
+    selectedAlbumIds = new Set();
+    albumMergePicking = false;
+  }
+  function startAlbumMergePicking() {
+    if (selectedAlbumIds.size >= 2) albumMergePicking = true;
+  }
+  function cancelAlbumMergePicking() {
+    albumMergePicking = false;
+  }
+  async function pickAlbumMergeTarget(targetId: number) {
+    if (!albumMergePicking || !selectedAlbumIds.has(targetId)) return;
+    const sourceIds = [...selectedAlbumIds].filter(id => id !== targetId);
+    const targetTitle = albums.find(a => a.id === targetId)?.title ?? String(targetId);
+    const sourceTitles = sourceIds.map(id => albums.find(a => a.id === id)?.title ?? String(id)).join(', ');
+    if (!confirm(`Merge "${sourceTitles}" into "${targetTitle}"?\n\nThis cannot be undone.`)) return;
+    albumMergeSaving = true;
+    try {
+      const updated = await mergeAlbums(sourceIds, targetId);
+      albums = albums
+        .filter(a => !sourceIds.includes(a.id))
+        .map(a => a.id === updated.id ? updated : a);
+      clearAlbumSelection();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      albumMergeSaving = false;
+    }
+  }
+
   // ── Reference helpers ─────────────────────────────────────────────────────
   async function addReference(
     entity: 'tracks' | 'albums' | 'artists',
@@ -761,6 +822,12 @@ function createLibraryStore() {
     get similarFilterActive() { return similarFilterActive; }, set similarFilterActive(v: boolean) { similarFilterActive = v; },
     get similarArtistIds() { return similarArtistIds; },
 
+    get selectedAlbumIds() { return selectedAlbumIds; },
+    get albumMergePicking() { return albumMergePicking; },
+    get albumMergeSaving() { return albumMergeSaving; },
+    get albumSimilarFilterActive() { return albumSimilarFilterActive; }, set albumSimilarFilterActive(v: boolean) { albumSimilarFilterActive = v; },
+    get similarAlbumIds() { return similarAlbumIds; },
+
     navigate, applyHash, switchTab, clearDrill, handleRefresh, loadAll,
     drillIntoArtist, drillIntoAlbum, backToArtist, backToRoot,
     drillIntoPlaylist,
@@ -770,6 +837,7 @@ function createLibraryStore() {
     batchFetchArtistIconsAction, batchFetchAlbumCoversAction,
     handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist, handleDeletePlaylist,
     toggleArtistSelection, clearArtistSelection, startMergePicking, cancelMergePicking, pickMergeTarget,
+    toggleAlbumSelection, clearAlbumSelection, startAlbumMergePicking, cancelAlbumMergePicking, pickAlbumMergeTarget,
     fmtDuration, isRemote,
     addReference, deleteReference,
 
