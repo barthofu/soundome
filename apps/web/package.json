@@ -4,18 +4,23 @@
   "version": "0.2.7",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "pnpm run generate-icons && vite",
+    "build": "pnpm run generate-icons && vite build",
     "preview": "vite preview",
+    "generate-icons": "node scripts/generate-all-icons.mjs",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.12.2",
+    "@vite-pwa/assets-generator": "^1.0.2",
+    "sharp": "^0.35.3",
     "svelte": "^5.55.4",
     "svelte-check": "^4.4.6",
     "typescript": "~6.0.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vite-plugin-pwa": "^1.3.0",
+    "workbox-window": "^7.4.1"
   }
 }

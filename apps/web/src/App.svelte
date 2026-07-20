@@ -8,6 +8,7 @@
   import Tools from './pages/Tools.svelte';
   import Ingest from './pages/Ingest.svelte';
   import HelpModal from './lib/HelpModal.svelte';
+  import PWAUpdatePrompt from './components/PWAUpdatePrompt.svelte';
 
   type Page = 'download' | 'validations' | 'tasks' | 'library' | 'tools' | 'ingest';
 
@@ -184,6 +185,8 @@
 </main>
 
 <HelpModal open={helpOpen} onClose={() => (helpOpen = false)} />
+
+<PWAUpdatePrompt />
 
 <style>
   nav {

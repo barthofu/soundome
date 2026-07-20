@@ -1,0 +1,117 @@
+/**
+ * PWA Service Worker Registration and Update Management
+ */
+
+let registration: ServiceWorkerRegistration | undefined
+let updateWaiting = false
+
+/**
+ * Initialize PWA service worker registration
+ * This sets up auto-update functionality and handles updates
+ */
+export function initPWA() {
+  if (!('serviceWorker' in navigator)) {
+    console.log('Service Worker not supported')
+    return
+  }
+
+  // Register the service worker
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .then(reg => {
+      registration = reg
+      console.log('PWA Service Worker registered')
+
+      // Check for updates every 60 seconds
+      setInterval(async () => {
+        await reg.update()
+      }, 60000)
+
+      // Listen for new service worker activation
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing
+        if (!newWorker) return
+
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New service worker is ready but waiting
+            updateWaiting = true
+            const event = new CustomEvent<PWAUpdatePayload>('PWAUpdate', {
+              detail: { registration: reg },
+            })
+            window.dispatchEvent(event as unknown as Event)
+          }
+        })
+      })
+    })
+    .catch(err => {
+      console.error('PWA registration error:', err)
+    })
+}
+
+interface PWAUpdatePayload {
+  registration?: ServiceWorkerRegistration
+}
+
+/**
+ * Request that the app refresh to the latest version
+ * This is typically called after a user accepts an update prompt
+ */
+export function refreshPWA() {
+  if (!registration?.waiting) {
+    console.warn('No waiting service worker found')
+    return
+  }
+
+  // Tell the waiting service worker to skip waiting
+  registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+
+  // Set a flag that we're refreshing
+  localStorage.setItem('pwa-refreshing', 'true')
+
+  // Reload when the controller changes
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true
+      window.location.reload()
+    }
+  })
+}
+
+/**
+ * Unregister the PWA service worker
+ * Useful for development or if the user wants to disable PWA features
+ */
+export async function unregisterPWA() {
+  if (registration) {
+    await registration.unregister()
+    console.log('PWA Service Worker unregistered')
+  }
+}
+
+/**
+ * Check if PWA is available in the current environment
+ */
+export function isPWAAvailable(): boolean {
+  return 'serviceWorker' in navigator && 'caches' in window
+}
+
+/**
+ * Get the current PWA registration
+ */
+export function getPWARegistration(): ServiceWorkerRegistration | undefined {
+  return registration
+}
+
+/**
+ * Listen for PWA updates
+ */
+export function onPWAUpdate(callback: () => void): () => void {
+  const handler = () => callback()
+  window.addEventListener('PWAUpdate', handler as EventListener)
+
+  return () => {
+    window.removeEventListener('PWAUpdate', handler as EventListener)
+  }
+}
+
