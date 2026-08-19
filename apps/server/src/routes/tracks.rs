@@ -159,7 +159,8 @@ impl TrackDto {
 pub struct UpdateTrackBody {
     pub title: Option<String>,
     pub artists: Option<Vec<String>>,
-    pub album_title: Option<String>,
+    #[serde(default)]
+    pub album_title: Option<Option<String>>,
     pub genre: Option<String>,
     pub date: Option<String>,
     pub track_number: Option<i32>,
@@ -275,34 +276,47 @@ pub async fn update(
             track.artists = artists;
         }
 
-        if let Some(album_title) = body.album_title {
-            // Preserve album ID and other metadata, updating the title
-            let existing_album = track.album.clone();
-            let new_album = Album {
-                id: existing_album.as_ref().and_then(|a| a.id),
-                title: album_title.clone(),
-                artists: existing_album
-                    .as_ref()
-                    .map(|a| a.artists.clone())
-                    .unwrap_or_default(),
-                album_type: shared::models::AlbumType::Album,
-                cover: existing_album.as_ref().and_then(|a| a.cover.clone()),
-                date: existing_album.as_ref().and_then(|a| a.date.clone()),
-                references: existing_album
-                    .as_ref()
-                    .map(|a| a.references.clone())
-                    .unwrap_or_default(),
-            };
+        // Handle album change or removal
+        // - If album_title is not present (None outer), leave album unchanged
+        // - If album_title is Some(Some(title)), set/update album with that title
+        // - If album_title is Some(None), clear the album
+        if let Some(album_title_opt) = &body.album_title {
+            match album_title_opt {
+                Some(album_title) => {
+                    // Update or create album with the given title
+                    let existing_album = track.album.clone();
+                    let new_album = Album {
+                        id: existing_album.as_ref().and_then(|a| a.id),
+                        title: album_title.clone(),
+                        artists: existing_album
+                            .as_ref()
+                            .map(|a| a.artists.clone())
+                            .unwrap_or_default(),
+                        album_type: shared::models::AlbumType::Album,
+                        cover: existing_album.as_ref().and_then(|a| a.cover.clone()),
+                        date: existing_album.as_ref().and_then(|a| a.date.clone()),
+                        references: existing_album
+                            .as_ref()
+                            .map(|a| a.references.clone())
+                            .unwrap_or_default(),
+                    };
 
-            // If album has an ID, update it; otherwise, create_or_ignore will handle it in create_or_update
-            if let Some(album_id) = new_album.id {
-                if let Err(e) = services.album_service.update(conn, album_id, &new_album) {
-                    tracing::warn!("Failed to update album: {}", e);
+                    // If album has an ID, update it; otherwise, create_or_ignore will handle it in create_or_update
+                    if let Some(album_id) = new_album.id {
+                        if let Err(e) = services.album_service.update(conn, album_id, &new_album) {
+                            tracing::warn!("Failed to update album: {}", e);
+                        }
+                    }
+
+                    track.album = Some(new_album);
+                }
+                None => {
+                    // Explicitly clear the album (album_title: null in JSON)
+                    track.album = None;
                 }
             }
-
-            track.album = Some(new_album);
         }
+        // If album_title is not in the request body at all, leave track.album unchanged
 
         // Update file if it exists and metadata changed
         tokio::task::block_in_place(|| {
