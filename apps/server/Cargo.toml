@@ -22,6 +22,7 @@ config = { path = "../../packages/config" }
 database = { path = "../../packages/database" }
 tagger = { path = "../../packages/tagger" }
 walkdir = "2"
+chrono = "0.4.39"
 
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true }
