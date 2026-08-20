@@ -61,9 +61,19 @@
 
   // Spotify/SoundCloud artists carry a `Metadata` reference (their durable
   // artist ID), while YouTube Music artists carry a `Source` reference —
-  // either can be used as a sync source, so both are selectable here.
+  // both are usable as a sync target. A `Metadata` reference is only
+  // eligible when its platform is actually a valid artist sync source
+  // (mirrors `domain::schedule::is_eligible_artist_sync_reference`) — e.g.
+  // a MusicBrainz `Metadata` reference is enrichment-only and can never be
+  // synced from directly.
+  const ARTIST_SOURCE_PLATFORMS = new Set(['Spotify', 'SoundCloud', 'YoutubeMusic']);
   let sources = $derived(
-    references.filter((r) => (r.ref_type === 'Source' || r.ref_type === 'Metadata') && r.external_url),
+    references.filter((r) => {
+      if (!r.external_url) return false;
+      if (r.ref_type === 'Source') return true;
+      if (r.ref_type === 'Metadata') return ARTIST_SOURCE_PLATFORMS.has(r.platform);
+      return false;
+    }),
   );
 </script>
 

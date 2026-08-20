@@ -66,7 +66,10 @@ The quickest path is a one-click button:
   subscribe (an artist can have several, e.g. Spotify and SoundCloud — each
   is synced independently). Spotify/SoundCloud artists carry their durable
   ID as a `Metadata` reference; YouTube Music artists carry a `Source`
-  reference — both are usable as a sync target.
+  reference — both are usable as a sync target. A `Metadata` reference is
+  only offered when its platform actually supports artist sync (Spotify,
+  SoundCloud, YouTube Music) — a MusicBrainz `Metadata` reference, for
+  example, is enrichment-only and never selectable here.
 - On a **playlist page**, a single "Add to scheduled sync" button subscribes
   its `source_url`.
 
