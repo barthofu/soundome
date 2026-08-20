@@ -2,6 +2,7 @@
   import { lib } from './store.svelte';
   import ReferencesPanel from './ReferencesPanel.svelte';
   import ArtistMultiSelect from './ArtistMultiSelect.svelte';
+  import ArtistSyncSources from './ArtistSyncSources.svelte';
 
   let dialogEl: HTMLDialogElement | undefined = $state(undefined);
 
@@ -286,6 +287,11 @@
           references={lib.editState.item.references}
           onAdd={(body) => lib.addReference('artists', lib.editState!.item.id, body)}
           onDelete={(ref) => lib.deleteReference('artists', lib.editState!.item.id, ref)}
+        />
+        <ArtistSyncSources
+          artistId={lib.editState.item.id}
+          artistName={lib.artistDraft.name ?? ''}
+          references={lib.editState.item.references}
         />
       </div>
     {/if}
