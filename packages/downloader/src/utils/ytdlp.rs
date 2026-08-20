@@ -153,7 +153,12 @@ where
     let mut attempt = 1;
     loop {
         let args = build_args();
-        tracing::info!("Running yt-dlp with args (attempt {}): {:?}", attempt, args);
+        tracing::info!(
+            "Running yt-dlp ({}) with args (attempt {}): {:?}",
+            shared::ytdlp_binary::path(),
+            attempt,
+            args
+        );
 
         match run_ytdlp(&args).await {
             Ok(stdout) => return Ok(stdout),
@@ -194,7 +199,7 @@ fn is_transient_error(stderr: &str) -> bool {
 /// Spawn `yt-dlp` with the given args and return its captured stdout.
 /// Maps a non-zero exit code to `Error::ExitCode` carrying the captured stderr.
 async fn run_ytdlp(args: &[String]) -> SoundomeResult<Vec<u8>> {
-    let mut child = Command::new("yt-dlp")
+    let mut child = Command::new(shared::ytdlp_binary::path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .args(args)

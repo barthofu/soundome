@@ -20,6 +20,8 @@ pub struct Config {
     pub server: ServerConfig,
     #[serde(default)]
     pub playlists: PlaylistsConfig,
+    #[serde(default)]
+    pub downloader: DownloaderConfig,
 }
 
 // ===============================================================================
@@ -295,4 +297,42 @@ pub struct PlaylistsConfig {
     /// May be relative (to the working directory) or absolute.
     /// Defaults to `{base_library_dir}/.playlists/` when absent.
     pub m3u8_dir: Option<String>,
+}
+
+// ===============================================================================
+// Downloader
+// ===============================================================================
+
+/// Configuration for external downloader tools (currently: yt-dlp).
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(unused)]
+pub struct DownloaderConfig {
+    #[serde(default)]
+    pub ytdlp: YtDlpConfig,
+}
+
+/// Allows overriding the `yt-dlp` binary embedded in the Docker image with a
+/// custom build (e.g. a nightly release that contains a fix for a YouTube
+/// countermeasure) without rebuilding/redeploying the image.
+///
+/// When `binary_url` is set, Soundome downloads the binary once at startup,
+/// caches it under `{database_dir}/bin/`, and uses it instead of the `yt-dlp`
+/// found on `PATH`. Changing `binary_url` (e.g. bumping to a newer nightly)
+/// only requires restarting the container, not rebuilding it.
+///
+/// If the download or checksum verification fails, Soundome logs an error and
+/// falls back to the `yt-dlp` binary on `PATH`.
+///
+/// ENV: SOUNDOME__DOWNLOADER__YTDLP__BINARY_URL / SOUNDOME__DOWNLOADER__YTDLP__SHA256
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(unused)]
+pub struct YtDlpConfig {
+    /// URL to a static yt-dlp binary release asset (e.g. a `yt-dlp_musllinux`
+    /// GitHub release asset, or a nightly build). Downloaded once per
+    /// distinct URL and cached on disk across restarts.
+    pub binary_url: Option<String>,
+    /// Optional sha256 checksum (hex) of the binary at `binary_url`. Strongly
+    /// recommended: without it, a warning is logged and the download is used
+    /// unverified.
+    pub sha256: Option<String>,
 }

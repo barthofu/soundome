@@ -157,6 +157,21 @@ Proxy URLs support HTTP, HTTPS, and SOCKS5. Credentials can be embedded directly
 
 ---
 
+## `[downloader]` (optional)
+
+Runtime overrides for external downloader tools. Currently only `yt-dlp` is configurable. See [../operations/youtube-search-configuration.md](../operations/youtube-search-configuration.md) for the full rationale and troubleshooting.
+
+### `[downloader.ytdlp]`
+
+Lets you point Soundome at a specific `yt-dlp` binary (e.g. a nightly build containing a fix for a recent YouTube countermeasure) without rebuilding the Docker image. Downloaded once at startup and cached across restarts; omit to use the `yt-dlp` baked into the image / found on `PATH`.
+
+| Key | Type | Default | Description | Environment variable |
+|---|---|---|---|---|
+| `downloader.ytdlp.binary_url` | string | — | URL to a static `yt-dlp` binary release asset (e.g. a `yt-dlp_musllinux` GitHub release asset). When set, downloaded once at boot and cached; omit to use `yt-dlp` from `PATH`. | `SOUNDOME__DOWNLOADER__YTDLP__BINARY_URL` |
+| `downloader.ytdlp.sha256` | string | — | Optional sha256 checksum (hex) of the binary at `binary_url`. Strongly recommended; a warning is logged when absent. | `SOUNDOME__DOWNLOADER__YTDLP__SHA256` |
+
+---
+
 ## `[playlists]` (optional)
 
 Controls the export of playlists as `.m3u8` files. Omit this section to use the default output directory.

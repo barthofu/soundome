@@ -120,9 +120,11 @@ client_secret = "your_spotify_client_secret"
 
 # -----------------------------------------------------------------------------
 # YouTube / YouTube Music
-# No configuration needed: Soundome shells out to the `yt-dlp` binary (must be
-# installed and on PATH) for both search and download. It talks to YouTube
-# directly and honors the shared [proxy] configuration below, if enabled.
+# No configuration needed by default: Soundome shells out to the `yt-dlp`
+# binary (must be installed and on PATH) for both search and download. It
+# talks to YouTube directly and honors the shared [proxy] configuration
+# below, if enabled. See [downloader.ytdlp] below to override the binary
+# without rebuilding the image.
 # -----------------------------------------------------------------------------
 
 
@@ -269,6 +271,34 @@ ingest_metadata_providers = ["spotify", "musicbrainz", "bandcamp"]
 # Hosts and domains that bypass the proxy.
 # ENV: SOUNDOME__PROXY__NO_PROXY
 # no_proxy = ["localhost", "127.0.0.1", "*.local"]
+
+# =============================================================================
+# [downloader]  (optional)
+# =============================================================================
+# Runtime overrides for external downloader tools. Currently only yt-dlp is
+# configurable. See docs/operations/youtube-search-configuration.md for the
+# full rationale and troubleshooting.
+# =============================================================================
+# [downloader.ytdlp]
+
+# URL to a static yt-dlp binary release asset (e.g. a "yt-dlp_musllinux"
+# GitHub release asset, or a nightly build). When set, Soundome downloads it
+# once at boot and caches it under "{directory of database.url}/bin/",
+# reusing the cached file on subsequent restarts as long as this URL doesn't
+# change. Falls back to "yt-dlp" from PATH (the version baked into the
+# image) if the download or checksum verification fails.
+# This lets you pick up a yt-dlp fix for a YouTube countermeasure by
+# restarting the container, without rebuilding/redeploying the image.
+# ENV: SOUNDOME__DOWNLOADER__YTDLP__BINARY_URL
+# binary_url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.15/yt-dlp_musllinux"
+# binary_url = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.19.233000/yt-dlp_musllinux"
+
+# Optional sha256 checksum (hex) of the binary at binary_url. Strongly
+# recommended: without it, a warning is logged and the download is used
+# unverified.
+# ENV: SOUNDOME__DOWNLOADER__YTDLP__SHA256
+# sha256 = "..."
+
 
 # =============================================================================
 # Playlists

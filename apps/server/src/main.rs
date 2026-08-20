@@ -37,6 +37,24 @@ fn rocket() -> _ {
 
     tracing::info!("Starting server...");
 
+    // Resolve (and, if configured, download) the yt-dlp binary to use.
+    // This performs network I/O, so it needs a tokio runtime. `#[launch]`'s
+    // generated `main()` calls this function synchronously *before* Rocket's
+    // own runtime is created (that runtime only starts once we return a
+    // built `Rocket<Build>` and `.launch()` is driven), so there is no
+    // existing reactor to attach to here. We spin up a short-lived runtime
+    // just for this one-off boot task and drop it once done. Never fails:
+    // it falls back to "yt-dlp" from PATH on any error (see its doc comment).
+    match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt.block_on(shared::ytdlp_binary::init()),
+        Err(e) => {
+            tracing::error!(
+                "Failed to create runtime for yt-dlp binary provisioning, falling back to \"yt-dlp\" from PATH: {}",
+                e
+            );
+        }
+    }
+
     // Initialize database and run migrations
     let db_url = Config::get().database.url.clone();
     if let Err(e) = database::init_database(&db_url) {
