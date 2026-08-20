@@ -161,7 +161,13 @@ Uniqueness constraints:
   filtering to `ReferenceType::Source` only excludes Spotify/SoundCloud
   artists entirely, since their references are created with
   `ReferenceType::Metadata` in `packages/fetcher` (only YouTube Music
-  artists get `Source`) — both types must be selectable.
+  artists get `Source`) — both types must be selectable. A `Metadata`
+  reference is only eligible when its platform is itself a valid artist
+  sync source (Spotify, SoundCloud, YouTube Music) — e.g. a MusicBrainz
+  `Metadata` reference is enrichment-only and must stay excluded. This
+  eligibility check is centralized in
+  `domain::schedule::is_eligible_artist_sync_reference` and mirrored
+  client-side.
 - Each eligible reference gets a toggle: "Scheduled sync" on/off.
   - On: creates a subscription (`entity_type: "artist"`, `artist_id`,
     `reference_id`).

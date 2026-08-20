@@ -5,7 +5,7 @@ use rocket::{delete, get, http::Status, patch, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use shared::models::{ReferenceType, SyncEntityType};
+use shared::models::SyncEntityType;
 
 use crate::utils::{
     cancellation::CancellationRegistry, database::Db, error::CustomError, response::Success,
@@ -161,7 +161,7 @@ pub async fn create(
                 .iter()
                 .find(|r| {
                     r.id == Some(reference_id)
-                        && matches!(r.ref_type, ReferenceType::Source | ReferenceType::Metadata)
+                        && domain::schedule::is_eligible_artist_sync_reference(r)
                 })
                 .cloned()
                 .ok_or(shared::errors::Error::InvalidArg)?;

@@ -1,6 +1,6 @@
 use chrono::NaiveDateTime;
 use shared::errors::Error;
-use shared::models::SyncEntityType;
+use shared::models::{Platform, Reference, ReferenceType, SyncEntityType};
 use shared::types::SoundomeResult;
 
 /// Best-effort URL-type detection for the manual "add link" scheduled-sync
@@ -14,6 +14,31 @@ pub fn detect_sync_entity_type(url: &str) -> SyncEntityType {
         SyncEntityType::Artist
     } else {
         SyncEntityType::Playlist
+    }
+}
+
+/// Whether an artist reference can be used as a scheduled-sync target.
+///
+/// `packages/fetcher` only tags YouTube Music artists with
+/// `ReferenceType::Source` — Spotify and SoundCloud artists carry their
+/// durable id as `ReferenceType::Metadata` instead (see
+/// `packages/fetcher/src/{spotify,soundcloud}/mappers.rs`). So `Metadata`
+/// references must also be accepted, but only for platforms that are
+/// actually a valid sync "source" for an artist (i.e. ones `Fetcher` can
+/// resolve via `get_artist_from_url`) — a `Metadata` reference to
+/// MusicBrainz, for instance, is enrichment-only and can never be synced
+/// from directly.
+pub fn is_eligible_artist_sync_reference(reference: &Reference) -> bool {
+    if reference.external_url.is_none() {
+        return false;
+    }
+    match reference.ref_type {
+        ReferenceType::Source => true,
+        ReferenceType::Metadata => matches!(
+            reference.platform,
+            Platform::Spotify | Platform::SoundCloud | Platform::YoutubeMusic
+        ),
+        ReferenceType::Provider | ReferenceType::Reference => false,
     }
 }
 
@@ -62,5 +87,71 @@ mod tests {
             .naive_utc();
         let result = calculate_next_run(now, "invalid cron");
         assert!(result.is_err());
+    }
+
+    fn reference(ref_type: ReferenceType, platform: Platform) -> Reference {
+        Reference {
+            id: Some(1),
+            ref_type,
+            platform,
+            external_id: None,
+            external_url: Some("https://example.com".to_string()),
+        }
+    }
+
+    #[test]
+    fn source_reference_is_always_eligible() {
+        assert!(is_eligible_artist_sync_reference(&reference(
+            ReferenceType::Source,
+            Platform::YoutubeMusic
+        )));
+    }
+
+    #[test]
+    fn metadata_reference_eligible_for_spotify_soundcloud_youtubemusic() {
+        for platform in [
+            Platform::Spotify,
+            Platform::SoundCloud,
+            Platform::YoutubeMusic,
+        ] {
+            assert!(is_eligible_artist_sync_reference(&reference(
+                ReferenceType::Metadata,
+                platform
+            )));
+        }
+    }
+
+    #[test]
+    fn metadata_reference_ineligible_for_non_source_platforms() {
+        for platform in [
+            Platform::MusicBrainz,
+            Platform::Youtube,
+            Platform::Bandcamp,
+            Platform::Unknown,
+        ] {
+            assert!(!is_eligible_artist_sync_reference(&reference(
+                ReferenceType::Metadata,
+                platform
+            )));
+        }
+    }
+
+    #[test]
+    fn provider_and_reference_types_are_ineligible() {
+        assert!(!is_eligible_artist_sync_reference(&reference(
+            ReferenceType::Provider,
+            Platform::Spotify
+        )));
+        assert!(!is_eligible_artist_sync_reference(&reference(
+            ReferenceType::Reference,
+            Platform::Spotify
+        )));
+    }
+
+    #[test]
+    fn reference_without_url_is_ineligible() {
+        let mut r = reference(ReferenceType::Metadata, Platform::Spotify);
+        r.external_url = None;
+        assert!(!is_eligible_artist_sync_reference(&r));
     }
 }
