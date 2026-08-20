@@ -1,7 +1,12 @@
 # Todo
 
+## Features
 - [ ] Add "search song" feature to download a single track by name/artist/album
 
+## Fixes
+- [ ] Permit user to cancel pending tasksé
+
+## Refacto
 - [ ] voir pour renommer les bails de "tag" et "tagger" en "metadata"
 - [ ] en plus du "transpose" des metadata, faire un "complete" qui vient simplement compléter les metadata manquantes
 

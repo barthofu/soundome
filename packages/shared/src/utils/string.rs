@@ -120,6 +120,56 @@ pub fn render_and_normalize_template(
     ))))
 }
 
+/**
+ * Splits a "band name" style string that actually encodes a collaboration between
+ * several distinct artists into individual artist names.
+ *
+ * Some sources (notably Bandcamp custom collaboration pages) publish a single combined
+ * name such as `"Acidpach, L'Art Cène"` or `"Adharaa & Kobaltik"` instead of listing each
+ * artist separately. When that combined string is used verbatim as a single `Artist`, it
+ * ends up overwriting two correctly separated artists (e.g. from SoundCloud) with one
+ * merged, incorrect artist name.
+ *
+ * This function recognizes common collaboration separators (`,`, `&`, `x`/`X`, `+`,
+ * `vs`/`vs.`, `feat`/`ft`) and splits on them, trimming and filtering empty segments.
+ * It intentionally does NOT try to be exhaustive: if the name doesn't contain any of
+ * these separators, it is returned as a single-element vector unchanged, since splitting
+ * on other punctuation (e.g. a dash) is far more likely to break legitimate single-artist
+ * or group names.
+ */
+pub fn split_collab_artist_name(name: &str) -> Vec<String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    // Order matters: longer/more specific separators first so we don't split "feat." on
+    // a bare "t" etc. Matching is case-insensitive but preserves the original casing.
+    const SEPARATORS: [&str; 9] = [
+        ",", " & ", " x ", " X ", " + ", " vs. ", " vs ", " feat. ", " ft. ",
+    ];
+
+    let mut parts = vec![trimmed.to_string()];
+    for separator in SEPARATORS {
+        parts = parts
+            .into_iter()
+            .flat_map(|part| {
+                part.split(separator)
+                    .map(|p| p.trim().to_string())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+    }
+
+    parts.retain(|p| !p.is_empty());
+
+    if parts.is_empty() {
+        vec![trimmed.to_string()]
+    } else {
+        parts
+    }
+}
+
 // ================================================================================================
 // Tests
 // ================================================================================================
@@ -265,5 +315,43 @@ mod tests {
             normalized, "",
             "Empty string should remain empty after normalization."
         );
+    }
+
+    #[test]
+    fn split_collab_artist_name_splits_on_comma() {
+        assert_eq!(
+            split_collab_artist_name("Acidpach, L'Art Cène"),
+            vec!["Acidpach".to_string(), "L'Art Cène".to_string()]
+        );
+    }
+
+    #[test]
+    fn split_collab_artist_name_splits_on_ampersand() {
+        assert_eq!(
+            split_collab_artist_name("Adharaa & Kobaltik"),
+            vec!["Adharaa".to_string(), "Kobaltik".to_string()]
+        );
+    }
+
+    #[test]
+    fn split_collab_artist_name_keeps_single_artist_unchanged() {
+        assert_eq!(
+            split_collab_artist_name("Boards of Canada"),
+            vec!["Boards of Canada".to_string()]
+        );
+    }
+
+    #[test]
+    fn split_collab_artist_name_handles_multiple_separators() {
+        assert_eq!(
+            split_collab_artist_name("Foo, Bar & Baz"),
+            vec!["Foo".to_string(), "Bar".to_string(), "Baz".to_string()]
+        );
+    }
+
+    #[test]
+    fn split_collab_artist_name_empty_returns_empty() {
+        assert_eq!(split_collab_artist_name(""), Vec::<String>::new());
+        assert_eq!(split_collab_artist_name("   "), Vec::<String>::new());
     }
 }

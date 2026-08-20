@@ -2,7 +2,7 @@ use bandcamp::{search, SearchResultItem};
 use shared::models::{Album, Artist, Track};
 use shared::models::{AlbumType, Platform, Reference, ReferenceType};
 use shared::utils::enums::Match;
-use shared::utils::string::{string_similarity, SimilarityAlgorithm};
+use shared::utils::string::{split_collab_artist_name, string_similarity, SimilarityAlgorithm};
 
 use crate::TagProvider;
 
@@ -123,20 +123,60 @@ fn strip_band_name_prefix(title: &str, band_name: &str) -> String {
     title.to_string()
 }
 
+/// Converts a Bandcamp "band name" into one or more `Artist`s.
+///
+/// Some Bandcamp pages (notably custom collaboration/collective pages) publish a single
+/// combined name for what are actually two or more distinct artists, e.g.
+/// `"Acidpach, L'Art Cène"` or `"Adharaa & Kobaltik"`. Using that combined string verbatim
+/// as a single `Artist` is what causes `Track::transpose_metadata_from_source` (which treats
+/// Bandcamp matches as authoritative and fully replaces the artist list) to overwrite two
+/// correctly separated source artists (e.g. from SoundCloud) with one incorrect merged one.
+///
+/// `split_collab_artist_name` splits the name on common collaboration separators. When it
+/// yields more than one artist, the Bandcamp band reference is intentionally NOT attached to
+/// any of them: that reference identifies the combined band/project page, not any individual
+/// artist, and attaching the same external id/url to two different artists could otherwise
+/// cause them to be incorrectly deduplicated as the same artist by `ArtistRepository::get_by_url`.
+fn band_name_to_artists(band_name: &str, band_id: u64, artist_url: &str) -> Vec<Artist> {
+    let names = split_collab_artist_name(band_name);
+
+    if names.len() <= 1 {
+        return vec![Artist {
+            id: None,
+            name: band_name.to_string(),
+            icon: None,
+            references: vec![Reference {
+                id: None,
+                ref_type: ReferenceType::Metadata,
+                platform: Platform::Bandcamp,
+                external_id: Some(band_id.to_string()),
+                external_url: Some(artist_url.to_string()),
+            }],
+        }];
+    }
+
+    names
+        .into_iter()
+        .map(|name| Artist {
+            id: None,
+            name,
+            icon: None,
+            references: Vec::new(),
+        })
+        .collect()
+}
+
 fn search_result_to_track(item: bandcamp::SearchResultItemTrack) -> Track {
     // Curate the "<band_name> - <title>" convention before it ever reaches Track.title —
     // see `strip_band_name_prefix` for why this is safe to do unconditionally here.
     let title = strip_band_name_prefix(&item.name, &item.band_name);
 
+    let artists = band_name_to_artists(&item.band_name, item.band_id, &item.url.artist_url);
+
     let album = item.album_name.as_ref().map(|album_title| Album {
         id: None,
         title: album_title.clone(),
-        artists: vec![Artist {
-            id: None,
-            name: item.band_name.clone(),
-            icon: None,
-            references: vec![],
-        }],
+        artists: artists.clone(),
         date: None,
         album_type: AlbumType::Unknown,
         cover: None,
@@ -160,18 +200,7 @@ fn search_result_to_track(item: bandcamp::SearchResultItemTrack) -> Track {
         validation_reason: None,
         soundome_id: None,
         title,
-        artists: vec![Artist {
-            id: None,
-            name: item.band_name,
-            icon: None,
-            references: vec![Reference {
-                id: None,
-                ref_type: ReferenceType::Metadata,
-                platform: Platform::Bandcamp,
-                external_id: Some(item.band_id.to_string()),
-                external_url: Some(item.url.artist_url.clone()),
-            }],
-        }],
+        artists,
         album,
         date: None,
         genre: None,
@@ -252,6 +281,29 @@ mod tests {
         assert_eq!(
             strip_band_name_prefix("Boards of Canada - ", "Boards of Canada"),
             "Boards of Canada - "
+        );
+    }
+
+    #[test]
+    fn band_name_to_artists_splits_collab_name_and_drops_ambiguous_reference() {
+        let artists =
+            band_name_to_artists("Acidpach, L'Art Cène", 123, "https://example.bandcamp.com");
+        assert_eq!(artists.len(), 2);
+        assert_eq!(artists[0].name, "Acidpach");
+        assert_eq!(artists[1].name, "L'Art Cène");
+        assert!(artists[0].references.is_empty());
+        assert!(artists[1].references.is_empty());
+    }
+
+    #[test]
+    fn band_name_to_artists_keeps_single_artist_with_reference() {
+        let artists = band_name_to_artists("Boards of Canada", 456, "https://example.bandcamp.com");
+        assert_eq!(artists.len(), 1);
+        assert_eq!(artists[0].name, "Boards of Canada");
+        assert_eq!(artists[0].references.len(), 1);
+        assert_eq!(
+            artists[0].references[0].external_id,
+            Some("456".to_string())
         );
     }
 }
