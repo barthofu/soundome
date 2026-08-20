@@ -118,6 +118,7 @@
 
 <!-- ── ARTIST DETAIL ─────────────────────────────────────────────────────── -->
 {:else if lib.drillArtist}
+  {@const sources = lib.drillArtist.references.filter((r) => r.ref_type === 'Source')}
   <div class="detail-hero">
     {@render artistCover(lib.drillArtist.icon, lib.drillArtist.name)}
     <div class="detail-info">
@@ -134,7 +135,6 @@
       </div>
 
       <!-- One-click subscribe to scheduled sync, per source -->
-      {@const sources = lib.drillArtist!.references.filter((r) => r.ref_type === 'Source')}
       <div class="sync-panel">
         <div class="sync-panel-title">Scheduled sync</div>
         {#if syncError}
