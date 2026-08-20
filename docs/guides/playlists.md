@@ -96,10 +96,13 @@ POST /api/sync-schedules
 GET /api/sync-settings
 PATCH /api/sync-settings
 {
-  "cron_expression": "0 3 * * *",
+  "cron_expression": "0 0 3 * * *",
   "enabled": true
 }
 ```
+
+The cron expression uses 6 fields (seconds, minutes, hours, day of month,
+month, day of week) — e.g. `0 0 3 * * *` runs daily at 3am.
 
 Trigger a full pass immediately, without waiting for the cron:
 

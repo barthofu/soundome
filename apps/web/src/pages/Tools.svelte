@@ -55,7 +55,7 @@
   let runAllMsg: string | null = $state(null);
 
   // Editable draft, only pushed to the server on submit
-  let cronDraft = $state('0 3 * * *');
+  let cronDraft = $state('0 0 3 * * *');
   let enabledDraft = $state(true);
 
   async function loadSettings() {
@@ -291,7 +291,7 @@
             <div class="form-row form-row--split">
               <input
                 type="text"
-                placeholder="Cron expression (e.g. '0 3 * * *' for daily at 3am)"
+                placeholder="Cron expression (6 fields incl. seconds, e.g. '0 0 3 * * *' for daily at 3am)"
                 bind:value={cronDraft}
                 disabled={savingSettings}
               />
