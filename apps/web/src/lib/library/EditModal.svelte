@@ -95,10 +95,7 @@
         </label>
         <label class="field-label">Album
           <input value={lib.trackDraft.album_title ?? ''}
-            oninput={(e) => { 
-              const value = (e.currentTarget as HTMLInputElement).value;
-              lib.trackDraft.album_title = value ? value : null;
-            }}
+            oninput={(e) => { lib.trackDraft.album_title = (e.currentTarget as HTMLInputElement).value || undefined; }}
             placeholder="Album" />
         </label>
         <div class="field-row">

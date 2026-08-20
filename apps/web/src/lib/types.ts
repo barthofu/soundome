@@ -139,7 +139,7 @@ export interface LibraryTrackDto {
 export interface UpdateTrackBody {
   title?: string;
   artists?: string[];
-  album_title?: string | null;
+  album_title?: string;
   genre?: string;
   date?: string;
   track_number?: number;
