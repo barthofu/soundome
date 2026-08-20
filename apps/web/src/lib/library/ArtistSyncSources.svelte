@@ -59,7 +59,12 @@
     if (!syncSchedulesLoaded) loadSyncSchedules();
   });
 
-  let sources = $derived(references.filter((r) => r.ref_type === 'Source'));
+  // Spotify/SoundCloud artists carry a `Metadata` reference (their durable
+  // artist ID), while YouTube Music artists carry a `Source` reference —
+  // either can be used as a sync source, so both are selectable here.
+  let sources = $derived(
+    references.filter((r) => (r.ref_type === 'Source' || r.ref_type === 'Metadata') && r.external_url),
+  );
 </script>
 
 <div class="sync-panel">

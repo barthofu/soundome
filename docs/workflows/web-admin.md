@@ -116,7 +116,7 @@ Everything is synchronized in one pass on a single global cron schedule.
 - **Add a link manually**: URL + optional label; entity type (playlist vs.
   artist) is auto-detected — this is a secondary path now
 - The primary way to subscribe is the one-click button on an artist page
-  (pick one or more `Source` references) or a playlist page
+  (pick one or more `Source`/`Metadata` references) or a playlist page
 - Per-subscription actions: **Pause / Resume**, **Sync now** (triggers an
   immediate background task for that item only), **Remove**
 
