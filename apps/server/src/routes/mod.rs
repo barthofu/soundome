@@ -7,6 +7,7 @@ pub mod metrics;
 pub mod misc;
 pub mod storage;
 pub mod sync_schedules;
+pub mod sync_settings;
 pub mod tasks;
 pub mod validations;
 

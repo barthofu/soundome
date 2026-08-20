@@ -41,6 +41,8 @@ async fn main() {
     let task_repo = Arc::new(repositories::task::DieselTaskRepository::new());
     let sync_schedule_repo =
         Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
+    let sync_settings_repo =
+        Arc::new(repositories::sync_settings::DieselSyncSettingsRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),
@@ -49,6 +51,7 @@ async fn main() {
         playlist: playlist_repo.clone(),
         task: task_repo.clone(),
         sync_schedule: sync_schedule_repo.clone(),
+        sync_settings: sync_settings_repo.clone(),
     });
 
     let conn = &mut database::init_connection(&Config::get().database.url);

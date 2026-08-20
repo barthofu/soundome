@@ -5,6 +5,7 @@ use rocket::{delete, get, http::Status, patch, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use shared::models::{ReferenceType, SyncEntityType};
 
 use crate::utils::{
     cancellation::CancellationRegistry, database::Db, error::CustomError, response::Success,
@@ -18,13 +19,13 @@ use crate::utils::{
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct SyncScheduleDto {
     pub id: i32,
-    pub playlist_url: String,
+    pub entity_type: String,
+    pub artist_id: Option<i32>,
+    pub reference_id: Option<i32>,
+    pub url: String,
     pub label: Option<String>,
-    pub interval_hours: Option<f64>,
-    pub cron_expression: Option<String>,
     pub enabled: bool,
     pub last_run: Option<String>,
-    pub next_run: Option<String>,
     pub created_at: Option<String>,
 }
 
@@ -32,14 +33,13 @@ impl SyncScheduleDto {
     fn from_model(s: shared::models::SyncSchedule) -> Option<Self> {
         Some(Self {
             id: s.id?,
-            playlist_url: s.playlist_url,
+            entity_type: s.entity_type.as_str().to_string(),
+            artist_id: s.artist_id,
+            reference_id: s.reference_id,
+            url: s.url,
             label: s.label,
-            // Convert seconds to hours for display
-            interval_hours: s.interval_seconds.map(|sec| sec as f64 / 3600.0),
-            cron_expression: s.cron_expression,
             enabled: s.enabled,
             last_run: s.last_run.map(|t| t.to_string()),
-            next_run: s.next_run.map(|t| t.to_string()),
             created_at: s.created_at.map(|t| t.to_string()),
         })
     }
@@ -47,22 +47,19 @@ impl SyncScheduleDto {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct CreateSyncScheduleBody {
-    pub playlist_url: String,
+    /// Manual "add link" path: a raw URL, entity type auto-detected. Mutually
+    /// exclusive with `artist_id`/`reference_id`.
+    pub url: Option<String>,
     pub label: Option<String>,
-    /// Interval in hours (optional, mutually exclusive with cron_expression).
-    /// Defaults to 1 hour if neither interval_hours nor cron_expression is provided.
-    pub interval_hours: Option<f64>,
-    /// Cron expression for scheduling (optional, mutually exclusive with interval_hours).
-    pub cron_expression: Option<String>,
+    /// One-click "subscribe from the artist page" path: an artist + one of
+    /// its `Source` references. Mutually exclusive with `url`.
+    pub artist_id: Option<i32>,
+    pub reference_id: Option<i32>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct UpdateSyncScheduleBody {
     pub label: Option<String>,
-    /// Interval in hours (optional, mutually exclusive with cron_expression).
-    pub interval_hours: Option<f64>,
-    /// Cron expression for scheduling (optional, mutually exclusive with interval_hours).
-    pub cron_expression: Option<String>,
     pub enabled: Option<bool>,
 }
 
@@ -70,7 +67,7 @@ pub struct UpdateSyncScheduleBody {
 // Routes
 // ================================================================================================
 
-/// List all sync schedules.
+/// List all sync subscriptions.
 #[openapi]
 #[get("/sync-schedules")]
 pub async fn get_all(
@@ -96,7 +93,7 @@ pub async fn get_all(
     ))
 }
 
-/// Get a sync schedule by id.
+/// Get a sync subscription by id.
 #[openapi]
 #[get("/sync-schedules/<id>")]
 pub async fn get_by_id(
@@ -126,7 +123,10 @@ pub async fn get_by_id(
         })
 }
 
-/// Create a new sync schedule.
+/// Create a new sync subscription. Either supply `url` (manual "add link",
+/// entity type auto-detected) or `artist_id` + `reference_id` (one-click
+/// subscribe from the artist page, using one of the artist's `Source`
+/// references).
 #[openapi]
 #[post("/sync-schedules", format = "json", data = "<body>")]
 pub async fn create(
@@ -135,47 +135,67 @@ pub async fn create(
     services: &rocket::State<Arc<ServiceLayer>>,
 ) -> Result<Json<SyncScheduleDto>, crate::utils::error::Error> {
     let services = Arc::clone(services);
-    let body = body.into_inner();
+    let CreateSyncScheduleBody {
+        url,
+        label,
+        artist_id,
+        reference_id,
+    } = body.into_inner();
 
-    // Validate that at least one of interval_hours or cron_expression is provided
-    if body.interval_hours.is_none() && body.cron_expression.is_none() {
+    if url.is_some() && (artist_id.is_some() || reference_id.is_some()) {
         return Err(crate::utils::error::Error::Custom(CustomError {
             status: Status::BadRequest,
             code: "BAD_REQUEST".to_string(),
-            message: "Either interval_hours or cron_expression must be provided".to_string(),
+            message: "Cannot provide both url and artist_id/reference_id".to_string(),
         }));
     }
 
-    // Validate that both are not provided
-    if body.interval_hours.is_some() && body.cron_expression.is_some() {
-        return Err(crate::utils::error::Error::Custom(CustomError {
-            status: Status::BadRequest,
-            code: "BAD_REQUEST".to_string(),
-            message: "Cannot provide both interval_hours and cron_expression".to_string(),
-        }));
-    }
-
-    // Convert hours to seconds
-    let interval_seconds = body.interval_hours.map(|hours| (hours * 3600.0) as i32);
-
-    let schedule = db
-        .run(move |conn| {
-            services.sync_schedule_service.create(
+    let schedule = if let (Some(artist_id), Some(reference_id)) = (artist_id, reference_id) {
+        db.run(move |conn| {
+            let artist = services.artist_service.get_by_id(conn, artist_id)?;
+            let reference = artist
+                .references
+                .iter()
+                .find(|r| r.id == Some(reference_id) && r.ref_type == ReferenceType::Source)
+                .cloned()
+                .ok_or(shared::errors::Error::InvalidArg)?;
+            let url = reference
+                .external_url
+                .clone()
+                .ok_or(shared::errors::Error::InvalidArg)?;
+            let label = label.or(Some(artist.name.clone()));
+            services.sync_schedule_service.subscribe_artist_source(
                 conn,
-                body.playlist_url,
-                body.label,
-                interval_seconds,
-                body.cron_expression,
+                artist_id,
+                reference_id,
+                url,
+                label,
             )
         })
         .await
-        .map_err(|e| {
-            crate::utils::error::Error::Custom(CustomError {
-                status: Status::InternalServerError,
-                code: "INTERNAL".to_string(),
-                message: e.to_string(),
-            })
-        })?;
+    } else if let Some(url) = url {
+        db.run(move |conn| {
+            let entity_type = domain::schedule::detect_sync_entity_type(&url);
+            services
+                .sync_schedule_service
+                .subscribe_url(conn, entity_type, url, label)
+        })
+        .await
+    } else {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BAD_REQUEST".to_string(),
+            message: "Either url or (artist_id and reference_id) must be provided".to_string(),
+        }));
+    }
+    .map_err(|e| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "INTERNAL".to_string(),
+            message: e.to_string(),
+        })
+    })?;
+
     SyncScheduleDto::from_model(schedule)
         .map(Json)
         .ok_or_else(|| {
@@ -187,7 +207,7 @@ pub async fn create(
         })
 }
 
-/// Update a sync schedule (label, interval, cron, or enabled flag).
+/// Update a sync subscription (label and/or enabled flag).
 #[openapi]
 #[patch("/sync-schedules/<id>", format = "json", data = "<body>")]
 pub async fn update(
@@ -199,28 +219,11 @@ pub async fn update(
     let services = Arc::clone(services);
     let body = body.into_inner();
 
-    // Validate that both interval_hours and cron_expression are not provided together
-    if body.interval_hours.is_some() && body.cron_expression.is_some() {
-        return Err(crate::utils::error::Error::Custom(CustomError {
-            status: Status::BadRequest,
-            code: "BAD_REQUEST".to_string(),
-            message: "Cannot provide both interval_hours and cron_expression".to_string(),
-        }));
-    }
-
     let schedule = db
         .run(move |conn| {
             let mut existing = services.sync_schedule_service.get_by_id(conn, id)?;
             if let Some(label) = body.label {
                 existing.label = Some(label);
-            }
-            if let Some(hours) = body.interval_hours {
-                existing.interval_seconds = Some((hours * 3600.0) as i32);
-                existing.cron_expression = None;
-            }
-            if let Some(cron) = body.cron_expression {
-                existing.cron_expression = Some(cron);
-                existing.interval_seconds = None;
             }
             if let Some(enabled) = body.enabled {
                 existing.enabled = enabled;
@@ -246,7 +249,7 @@ pub async fn update(
         })
 }
 
-/// Delete a sync schedule.
+/// Delete a sync subscription (unsubscribe).
 #[openapi]
 #[delete("/sync-schedules/<id>")]
 pub async fn delete(
@@ -267,7 +270,8 @@ pub async fn delete(
     Ok(Json(Success { success: true }))
 }
 
-/// Manually trigger a sync schedule immediately.
+/// Manually trigger a single sync subscription immediately (does not affect
+/// the global cron's next_run).
 #[openapi]
 #[post("/sync-schedules/<id>/trigger")]
 pub async fn trigger(
@@ -282,7 +286,7 @@ pub async fn trigger(
     let registry = Arc::clone(registry);
     let executor = Arc::clone(executor);
 
-    // Fetch the schedule and mark it as ran immediately
+    // Fetch the subscription and mark it as ran immediately
     let schedule = db
         .run(move |conn| {
             let s = services_for_db.sync_schedule_service.get_by_id(conn, id)?;
@@ -298,14 +302,22 @@ pub async fn trigger(
             })
         })?;
 
-    let url = schedule.playlist_url.clone();
+    let url = schedule.url.clone();
     let label = schedule.label.clone();
+    let entity_type = schedule.entity_type;
 
     let task = db
-        .run(move |conn| {
-            services_for_task
-                .task_service
-                .create_playlist_sync(conn, &url, label)
+        .run(move |conn| match entity_type {
+            SyncEntityType::Playlist => {
+                services_for_task
+                    .task_service
+                    .create_playlist_sync(conn, &url, label)
+            }
+            SyncEntityType::Artist => {
+                services_for_task
+                    .task_service
+                    .create_artist_sync(conn, &url, label)
+            }
         })
         .await
         .map_err(|e| {
@@ -317,9 +329,12 @@ pub async fn trigger(
         })?;
 
     let task_id = task.id.unwrap();
-    let url = schedule.playlist_url.clone();
+    let url = schedule.url.clone();
     let cancel_flag = registry.register(task_id);
-    executor.enqueue_playlist_sync(task_id, url, cancel_flag);
+    match schedule.entity_type {
+        SyncEntityType::Playlist => executor.enqueue_playlist_sync(task_id, url, cancel_flag),
+        SyncEntityType::Artist => executor.enqueue_artist_sync(task_id, url, cancel_flag),
+    }
 
     Ok(Json(serde_json::json!({ "task_id": task_id })))
 }

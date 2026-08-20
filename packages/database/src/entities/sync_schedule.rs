@@ -7,35 +7,32 @@ use crate::schema::sync_schedule;
 #[diesel(table_name = sync_schedule)]
 pub struct SyncScheduleEntity {
     pub id: i32,
-    pub playlist_url: String,
+    pub entity_type: String,
+    pub artist_id: Option<i32>,
+    pub reference_id: Option<i32>,
+    pub url: String,
     pub label: Option<String>,
-    pub interval_seconds: Option<i32>,
-    pub cron_expression: Option<String>,
     pub enabled: i32,
     pub last_run: Option<chrono::NaiveDateTime>,
-    pub next_run: Option<chrono::NaiveDateTime>,
     pub created_at: chrono::NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Insertable, Deserialize)]
 #[diesel(table_name = sync_schedule)]
 pub struct NewSyncScheduleEntity {
-    pub playlist_url: String,
+    pub entity_type: String,
+    pub artist_id: Option<i32>,
+    pub reference_id: Option<i32>,
+    pub url: String,
     pub label: Option<String>,
-    pub interval_seconds: Option<i32>,
-    pub cron_expression: Option<String>,
     pub enabled: i32,
     pub last_run: Option<chrono::NaiveDateTime>,
-    pub next_run: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, AsChangeset, Deserialize)]
 #[diesel(table_name = sync_schedule)]
 pub struct UpdateSyncScheduleEntity {
     pub label: Option<String>,
-    pub interval_seconds: Option<i32>,
-    pub cron_expression: Option<String>,
     pub enabled: Option<i32>,
     pub last_run: Option<chrono::NaiveDateTime>,
-    pub next_run: Option<chrono::NaiveDateTime>,
 }

@@ -107,13 +107,18 @@ Background job monitor (playlist syncs, downloads).
 - **Retry** available for Pending, Running, Failed, and Cancelled tasks
 - **Cancel** available for Running and Pending tasks
 
-### Sync Schedules
+### Tools → Sync
 
-Configure playlists to sync automatically at a fixed interval.
+Everything is synchronized in one pass on a single global cron schedule.
 
-- Add a schedule: playlist URL, optional label, interval in minutes
-- Per-schedule actions: **Pause / Resume**, **Sync now** (triggers an immediate background task), **Delete**
-- Shows last-run and next-run timestamps
+- **Global schedule**: one cron expression + enabled toggle for the whole
+  library, with last/next run timestamps and a "Run now" button
+- **Add a link manually**: URL + optional label; entity type (playlist vs.
+  artist) is auto-detected — this is a secondary path now
+- The primary way to subscribe is the one-click button on an artist page
+  (pick one or more `Source` references) or a playlist page
+- Per-subscription actions: **Pause / Resume**, **Sync now** (triggers an
+  immediate background task for that item only), **Remove**
 
 ## Keyboard shortcuts
 
@@ -190,11 +195,14 @@ All routes are documented interactively at `/swagger`.
 | `GET` | `/api/tasks` | List background tasks |
 | `POST` | `/api/tasks/:id/retry` | Retry a task |
 | `POST` | `/api/tasks/:id/cancel` | Cancel a task |
-| `GET` | `/api/sync-schedules` | List sync schedules |
-| `POST` | `/api/sync-schedules` | Create a sync schedule |
-| `PATCH` | `/api/sync-schedules/:id` | Update a sync schedule |
-| `DELETE` | `/api/sync-schedules/:id` | Delete a sync schedule |
-| `POST` | `/api/sync-schedules/:id/trigger` | Trigger a sync immediately |
+| `GET` | `/api/sync-schedules` | List scheduled sync subscriptions |
+| `POST` | `/api/sync-schedules` | Add a subscription (link, or artist + source) |
+| `PATCH` | `/api/sync-schedules/:id` | Update a subscription (label/enabled) |
+| `DELETE` | `/api/sync-schedules/:id` | Remove a subscription |
+| `POST` | `/api/sync-schedules/:id/trigger` | Trigger a single subscription immediately |
+| `GET` | `/api/sync-settings` | Get the global scheduled-sync cron config |
+| `PATCH` | `/api/sync-settings` | Update the global scheduled-sync cron config |
+| `POST` | `/api/sync-settings/trigger` | Run a full scheduled-sync pass immediately |
 | `GET` | `/metrics` | Prometheus metrics (tracks, albums, artists, playlists, tasks by status) |
 
 ## Frontend file structure
@@ -223,7 +231,7 @@ apps/web/
 │       ├── Library.svelte
 │       ├── Validations.svelte
 │       ├── Tasks.svelte
-│       └── SyncSchedules.svelte
+│       └── Tools.svelte        # storage stats + scheduled sync management
 ├── vite.config.ts
 └── package.json
 ```

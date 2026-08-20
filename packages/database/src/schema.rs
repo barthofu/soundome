@@ -85,14 +85,24 @@ diesel::table! {
 diesel::table! {
     sync_schedule (id) {
         id -> Integer,
-        playlist_url -> Text,
+        entity_type -> Text,
+        artist_id -> Nullable<Integer>,
+        reference_id -> Nullable<Integer>,
+        url -> Text,
         label -> Nullable<Text>,
-        interval_seconds -> Nullable<Integer>,
-        cron_expression -> Nullable<Text>,
+        enabled -> Integer,
+        last_run -> Nullable<Timestamp>,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    sync_settings (id) {
+        id -> Integer,
+        cron_expression -> Text,
         enabled -> Integer,
         last_run -> Nullable<Timestamp>,
         next_run -> Nullable<Timestamp>,
-        created_at -> Timestamp,
     }
 }
 
@@ -158,6 +168,8 @@ diesel::joinable!(artist_tracks -> artist (artist_id));
 diesel::joinable!(artist_tracks -> track (track_id));
 diesel::joinable!(playlist_tracks -> playlist (playlist_id));
 diesel::joinable!(playlist_tracks -> track (track_id));
+diesel::joinable!(sync_schedule -> artist (artist_id));
+diesel::joinable!(sync_schedule -> artist_ref (reference_id));
 diesel::joinable!(track -> album (album_id));
 diesel::joinable!(track_genres -> genre (genre_id));
 diesel::joinable!(track_genres -> track (track_id));
@@ -174,6 +186,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     playlist,
     playlist_tracks,
     sync_schedule,
+    sync_settings,
     task,
     track,
     track_genres,

@@ -5,9 +5,9 @@ use shared::models::{Album, AlbumType, Platform};
 use crate::entities::{
     AlbumEntity, AlbumRefEntity, ArtistEntity, ArtistRefEntity, NewAlbumEntity, NewAlbumRefEntity,
     NewArtistEntity, NewArtistRefEntity, NewPlaylistEntity, NewSyncScheduleEntity, NewTaskEntity,
-    NewTrackEntity, NewTrackRefEntity, PlaylistEntity, SyncScheduleEntity, TaskEntity, TrackEntity,
-    TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity, UpdateArtistEntity,
-    UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity,
+    NewTrackEntity, NewTrackRefEntity, PlaylistEntity, SyncScheduleEntity, SyncSettingsEntity,
+    TaskEntity, TrackEntity, TrackRefEntity, UpdateAlbumEntity, UpdateAlbumRefEntity,
+    UpdateArtistEntity, UpdateArtistRefEntity, UpdateTrackEntity, UpdateTrackRefEntity,
 };
 
 // ================================================================================================
@@ -391,13 +391,13 @@ impl SyncScheduleEntity {
     pub fn convert_to_domain(entity: SyncScheduleEntity) -> shared::models::SyncSchedule {
         shared::models::SyncSchedule {
             id: Some(entity.id),
-            playlist_url: entity.playlist_url,
+            entity_type: shared::models::SyncEntityType::from_str(&entity.entity_type),
+            artist_id: entity.artist_id,
+            reference_id: entity.reference_id,
+            url: entity.url,
             label: entity.label,
-            interval_seconds: entity.interval_seconds,
-            cron_expression: entity.cron_expression,
             enabled: entity.enabled != 0,
             last_run: entity.last_run,
-            next_run: entity.next_run,
             created_at: Some(entity.created_at),
         }
     }
@@ -406,13 +406,28 @@ impl SyncScheduleEntity {
 impl NewSyncScheduleEntity {
     pub fn convert_from_domain(schedule: &shared::models::SyncSchedule) -> NewSyncScheduleEntity {
         NewSyncScheduleEntity {
-            playlist_url: schedule.playlist_url.clone(),
+            entity_type: schedule.entity_type.as_str().to_string(),
+            artist_id: schedule.artist_id,
+            reference_id: schedule.reference_id,
+            url: schedule.url.clone(),
             label: schedule.label.clone(),
-            interval_seconds: schedule.interval_seconds,
-            cron_expression: schedule.cron_expression.clone(),
             enabled: if schedule.enabled { 1 } else { 0 },
             last_run: schedule.last_run,
-            next_run: schedule.next_run,
+        }
+    }
+}
+
+// ================================================================================================
+// SyncSettings
+// ================================================================================================
+
+impl SyncSettingsEntity {
+    pub fn convert_to_domain(entity: SyncSettingsEntity) -> shared::models::SyncSettings {
+        shared::models::SyncSettings {
+            cron_expression: entity.cron_expression,
+            enabled: entity.enabled != 0,
+            last_run: entity.last_run,
+            next_run: entity.next_run,
         }
     }
 }

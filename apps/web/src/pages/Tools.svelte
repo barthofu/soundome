@@ -1,7 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getStorageStats, getSyncSchedules, createSyncSchedule, updateSyncSchedule, deleteSyncSchedule, triggerSyncSchedule } from '../lib/api';
-  import type { StorageStatsDto, SyncScheduleDto } from '../lib/api';
+  import {
+    getStorageStats,
+    getSyncSchedules,
+    createSyncSchedule,
+    updateSyncSchedule,
+    deleteSyncSchedule,
+    triggerSyncSchedule,
+    getSyncSettings,
+    updateSyncSettings,
+    triggerAllSyncSchedules,
+  } from '../lib/api';
+  import type { StorageStatsDto, SyncScheduleDto, SyncSettingsDto } from '../lib/api';
 
   // ── Tab ────────────────────────────────────────────────────────────────────
   type Tab = 'storage' | 'sync';
@@ -36,17 +46,69 @@
     return `${size.toFixed(1)} ${units[unitIdx]}`;
   }
 
-  // ── Sync ─────────────────────────────────────────────────────────────────────
+  // ── Sync: global cron settings ───────────────────────────────────────────────
+  let settings: SyncSettingsDto | null = $state(null);
+  let settingsLoading = $state(true);
+  let settingsError: string | null = $state(null);
+  let savingSettings = $state(false);
+  let runningAll = $state(false);
+  let runAllMsg: string | null = $state(null);
+
+  // Editable draft, only pushed to the server on submit
+  let cronDraft = $state('0 3 * * *');
+  let enabledDraft = $state(true);
+
+  async function loadSettings() {
+    settingsLoading = true;
+    settingsError = null;
+    try {
+      settings = await getSyncSettings();
+      cronDraft = settings.cron_expression;
+      enabledDraft = settings.enabled;
+    } catch (e: unknown) {
+      settingsError = e instanceof Error ? e.message : String(e);
+    } finally {
+      settingsLoading = false;
+    }
+  }
+
+  async function handleSaveSettings(e: SubmitEvent) {
+    e.preventDefault();
+    savingSettings = true;
+    settingsError = null;
+    try {
+      settings = await updateSyncSettings({ cron_expression: cronDraft.trim(), enabled: enabledDraft });
+    } catch (e: unknown) {
+      settingsError = e instanceof Error ? e.message : String(e);
+    } finally {
+      savingSettings = false;
+    }
+  }
+
+  async function handleRunAll() {
+    runningAll = true;
+    runAllMsg = null;
+    try {
+      const res = await triggerAllSyncSchedules();
+      runAllMsg = `Started ${res.task_ids.length} sync task(s)`;
+      await loadSettings();
+      await loadSync();
+    } catch (e: unknown) {
+      runAllMsg = e instanceof Error ? e.message : String(e);
+    } finally {
+      runningAll = false;
+      setTimeout(() => (runAllMsg = null), 5000);
+    }
+  }
+
+  // ── Sync: subscriptions ──────────────────────────────────────────────────────
   let schedules: SyncScheduleDto[] = $state([]);
   let syncLoading = $state(true);
   let syncError: string | null = $state(null);
 
-  // Create form
+  // Add-link form (manual, secondary path — type is auto-detected server-side)
   let newUrl = $state('');
   let newLabel = $state('');
-  let newScheduleType = $state<'interval' | 'cron'>('interval');
-  let newIntervalHours = $state(1);
-  let newCronExpression = $state('0 12 * * *');
   let creating = $state(false);
   let createError: string | null = $state(null);
 
@@ -71,21 +133,9 @@
     creating = true;
     createError = null;
     try {
-      const body: any = {
-        playlist_url: newUrl.trim(),
-        label: newLabel.trim() || null,
-      };
-      if (newScheduleType === 'interval') {
-        body.interval_hours = newIntervalHours;
-      } else {
-        body.cron_expression = newCronExpression;
-      }
-      await createSyncSchedule(body);
+      await createSyncSchedule({ url: newUrl.trim(), label: newLabel.trim() || null });
       newUrl = '';
       newLabel = '';
-      newIntervalHours = 1;
-      newCronExpression = '0 12 * * *';
-      newScheduleType = 'interval';
       await loadSync();
     } catch (e: unknown) {
       createError = e instanceof Error ? e.message : String(e);
@@ -104,7 +154,7 @@
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Delete this sync schedule?')) return;
+    if (!confirm('Remove this subscription from scheduled sync?')) return;
     try {
       await deleteSyncSchedule(id);
       schedules = schedules.filter((s) => s.id !== id);
@@ -128,17 +178,6 @@
     }
   }
 
-  function formatSchedule(schedule: SyncScheduleDto): string {
-    if (schedule.interval_hours !== null && schedule.interval_hours !== undefined) {
-      const h = schedule.interval_hours;
-      if (h < 1) return `every ${Math.round(h * 60)}m`;
-      if (h === 1) return 'every hour';
-      if (h === Math.floor(h)) return `every ${Math.floor(h)}h`;
-      return `every ${h}h`;
-    }
-    return `cron: ${schedule.cron_expression || '?'}`;
-  }
-
   function formatDate(dt: string | null): string {
     if (!dt) return '—';
     const d = new Date(dt.replace(' ', 'T'));
@@ -147,6 +186,7 @@
 
   onMount(() => {
     loadStorage();
+    loadSettings();
     loadSync();
   });
 
@@ -233,63 +273,73 @@
   <!-- ── Sync tab ────────────────────────────────────────────────────────────── -->
   {#if activeTab === 'sync'}
     <div class="tab-content">
-      <p class="sync-subtitle">Define playlists to synchronize automatically using intervals or cron expressions.</p>
+      <p class="sync-subtitle">
+        Everything below is synchronized in a single pass on the schedule configured here.
+        Subscribe artists and playlists from their own pages for the quickest path — this page
+        also lets you add a link manually and fine-tune the global schedule.
+      </p>
 
       <section class="create-section">
-        <h3>Add a schedule</h3>
+        <h3>Global schedule</h3>
+        {#if settingsError}
+          <p class="feedback error">{settingsError}</p>
+        {/if}
+        {#if settingsLoading}
+          <p class="status">Loading…</p>
+        {:else if settings}
+          <form class="create-form" onsubmit={handleSaveSettings}>
+            <div class="form-row form-row--split">
+              <input
+                type="text"
+                placeholder="Cron expression (e.g. '0 3 * * *' for daily at 3am)"
+                bind:value={cronDraft}
+                disabled={savingSettings}
+              />
+              <label class="enabled-toggle">
+                <input type="checkbox" bind:checked={enabledDraft} disabled={savingSettings} />
+                Enabled
+              </label>
+              <button type="submit" class="btn-accent" disabled={savingSettings || !cronDraft.trim()}>
+                {#if savingSettings}<span class="spinner"></span> Saving…{:else}Save{/if}
+              </button>
+            </div>
+          </form>
+          <div class="schedule-dates">
+            <span>Last run: {formatDate(settings.last_run)}</span>
+            <span>Next run: {formatDate(settings.next_run)}</span>
+          </div>
+          <div class="section-toolbar">
+            <button class="btn-secondary" disabled={runningAll} onclick={handleRunAll}>
+              {#if runningAll}<span class="spinner"></span> Running…{:else}Run now{/if}
+            </button>
+          </div>
+          {#if runAllMsg}
+            <div class="feedback info">{runAllMsg}</div>
+          {/if}
+        {/if}
+      </section>
+
+      <section class="create-section">
+        <h3>Add a link manually</h3>
         <form class="create-form" onsubmit={handleCreate}>
-          <div class="form-row">
+          <div class="form-row form-row--split">
             <input
               type="url"
-              placeholder="Playlist URL (Spotify, SoundCloud, YouTube…)"
+              placeholder="Artist or playlist URL (Spotify, SoundCloud, YouTube…)"
               bind:value={newUrl}
               disabled={creating}
               required
             />
-          </div>
-          <div class="form-row form-row--split">
             <input
               type="text"
               placeholder="Label (optional)"
               bind:value={newLabel}
               disabled={creating}
             />
-            <div class="schedule-type-toggle">
-              <button
-                type="button"
-                class="toggle-btn"
-                class:active={newScheduleType === 'interval'}
-                disabled={creating}
-                onclick={() => (newScheduleType = 'interval')}
-              >Interval</button>
-              <button
-                type="button"
-                class="toggle-btn"
-                class:active={newScheduleType === 'cron'}
-                disabled={creating}
-                onclick={() => (newScheduleType = 'cron')}
-              >Cron</button>
-            </div>
+            <button type="submit" class="btn-accent" disabled={creating || !newUrl.trim()}>
+              {#if creating}<span class="spinner"></span> Adding…{:else}Add{/if}
+            </button>
           </div>
-
-          {#if newScheduleType === 'interval'}
-            <div class="form-row form-row--split">
-              <div class="interval-group">
-                <input type="number" min="0.25" step="0.25" bind:value={newIntervalHours} disabled={creating} />
-                <span class="interval-hint">hours</span>
-              </div>
-              <button type="submit" class="btn-accent" disabled={creating || !newUrl.trim()}>
-                {#if creating}<span class="spinner"></span> Adding…{:else}Add{/if}
-              </button>
-            </div>
-          {:else}
-            <div class="form-row form-row--split">
-              <input type="text" placeholder="Cron expression (e.g. '0 12 * * *' for daily at noon)" bind:value={newCronExpression} disabled={creating} />
-              <button type="submit" class="btn-accent" disabled={creating || !newUrl.trim()}>
-                {#if creating}<span class="spinner"></span> Adding…{:else}Add{/if}
-              </button>
-            </div>
-          {/if}
 
           {#if createError}
             <p class="feedback error">{createError}</p>
@@ -307,20 +357,20 @@
       {#if syncLoading}
         <p class="status">Loading…</p>
       {:else if schedules.length === 0}
-        <p class="status">No schedules yet.</p>
+        <p class="status">No subscriptions yet.</p>
       {:else}
         <ul class="schedule-list">
           {#each schedules as schedule (schedule.id)}
             <li class="schedule-card" class:disabled={!schedule.enabled}>
               <div class="schedule-header">
                 <div class="schedule-info">
-                  <span class="schedule-label">{schedule.label ?? schedule.playlist_url}</span>
+                  <span class="schedule-label">{schedule.label ?? schedule.url}</span>
                   {#if schedule.label}
-                    <span class="schedule-url">{schedule.playlist_url}</span>
+                    <span class="schedule-url">{schedule.url}</span>
                   {/if}
                 </div>
                 <div class="schedule-meta">
-                  <span class="interval-badge">{formatSchedule(schedule)}</span>
+                  <span class="type-badge">{schedule.entity_type}</span>
                   <span class="status-badge" class:enabled={schedule.enabled} class:paused={!schedule.enabled}>
                     {schedule.enabled ? 'Active' : 'Paused'}
                   </span>
@@ -328,7 +378,6 @@
               </div>
               <div class="schedule-dates">
                 <span>Last run: {formatDate(schedule.last_run)}</span>
-                <span>Next run: {formatDate(schedule.next_run)}</span>
               </div>
               <div class="schedule-actions">
                 <button class="btn-secondary" onclick={() => toggleEnabled(schedule)}>
@@ -341,7 +390,7 @@
                     Sync now
                   {/if}
                 </button>
-                <button class="btn-danger" onclick={() => handleDelete(schedule.id)}>Delete</button>
+                <button class="btn-danger" onclick={() => handleDelete(schedule.id)}>Remove</button>
               </div>
             </li>
           {/each}
@@ -591,70 +640,12 @@
     opacity: 0.5;
   }
 
-  .schedule-type-toggle {
-    display: flex;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-
-  .toggle-btn {
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    border: none;
-    background: var(--surface);
-    color: var(--muted);
-    font-size: 0.875rem;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .toggle-btn:not(:last-child) {
-    border-right: 1px solid var(--border);
-  }
-
-  .toggle-btn.active {
-    background: var(--accent);
-    color: #fff;
-  }
-
-  .toggle-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .interval-group {
+  .enabled-toggle {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-  }
-
-  .interval-group input[type="number"] {
-    width: 80px;
-    padding: 0.5rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    color: var(--text);
     font-size: 0.875rem;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .interval-group input[type="number"]:focus {
-    border-color: var(--accent);
-  }
-
-  .interval-group input[type="number"]:disabled {
-    opacity: 0.5;
-  }
-
-  .interval-hint {
-    font-size: 0.8rem;
-    color: var(--muted);
+    color: var(--text);
     white-space: nowrap;
   }
 
@@ -718,12 +709,13 @@
     flex-shrink: 0;
   }
 
-  .interval-badge {
+  .type-badge {
     font-size: 0.75rem;
     padding: 0.2rem 0.5rem;
     border-radius: 20px;
     background: var(--surface-2);
     color: var(--muted);
+    text-transform: capitalize;
   }
 
   .status-badge {

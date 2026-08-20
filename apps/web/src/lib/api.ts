@@ -437,18 +437,20 @@ export async function deleteEntityReference(
 }
 
 // ================================================================================================
-// Sync Schedules
+// Sync Schedules (subscriptions) + global sync settings
 // ================================================================================================
+
+export type SyncEntityType = 'playlist' | 'artist';
 
 export interface SyncScheduleDto {
   id: number;
-  playlist_url: string;
+  entity_type: SyncEntityType;
+  artist_id: number | null;
+  reference_id: number | null;
+  url: string;
   label: string | null;
-  interval_hours: number | null;
-  cron_expression: string | null;
   enabled: boolean;
   last_run: string | null;
-  next_run: string | null;
   created_at: string | null;
 }
 
@@ -459,12 +461,9 @@ export async function getSyncSchedules(): Promise<SyncScheduleDto[]> {
 }
 
 export async function createSyncSchedule(
-  body: {
-    playlist_url: string;
-    label?: string | null;
-    interval_hours?: number;
-    cron_expression?: string;
-  },
+  body:
+    | { url: string; label?: string | null }
+    | { artist_id: number; reference_id: number; label?: string | null },
 ): Promise<SyncScheduleDto> {
   const res = await fetch(`${BASE}/sync-schedules`, {
     method: 'POST',
@@ -480,7 +479,7 @@ export async function createSyncSchedule(
 
 export async function updateSyncSchedule(
   id: number,
-  patch: { label?: string; interval_hours?: number; cron_expression?: string; enabled?: boolean },
+  patch: { label?: string; enabled?: boolean },
 ): Promise<SyncScheduleDto> {
   const res = await fetch(`${BASE}/sync-schedules/${id}`, {
     method: 'PATCH',
@@ -510,6 +509,45 @@ export async function triggerSyncSchedule(id: number): Promise<{ task_id: number
   }
   return res.json();
 }
+
+export interface SyncSettingsDto {
+  cron_expression: string;
+  enabled: boolean;
+  last_run: string | null;
+  next_run: string | null;
+}
+
+export async function getSyncSettings(): Promise<SyncSettingsDto> {
+  const res = await fetch(`${BASE}/sync-settings`);
+  if (!res.ok) throw new Error(`Failed to fetch sync settings: ${res.statusText}`);
+  return res.json();
+}
+
+export async function updateSyncSettings(
+  patch: { cron_expression?: string; enabled?: boolean },
+): Promise<SyncSettingsDto> {
+  const res = await fetch(`${BASE}/sync-settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function triggerAllSyncSchedules(): Promise<{ task_ids: number[] }> {
+  const res = await fetch(`${BASE}/sync-settings/trigger`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+
 
 // ================================================================================================
 // Ingest
