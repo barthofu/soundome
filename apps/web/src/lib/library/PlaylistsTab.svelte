@@ -1,5 +1,7 @@
 <script lang="ts">
   import { lib } from './store.svelte';
+  import { getSyncSchedules, createSyncSchedule, deleteSyncSchedule } from '../api';
+  import type { SyncScheduleDto } from '../api';
 
   function fmtDuration(secs: number | null): string {
     if (secs == null) return '—';
@@ -7,6 +9,51 @@
     const s = secs % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
   }
+
+  // ── Scheduled sync (one-click subscribe by source_url) ──────────────────────
+  let syncSchedules: SyncScheduleDto[] = $state([]);
+  let syncSchedulesLoaded = $state(false);
+  let syncToggling = $state(false);
+  let syncError: string | null = $state(null);
+
+  async function loadSyncSchedules() {
+    try {
+      syncSchedules = await getSyncSchedules();
+    } catch (e: unknown) {
+      syncError = e instanceof Error ? e.message : String(e);
+    } finally {
+      syncSchedulesLoaded = true;
+    }
+  }
+
+  function findPlaylistSubscription(url: string): SyncScheduleDto | undefined {
+    return syncSchedules.find((s) => s.entity_type === 'playlist' && s.url === url);
+  }
+
+  async function togglePlaylistSync(url: string, label: string) {
+    syncError = null;
+    syncToggling = true;
+    try {
+      const existing = findPlaylistSubscription(url);
+      if (existing) {
+        await deleteSyncSchedule(existing.id);
+        syncSchedules = syncSchedules.filter((s) => s.id !== existing.id);
+      } else {
+        const created = await createSyncSchedule({ url, label });
+        syncSchedules = [...syncSchedules, created];
+      }
+    } catch (e: unknown) {
+      syncError = e instanceof Error ? e.message : String(e);
+    } finally {
+      syncToggling = false;
+    }
+  }
+
+  $effect(() => {
+    if (lib.drillPlaylistId != null && !syncSchedulesLoaded) {
+      loadSyncSchedules();
+    }
+  });
 </script>
 
 {#snippet coverWrap(src: string | null | undefined, alt: string)}
@@ -41,8 +88,22 @@
           {#if playlist.source_url}
             <a class="source-link" href={playlist.source_url} target="_blank" rel="noopener noreferrer">Open source ↗</a>
           {/if}
+          {#if syncError}
+            <p class="sync-error">{syncError}</p>
+          {/if}
           <div class="detail-actions">
             <button class="btn-delete" onclick={() => lib.handleDeletePlaylist(playlist.id)}>Delete playlist</button>
+            {#if playlist.source_url}
+              {@const subscribed = !!findPlaylistSubscription(playlist.source_url)}
+              <button
+                class="btn-sync"
+                class:active={subscribed}
+                disabled={syncToggling}
+                onclick={() => togglePlaylistSync(playlist.source_url!, playlist.name)}
+              >
+                {subscribed ? 'Remove from scheduled sync' : 'Add to scheduled sync'}
+              </button>
+            {/if}
           </div>
         </div>
       </div>
@@ -228,6 +289,14 @@
     color: var(--text, #eee);
   }
   .detail-actions button:hover { background: var(--surface, #141414); }
+
+  .btn-sync.active {
+    background: color-mix(in srgb, var(--accent, #6d5efc) 14%, var(--surface, #111));
+    color: var(--accent, #6d5efc);
+    border-color: color-mix(in srgb, var(--accent, #6d5efc) 45%, transparent);
+  }
+
+  .sync-error { font-size: 0.8rem; color: var(--error, #e05); margin: 0.4rem 0 0; }
 
   /* Delete button */
   .btn-delete {

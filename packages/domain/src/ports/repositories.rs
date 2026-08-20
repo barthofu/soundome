@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use diesel::SqliteConnection;
 use shared::{
-    models::{Album, Artist, Playlist, SyncSchedule, Task, Track},
+    models::{Album, Artist, Playlist, SyncSchedule, SyncSettings, Task, Track},
     types::SoundomeResult,
 };
 
@@ -13,6 +13,7 @@ pub struct RepositoryLayer {
     pub playlist: Arc<dyn PlaylistRepository>,
     pub task: Arc<dyn TaskRepository>,
     pub sync_schedule: Arc<dyn SyncScheduleRepository>,
+    pub sync_settings: Arc<dyn SyncSettingsRepository>,
 }
 
 // ================================================================================================
@@ -270,8 +271,35 @@ pub trait SyncScheduleRepository: Send + Sync {
         schedule: &SyncSchedule,
     ) -> SoundomeResult<SyncSchedule>;
     fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
-    /// Returns all schedules that are enabled and whose next_run is in the past (or NULL).
-    fn get_due(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<SyncSchedule>>;
-    /// Record that a schedule ran now and compute the next_run time.
+    /// Returns all enabled subscriptions (everything the global cron pass should sync).
+    fn get_enabled(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<SyncSchedule>>;
+    /// Record that a subscription ran now.
     fn mark_ran(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
+    /// Look up an existing artist subscription for a given (artist_id, reference_id) pair, if any.
+    fn find_artist_subscription(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+        reference_id: i32,
+    ) -> SoundomeResult<Option<SyncSchedule>>;
+    /// Look up an existing subscription for a given (entity_type, url) pair, if any.
+    fn find_by_url(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: shared::models::SyncEntityType,
+        url: &str,
+    ) -> SoundomeResult<Option<SyncSchedule>>;
+}
+
+// ================================================================================================
+
+pub trait SyncSettingsRepository: Send + Sync {
+    fn get(&self, conn: &mut SqliteConnection) -> SoundomeResult<SyncSettings>;
+    fn update(
+        &self,
+        conn: &mut SqliteConnection,
+        settings: &SyncSettings,
+    ) -> SoundomeResult<SyncSettings>;
+    /// Record that the global cron pass ran now and compute the next run time.
+    fn mark_ran(&self, conn: &mut SqliteConnection) -> SoundomeResult<()>;
 }

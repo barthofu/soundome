@@ -69,6 +69,8 @@ fn rocket() -> _ {
     let task_repo = Arc::new(repositories::task::DieselTaskRepository::new());
     let sync_schedule_repo =
         Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
+    let sync_settings_repo =
+        Arc::new(repositories::sync_settings::DieselSyncSettingsRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),
@@ -77,6 +79,7 @@ fn rocket() -> _ {
         playlist: playlist_repo.clone(),
         task: task_repo.clone(),
         sync_schedule: sync_schedule_repo.clone(),
+        sync_settings: sync_settings_repo.clone(),
     });
 
     let services = Arc::new(ServiceLayer::new(repositories));
@@ -149,7 +152,9 @@ fn rocket() -> _ {
     }
     */
 
-    // Spawn the background sync scheduler (checks every 60 seconds)
+    // Spawn the background sync scheduler (checks every 60 seconds).
+    // A single global cron (`sync_settings`) decides *when* to run; when due,
+    // every enabled subscription (`sync_schedule`) is enqueued in one pass.
     {
         let db_url = Config::get().database.url.clone();
         let services_for_scheduler = services.clone();
@@ -159,40 +164,73 @@ fn rocket() -> _ {
             std::thread::sleep(std::time::Duration::from_secs(60));
 
             let conn = &mut database::init_connection(&db_url);
-            let due = match services_for_scheduler.sync_schedule_service.get_due(conn) {
+
+            let settings = match services_for_scheduler.sync_settings_service.get(conn) {
                 Ok(v) => v,
                 Err(e) => {
-                    tracing::error!("Scheduler: failed to query due schedules: {}", e);
+                    tracing::error!("Scheduler: failed to load global sync settings: {}", e);
                     continue;
                 }
             };
-            for schedule in due {
-                let schedule_id = match schedule.id {
+
+            let now = chrono::Utc::now().naive_utc();
+            let is_due = settings.enabled
+                && settings
+                    .next_run
+                    .map(|next_run| next_run <= now)
+                    .unwrap_or(true);
+            if !is_due {
+                continue;
+            }
+
+            if let Err(e) = services_for_scheduler.sync_settings_service.mark_ran(conn) {
+                tracing::error!("Scheduler: failed to mark global sync settings as ran: {}", e);
+                continue;
+            }
+
+            let subscriptions = match services_for_scheduler.sync_schedule_service.get_enabled(conn)
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::error!("Scheduler: failed to query enabled subscriptions: {}", e);
+                    continue;
+                }
+            };
+
+            for subscription in subscriptions {
+                let subscription_id = match subscription.id {
                     Some(id) => id,
                     None => continue,
                 };
-                let url = schedule.playlist_url.clone();
-                let label = schedule.label.clone();
+                let url = subscription.url.clone();
+                let label = subscription.label.clone();
+
                 if let Err(e) = services_for_scheduler
                     .sync_schedule_service
-                    .mark_ran(conn, schedule_id)
+                    .mark_ran(conn, subscription_id)
                 {
                     tracing::error!(
-                        "Scheduler: failed to mark schedule {} as ran: {}",
-                        schedule_id,
+                        "Scheduler: failed to mark subscription {} as ran: {}",
+                        subscription_id,
                         e
                     );
                     continue;
                 }
-                let task = match services_for_scheduler
-                    .task_service
-                    .create_playlist_sync(conn, &url, label)
-                {
+
+                let task = match subscription.entity_type {
+                    shared::models::SyncEntityType::Playlist => services_for_scheduler
+                        .task_service
+                        .create_playlist_sync(conn, &url, label),
+                    shared::models::SyncEntityType::Artist => services_for_scheduler
+                        .task_service
+                        .create_artist_sync(conn, &url, label),
+                };
+                let task = match task {
                     Ok(t) => t,
                     Err(e) => {
                         tracing::error!(
-                            "Scheduler: failed to create task for schedule {}: {}",
-                            schedule_id,
+                            "Scheduler: failed to create task for subscription {}: {}",
+                            subscription_id,
                             e
                         );
                         continue;
@@ -204,11 +242,19 @@ fn rocket() -> _ {
                 };
                 let cancel_flag = registry_for_scheduler.register(task_id);
                 tracing::info!(
-                    "Scheduler: enqueueing sync for schedule {} (url={})",
-                    schedule_id,
+                    "Scheduler: enqueueing sync for subscription {} (type={:?}, url={})",
+                    subscription_id,
+                    subscription.entity_type,
                     url
                 );
-                executor_for_scheduler.enqueue_playlist_sync(task_id, url, cancel_flag);
+                match subscription.entity_type {
+                    shared::models::SyncEntityType::Playlist => {
+                        executor_for_scheduler.enqueue_playlist_sync(task_id, url, cancel_flag);
+                    }
+                    shared::models::SyncEntityType::Artist => {
+                        executor_for_scheduler.enqueue_artist_sync(task_id, url, cancel_flag);
+                    }
+                }
             }
         });
     }
@@ -269,6 +315,9 @@ fn rocket() -> _ {
                 routes::sync_schedules::update,
                 routes::sync_schedules::delete,
                 routes::sync_schedules::trigger,
+                routes::sync_settings::get_settings,
+                routes::sync_settings::update_settings,
+                routes::sync_settings::trigger_all,
                 routes::tracks::get_all,
                 routes::tracks::get,
                 routes::tracks::update,

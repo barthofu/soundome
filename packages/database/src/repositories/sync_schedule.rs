@@ -1,7 +1,6 @@
 use domain::ports::repositories::SyncScheduleRepository;
-use domain::schedule::calculate_next_run;
 
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::{models::SyncSchedule, types::SoundomeResult};
 
 use crate::{
@@ -64,11 +63,8 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
     ) -> SoundomeResult<SyncSchedule> {
         let changeset = UpdateSyncScheduleEntity {
             label: schedule.label.clone(),
-            interval_seconds: schedule.interval_seconds,
-            cron_expression: schedule.cron_expression.clone(),
             enabled: Some(if schedule.enabled { 1 } else { 0 }),
             last_run: schedule.last_run,
-            next_run: schedule.next_run,
         };
         diesel::update(schema::sync_schedule::table.filter(schema::sync_schedule::id.eq(id)))
             .set(&changeset)
@@ -84,16 +80,9 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
         Ok(())
     }
 
-    fn get_due(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<SyncSchedule>> {
-        use diesel::BoolExpressionMethods;
-        let now = chrono::Utc::now().naive_utc();
+    fn get_enabled(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<SyncSchedule>> {
         let entities = schema::sync_schedule::table
             .filter(schema::sync_schedule::enabled.eq(1))
-            .filter(
-                schema::sync_schedule::next_run
-                    .is_null()
-                    .or(schema::sync_schedule::next_run.le(now)),
-            )
             .load::<SyncScheduleEntity>(conn)
             .map_err(map_error)?;
         Ok(entities
@@ -103,23 +92,42 @@ impl SyncScheduleRepository for DieselSyncScheduleRepository {
     }
 
     fn mark_ran(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()> {
-        // Fetch schedule to get interval_seconds and cron_expression
-        let schedule = self.get_by_id(conn, id)?;
-
         let now = chrono::Utc::now().naive_utc();
-        let next = calculate_next_run(
-            now,
-            schedule.interval_seconds,
-            schedule.cron_expression.as_deref(),
-        )?;
-
         diesel::update(schema::sync_schedule::table.filter(schema::sync_schedule::id.eq(id)))
-            .set((
-                schema::sync_schedule::last_run.eq(Some(now)),
-                schema::sync_schedule::next_run.eq(Some(next)),
-            ))
+            .set(schema::sync_schedule::last_run.eq(Some(now)))
             .execute(conn)
             .map_err(map_error)?;
         Ok(())
+    }
+
+    fn find_artist_subscription(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+        reference_id: i32,
+    ) -> SoundomeResult<Option<SyncSchedule>> {
+        let entity = schema::sync_schedule::table
+            .filter(schema::sync_schedule::entity_type.eq("artist"))
+            .filter(schema::sync_schedule::artist_id.eq(artist_id))
+            .filter(schema::sync_schedule::reference_id.eq(reference_id))
+            .first::<SyncScheduleEntity>(conn)
+            .optional()
+            .map_err(map_error)?;
+        Ok(entity.map(SyncScheduleEntity::convert_to_domain))
+    }
+
+    fn find_by_url(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: shared::models::SyncEntityType,
+        url: &str,
+    ) -> SoundomeResult<Option<SyncSchedule>> {
+        let entity = schema::sync_schedule::table
+            .filter(schema::sync_schedule::entity_type.eq(entity_type.as_str()))
+            .filter(schema::sync_schedule::url.eq(url))
+            .first::<SyncScheduleEntity>(conn)
+            .optional()
+            .map_err(map_error)?;
+        Ok(entity.map(SyncScheduleEntity::convert_to_domain))
     }
 }

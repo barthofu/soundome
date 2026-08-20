@@ -54,43 +54,69 @@ These are all async background tasks with the same progress, cancel, and retry b
 
 ## Scheduled syncs
 
-You can schedule a playlist to re-sync automatically at a regular interval. This keeps your library up to date without manual intervention.
+Soundome synchronizes everything in a single pass driven by one **global cron
+schedule** (configured once, not per item). Subscribe artists and playlists
+individually — what gets synced — and let the global schedule decide when.
 
-### Creating a schedule
+### Subscribing
 
-Open the **Sync Schedules** tab and click **New schedule**, or use the API:
+The quickest path is a one-click button:
+
+- On an **artist page**, pick one or more `Source` references to subscribe
+  (an artist can have several, e.g. Spotify and SoundCloud — each is synced
+  independently).
+- On a **playlist page**, a single "Add to scheduled sync" button subscribes
+  its `source_url`.
+
+You can also add a link manually from the **Tools → Sync** page, or via the API:
 
 ```
 POST /api/sync-schedules
 {
-  "playlist_url": "https://open.spotify.com/playlist/...",
-  "label": "My Weekend Mix",
-  "interval_hours": 24
+  "url": "https://open.spotify.com/playlist/...",
+  "label": "My Weekend Mix"
 }
 ```
 
-Or with a cron expression instead of an interval:
+The entity type (playlist vs. artist) is auto-detected from the URL. To
+subscribe a specific artist source directly:
 
 ```
 POST /api/sync-schedules
 {
-  "playlist_url": "https://soundcloud.com/artist/sets/playlist",
-  "label": "SoundCloud Favourites",
-  "cron_expression": "0 6 * * 1"
+  "artist_id": 42,
+  "reference_id": 7,
+  "label": "My Favourite Artist"
 }
 ```
 
-`interval_hours` and `cron_expression` are mutually exclusive.
+### The global schedule
 
-### Managing schedules
+```
+GET /api/sync-settings
+PATCH /api/sync-settings
+{
+  "cron_expression": "0 3 * * *",
+  "enabled": true
+}
+```
 
-From the **Sync Schedules** tab you can:
+Trigger a full pass immediately, without waiting for the cron:
 
-- **Pause** a schedule without deleting it (toggle `enabled`)
-- **Resume** a paused schedule
-- **Trigger immediately** — runs a sync now without waiting for the next scheduled time
-- **Edit** the interval, label, or expression
-- **Delete** the schedule
+```
+POST /api/sync-settings/trigger
+```
+
+### Managing subscriptions
+
+From the **Tools → Sync** page (or the `/api/sync-schedules` endpoints) you can:
+
+- **Pause** a subscription without deleting it (toggle `enabled`)
+- **Resume** a paused subscription
+- **Trigger immediately** — runs this one subscription now without waiting
+  for the next global cron pass
+- **Edit** the label
+- **Remove** the subscription (unsubscribe)
 
 ### Manual trigger via API
 
