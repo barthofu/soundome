@@ -153,18 +153,27 @@ Uniqueness constraints:
   enabled/pause toggle, per-item "sync now", delete.
 - Delete the dead duplicate page `apps/web/src/pages/SyncSchedules.svelte`.
 
-### Artist page (`ArtistTab.svelte`)
+### Artist page (`ArtistTab.svelte`, plus the artist `EditModal`)
 
 - Render the artist's references (currently not shown at all despite the
-  data being available), filtered to `ReferenceType::Source`.
-- Each source reference gets a toggle: "Scheduled sync" on/off.
+  data being available), filtered to `Source`/`Metadata` references that
+  carry a usable `external_url`. **Correction from the initial draft:**
+  filtering to `ReferenceType::Source` only excludes Spotify/SoundCloud
+  artists entirely, since their references are created with
+  `ReferenceType::Metadata` in `packages/fetcher` (only YouTube Music
+  artists get `Source`) — both types must be selectable.
+- Each eligible reference gets a toggle: "Scheduled sync" on/off.
   - On: creates a subscription (`entity_type: "artist"`, `artist_id`,
     `reference_id`).
   - Off: deletes (or disables) the matching subscription.
   - No immediate sync on click — subscribing only affects the next global
     cron pass.
-- If the artist has no `Source` reference, show an explicit empty state
+- If the artist has no eligible reference, show an explicit empty state
   instead of a blank control.
+- Implemented as a shared `ArtistSyncSources.svelte` component, rendered
+  both on the artist detail page and inside the artist `EditModal` (next to
+  `ReferencesPanel`), since reference management already lives in the modal
+  and users look for related controls there.
 
 ### Playlist page (`PlaylistsTab.svelte`)
 

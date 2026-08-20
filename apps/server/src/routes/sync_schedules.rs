@@ -52,7 +52,10 @@ pub struct CreateSyncScheduleBody {
     pub url: Option<String>,
     pub label: Option<String>,
     /// One-click "subscribe from the artist page" path: an artist + one of
-    /// its `Source` references. Mutually exclusive with `url`.
+    /// its `Source`/`Metadata` references (whichever carries a usable
+    /// `external_url` for this artist — e.g. Spotify/SoundCloud artists use
+    /// `Metadata`, YouTube Music artists use `Source`). Mutually exclusive
+    /// with `url`.
     pub artist_id: Option<i32>,
     pub reference_id: Option<i32>,
 }
@@ -125,8 +128,8 @@ pub async fn get_by_id(
 
 /// Create a new sync subscription. Either supply `url` (manual "add link",
 /// entity type auto-detected) or `artist_id` + `reference_id` (one-click
-/// subscribe from the artist page, using one of the artist's `Source`
-/// references).
+/// subscribe from the artist page, using one of the artist's `Source` or
+/// `Metadata` references).
 #[openapi]
 #[post("/sync-schedules", format = "json", data = "<body>")]
 pub async fn create(
@@ -156,7 +159,10 @@ pub async fn create(
             let reference = artist
                 .references
                 .iter()
-                .find(|r| r.id == Some(reference_id) && r.ref_type == ReferenceType::Source)
+                .find(|r| {
+                    r.id == Some(reference_id)
+                        && matches!(r.ref_type, ReferenceType::Source | ReferenceType::Metadata)
+                })
                 .cloned()
                 .ok_or(shared::errors::Error::InvalidArg)?;
             let url = reference

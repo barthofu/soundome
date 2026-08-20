@@ -62,9 +62,11 @@ individually — what gets synced — and let the global schedule decide when.
 
 The quickest path is a one-click button:
 
-- On an **artist page**, pick one or more `Source` references to subscribe
-  (an artist can have several, e.g. Spotify and SoundCloud — each is synced
-  independently).
+- On an **artist page**, pick one or more `Source`/`Metadata` references to
+  subscribe (an artist can have several, e.g. Spotify and SoundCloud — each
+  is synced independently). Spotify/SoundCloud artists carry their durable
+  ID as a `Metadata` reference; YouTube Music artists carry a `Source`
+  reference — both are usable as a sync target.
 - On a **playlist page**, a single "Add to scheduled sync" button subscribes
   its `source_url`.
 
