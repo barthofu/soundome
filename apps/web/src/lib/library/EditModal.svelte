@@ -95,18 +95,18 @@
         </label>
         <label class="field-label">Album
           <input value={lib.trackDraft.album_title ?? ''}
-            oninput={(e) => { lib.trackDraft.album_title = (e.currentTarget as HTMLInputElement).value || undefined; }}
+            oninput={(e) => { lib.trackDraft.album_title = (e.currentTarget as HTMLInputElement).value; }}
             placeholder="Album" />
         </label>
         <div class="field-row">
           <label class="field-label half">Genre
             <input value={lib.trackDraft.genre ?? ''}
-              oninput={(e) => { lib.trackDraft.genre = (e.currentTarget as HTMLInputElement).value || undefined; }}
+              oninput={(e) => { lib.trackDraft.genre = (e.currentTarget as HTMLInputElement).value; }}
               placeholder="Genre" />
           </label>
           <label class="field-label half">Date
             <input value={lib.trackDraft.date ?? ''}
-              oninput={(e) => { lib.trackDraft.date = (e.currentTarget as HTMLInputElement).value || undefined; }}
+              oninput={(e) => { lib.trackDraft.date = (e.currentTarget as HTMLInputElement).value; }}
               placeholder="YYYY-MM-DD" />
           </label>
         </div>
@@ -121,7 +121,7 @@
           </label>
           <label class="field-label third">Label
             <input value={lib.trackDraft.label ?? ''}
-              oninput={(e) => { lib.trackDraft.label = (e.currentTarget as HTMLInputElement).value || undefined; }}
+              oninput={(e) => { lib.trackDraft.label = (e.currentTarget as HTMLInputElement).value; }}
               placeholder="Label" />
           </label>
         </div>
@@ -172,7 +172,7 @@
                 <input
                   type="url"
                   value={lib.albumDraft.cover ?? ''}
-                  oninput={(e) => { lib.albumDraft.cover = (e.currentTarget as HTMLInputElement).value || undefined; }}
+                  oninput={(e) => { lib.albumDraft.cover = (e.currentTarget as HTMLInputElement).value; }}
                   placeholder="https://…"
                 />
                 <button
@@ -203,7 +203,7 @@
         </label>
         <label class="field-label">Date
           <input value={lib.albumDraft.date ?? ''}
-            oninput={(e) => { lib.albumDraft.date = (e.currentTarget as HTMLInputElement).value || undefined; }}
+            oninput={(e) => { lib.albumDraft.date = (e.currentTarget as HTMLInputElement).value; }}
             placeholder="YYYY-MM-DD" />
         </label>
         <ReferencesPanel
@@ -253,7 +253,7 @@
                 <input
                   type="url"
                   value={lib.artistDraft.icon ?? ''}
-                  oninput={(e) => { lib.artistDraft.icon = (e.currentTarget as HTMLInputElement).value || undefined; }}
+                  oninput={(e) => { lib.artistDraft.icon = (e.currentTarget as HTMLInputElement).value; }}
                   placeholder="https://…"
                 />
                 <button
