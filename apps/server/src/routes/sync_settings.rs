@@ -81,10 +81,9 @@ pub async fn update_settings(
     // Validate the cron expression eagerly so a bad value never gets
     // persisted (the scheduler would otherwise fail silently every minute).
     if let Some(cron_expression) = &body.cron_expression {
-        if let Err(e) = domain::schedule::calculate_next_run(
-            chrono::Utc::now().naive_utc(),
-            cron_expression,
-        ) {
+        if let Err(e) =
+            domain::schedule::calculate_next_run(chrono::Utc::now().naive_utc(), cron_expression)
+        {
             return Err(crate::utils::error::Error::Custom(CustomError {
                 status: Status::BadRequest,
                 code: "BAD_REQUEST".to_string(),

@@ -184,11 +184,16 @@ fn rocket() -> _ {
             }
 
             if let Err(e) = services_for_scheduler.sync_settings_service.mark_ran(conn) {
-                tracing::error!("Scheduler: failed to mark global sync settings as ran: {}", e);
+                tracing::error!(
+                    "Scheduler: failed to mark global sync settings as ran: {}",
+                    e
+                );
                 continue;
             }
 
-            let subscriptions = match services_for_scheduler.sync_schedule_service.get_enabled(conn)
+            let subscriptions = match services_for_scheduler
+                .sync_schedule_service
+                .get_enabled(conn)
             {
                 Ok(v) => v,
                 Err(e) => {
