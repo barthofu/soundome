@@ -308,16 +308,12 @@ pub async fn trigger(
 
     let task = db
         .run(move |conn| match entity_type {
-            SyncEntityType::Playlist => {
-                services_for_task
-                    .task_service
-                    .create_playlist_sync(conn, &url, label)
-            }
-            SyncEntityType::Artist => {
-                services_for_task
-                    .task_service
-                    .create_artist_sync(conn, &url, label)
-            }
+            SyncEntityType::Playlist => services_for_task
+                .task_service
+                .create_playlist_sync(conn, &url, label),
+            SyncEntityType::Artist => services_for_task
+                .task_service
+                .create_artist_sync(conn, &url, label),
         })
         .await
         .map_err(|e| {
