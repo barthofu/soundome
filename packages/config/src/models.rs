@@ -153,6 +153,12 @@ pub struct AiConfig {
     pub provider_order: Vec<String>,
     pub openrouter: Option<OpenRouterConfig>,
     pub ollama: Option<OllamaConfig>,
+    /// Maximum number of tracks sent to the AI in a single metadata cleanup request.
+    /// Keeping this small helps the model maintain track boundaries and avoids
+    /// "leaking" artist names across unrelated tracks in the same batch.
+    /// ENV: SOUNDOME__AI__CLEANUP_BATCH_SIZE
+    #[serde(default = "AiConfig::default_cleanup_batch_size")]
+    pub cleanup_batch_size: usize,
 }
 
 impl Default for AiConfig {
@@ -162,6 +168,7 @@ impl Default for AiConfig {
             provider_order: Self::default_provider_order(),
             openrouter: None,
             ollama: None,
+            cleanup_batch_size: Self::default_cleanup_batch_size(),
         }
     }
 }
@@ -169,6 +176,10 @@ impl Default for AiConfig {
 impl AiConfig {
     fn default_provider_order() -> Vec<String> {
         vec!["openrouter".to_string()]
+    }
+
+    fn default_cleanup_batch_size() -> usize {
+        10
     }
 }
 

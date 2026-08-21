@@ -147,6 +147,13 @@ enabled = false
 # ENV: SOUNDOME__AI__PROVIDER_ORDER
 provider_order = ["openrouter"]
 
+# Maximum number of tracks sent to the AI in a single metadata cleanup request.
+# Keeping this small helps the model maintain track boundaries and avoids
+# "leaking" artist names across unrelated tracks in the same batch.
+# ENV: SOUNDOME__AI__CLEANUP_BATCH_SIZE
+# cleanup_batch_size = 10
+
+
 # -----------------------------------------------------------------------------
 # Ollama (optional)
 # Local or self-hosted LLM server. Useful as a fast, free primary provider.
