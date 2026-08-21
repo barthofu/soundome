@@ -4115,7 +4115,7 @@ dependencies = [
 
 [[package]]
 name = "soundome-server"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "chrono",
  "config 0.1.0",
