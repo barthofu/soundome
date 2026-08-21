@@ -24,6 +24,59 @@ impl DieselArtistRepository {
     pub fn new() -> Self {
         Self {}
     }
+
+    /// Looks up an existing artist by matching any of `references` against stored
+    /// `artist_ref` rows on `(platform, external_id)` or `(platform, external_url)`.
+    /// Used to dedupe by durable platform identity before falling back to a
+    /// name-based match, e.g. so re-syncing the same SoundCloud artist never
+    /// creates a duplicate row even if the display name changed slightly.
+    fn find_artist_id_by_any_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        references: &[Reference],
+    ) -> SoundomeResult<Option<i32>> {
+        for reference in references {
+            if reference.external_id.is_none() && reference.external_url.is_none() {
+                continue;
+            }
+            let platform = reference.platform.as_ref().to_string().to_lowercase();
+
+            if let Some(external_id) = &reference.external_id {
+                let found: Option<ArtistRefEntity> = schema::artist_ref::table
+                    .filter(schema::artist_ref::platform.eq(&platform))
+                    .filter(schema::artist_ref::external_id.eq(external_id))
+                    .first(conn)
+                    .optional()
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to look up artist by reference external_id: {}",
+                            err
+                        ))
+                    })?;
+                if let Some(entity) = found {
+                    return Ok(Some(entity.artist_id));
+                }
+            }
+
+            if let Some(external_url) = &reference.external_url {
+                let found: Option<ArtistRefEntity> = schema::artist_ref::table
+                    .filter(schema::artist_ref::platform.eq(&platform))
+                    .filter(schema::artist_ref::external_url.eq(external_url))
+                    .first(conn)
+                    .optional()
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to look up artist by reference external_url: {}",
+                            err
+                        ))
+                    })?;
+                if let Some(entity) = found {
+                    return Ok(Some(entity.artist_id));
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl ArtistRepository for DieselArtistRepository {
@@ -255,6 +308,15 @@ impl ArtistRepository for DieselArtistRepository {
         if let Some(id) = artist.id {
             return self.get_by_id(conn, id);
         }
+        // Reference fast path: a matching (platform, external_id/external_url) is a
+        // stronger identity signal than the name and takes priority over name-based
+        // matching below. This prevents duplicate artists when the same platform
+        // reference is synced again under a slightly different display name, and
+        // avoids wrongly merging two distinct artists that only share a name.
+        if let Some(existing_id) = self.find_artist_id_by_any_reference(conn, &artist.references)? {
+            self.set_references(conn, existing_id, &artist.references)?;
+            return self.get_by_id(conn, existing_id);
+        }
         // Exact-name fast path
         let exact: Option<ArtistEntity> = schema::artist::table
             .filter(schema::artist::name.eq(&artist.name))
@@ -264,11 +326,9 @@ impl ArtistRepository for DieselArtistRepository {
                 shared::errors::Error::Database(format!("Failed to look up artist: {}", err))
             })?;
         if let Some(entity) = exact {
-            let references: Vec<ArtistRefEntity> = schema::artist_ref::table
-                .filter(schema::artist_ref::artist_id.eq(entity.id))
-                .load(conn)
-                .unwrap_or_default();
-            return Ok(ArtistEntity::convert_to_domain(entity, references));
+            // Merge references when finding an existing artist by exact name
+            self.set_references(conn, entity.id, &artist.references)?;
+            return self.get_by_id(conn, entity.id);
         }
         // Case-insensitive fallback (Unicode-safe: compare lowercased in Rust)
         let name_lower = artist.name.to_lowercase();
@@ -279,11 +339,9 @@ impl ArtistRepository for DieselArtistRepository {
             .into_iter()
             .find(|e| e.name.to_lowercase() == name_lower)
         {
-            let references: Vec<ArtistRefEntity> = schema::artist_ref::table
-                .filter(schema::artist_ref::artist_id.eq(entity.id))
-                .load(conn)
-                .unwrap_or_default();
-            return Ok(ArtistEntity::convert_to_domain(entity, references));
+            // Merge references when finding an existing artist by case-insensitive name
+            self.set_references(conn, entity.id, &artist.references)?;
+            return self.get_by_id(conn, entity.id);
         }
         // Not found: create the artist and its references
         let created_artist = self.create(conn, artist)?;

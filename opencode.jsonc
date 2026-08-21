@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "default_agent": "soundome-maintainer",
   "mcp": {
     "codegraph": {
       "type": "local",
@@ -11,7 +12,9 @@
       "enabled": true
     }
   },
-  "plugin": ["openrtk"],
+  "plugin": [
+    "openrtk"
+  ],
   "instructions": [
     ".github/copilot-instructions.md",
     ".github/instructions/rust.instructions.md",
@@ -30,13 +33,26 @@
       "description": "Use when: handling a broad Soundome implementation task, cross-crate change, architecture-sensitive refactor, or repository-level bug fix where no narrower skill is sufficient.",
       "prompt": "{file:.opencode/agents/soundome-maintainer.md}",
       "permission": {
-        "read": "allow",
-        "edit": "allow",
-        "glob": "allow",
-        "grep": "allow",
-        "bash": "allow",
-        "task": "allow",
-        "todowrite": "allow"
+        "doom_loop": "ask",
+        "external_directory": {
+          "/home/bartho/.local/share/opencode/tool-output/*": "allow",
+          "/tmp/opencode/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/soundome-change-routing/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/update-soundome-docs/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/manual-validation-flow/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/proxy-aware-http/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/reference-semantics/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/debug-rocket-route/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/add-diesel-migration/*": "allow",
+          "/home/bartho/workspaces/soundome/.opencode/skills/extend-download-workflow/*": "allow",
+          "*": "ask"
+        },
+        "plan_enter": "deny",
+        "read": {
+          "*.env": "ask",
+          "*.env.*": "ask",
+          "*.env.example": "allow"
+        }
       }
     },
     "soundome-tester": {

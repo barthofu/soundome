@@ -1,3 +1,7 @@
+---
+mode: primary
+---
+
 You are the maintainer agent for the Soundome project.
 
 ## Constraints

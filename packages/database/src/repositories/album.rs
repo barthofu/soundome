@@ -28,6 +28,58 @@ impl DieselAlbumRepository {
     pub fn new() -> Self {
         Self {}
     }
+
+    /// Looks up an existing album by matching any of `references` against stored
+    /// `album_ref` rows on `(platform, external_id)` or `(platform, external_url)`.
+    /// Used to dedupe by durable platform identity before falling back to a
+    /// title-based match. See `DieselArtistRepository::find_artist_id_by_any_reference`.
+    fn find_album_id_by_any_reference(
+        &self,
+        conn: &mut SqliteConnection,
+        references: &[Reference],
+    ) -> SoundomeResult<Option<i32>> {
+        for reference in references {
+            if reference.external_id.is_none() && reference.external_url.is_none() {
+                continue;
+            }
+            let platform = reference.platform.as_ref().to_string().to_lowercase();
+
+            if let Some(external_id) = &reference.external_id {
+                let found: Option<AlbumRefEntity> = schema::album_ref::table
+                    .filter(schema::album_ref::platform.eq(&platform))
+                    .filter(schema::album_ref::external_id.eq(external_id))
+                    .first(conn)
+                    .optional()
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to look up album by reference external_id: {}",
+                            err
+                        ))
+                    })?;
+                if let Some(entity) = found {
+                    return Ok(Some(entity.album_id));
+                }
+            }
+
+            if let Some(external_url) = &reference.external_url {
+                let found: Option<AlbumRefEntity> = schema::album_ref::table
+                    .filter(schema::album_ref::platform.eq(&platform))
+                    .filter(schema::album_ref::external_url.eq(external_url))
+                    .first(conn)
+                    .optional()
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to look up album by reference external_url: {}",
+                            err
+                        ))
+                    })?;
+                if let Some(entity) = found {
+                    return Ok(Some(entity.album_id));
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl AlbumRepository for DieselAlbumRepository {
@@ -127,6 +179,13 @@ impl AlbumRepository for DieselAlbumRepository {
         if let Some(id) = album.id {
             return self.get_by_id(conn, id);
         }
+        // Reference fast path: a matching (platform, external_id/external_url) is a
+        // stronger identity signal than the title and takes priority over
+        // title-based matching below (see artist repo for rationale).
+        if let Some(existing_id) = self.find_album_id_by_any_reference(conn, &album.references)? {
+            self.set_references(conn, existing_id, &album.references)?;
+            return self.get_by_id(conn, existing_id);
+        }
         // Exact-title fast path
         let exact: Option<AlbumEntity> = schema::album::table
             .filter(schema::album::title.eq(&album.title))
@@ -136,6 +195,8 @@ impl AlbumRepository for DieselAlbumRepository {
                 shared::errors::Error::Database(format!("Failed to look up album: {}", err))
             })?;
         if let Some(entity) = exact {
+            // Merge references when finding an existing album by exact title
+            self.set_references(conn, entity.id, &album.references)?;
             return self.get_by_id(conn, entity.id);
         }
         // Case-insensitive fallback (Unicode-safe: compare lowercased in Rust)
@@ -147,6 +208,8 @@ impl AlbumRepository for DieselAlbumRepository {
             .into_iter()
             .find(|e| e.title.to_lowercase() == title_lower)
         {
+            // Merge references when finding an existing album by case-insensitive title
+            self.set_references(conn, entity.id, &album.references)?;
             return self.get_by_id(conn, entity.id);
         }
         // Not found: create the album and its references
