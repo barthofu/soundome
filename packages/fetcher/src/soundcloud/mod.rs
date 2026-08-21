@@ -62,6 +62,22 @@ impl Soundcloud {
     // Utils
     // =================
 
+    /// Extracts the `offset` query parameter from a `next_href` pagination URL.
+    ///
+    /// SoundCloud's `linked_partitioning=1` collections use an *opaque cursor*
+    /// (e.g. `2026-03-13T00:49:46.000Z,tracks,00000000002282757278`) as the
+    /// `offset` value, not a plain integer. Manually incrementing a numeric
+    /// offset does not paginate correctly — the only reliable way to fetch the
+    /// next page is to reuse the cursor SoundCloud gives back in `next_href`.
+    fn extract_cursor_from_next_href(next_href: &str) -> Option<String> {
+        reqwest::Url::parse(next_href).ok().and_then(|parsed| {
+            parsed
+                .query_pairs()
+                .find(|(key, _)| key == "offset")
+                .map(|(_, value)| value.into_owned())
+        })
+    }
+
     /// Fetch all tracks for a user with pagination (the default API only returns one page).
     /// Also fetches tracks from the user's albums since those are not included in `/tracks`.
     async fn get_all_user_tracks(&self, url: &str) -> Result<Vec<BasicTrack>, Error> {
@@ -76,23 +92,23 @@ impl Soundcloud {
         let mut all_tracks: Vec<BasicTrack> = Vec::new();
         let mut seen_ids: std::collections::HashSet<u64> = std::collections::HashSet::new();
 
-        // 1. Fetch direct uploads (singles) with pagination
+        // 1. Fetch direct uploads (singles) with cursor-based pagination
         let limit = 50u32;
-        let mut offset = 0u32;
+        let mut cursor: Option<String> = None;
 
         loop {
             let uri = format!("/users/{}/tracks", user_id);
             let mut query = std::collections::HashMap::new();
             query.insert("limit".to_string(), limit.to_string());
-            query.insert("offset".to_string(), offset.to_string());
             query.insert("linked_partitioning".to_string(), "1".to_string());
+            if let Some(ref c) = cursor {
+                query.insert("offset".to_string(), c.clone());
+            }
 
-            let result = self.client.api_get(&uri, query).await.map_err(|e| {
-                Error::Network(format!(
-                    "Failed to fetch user tracks page at offset {}: {}",
-                    offset, e
-                ))
-            })?;
+            let result =
+                self.client.api_get(&uri, query).await.map_err(|e| {
+                    Error::Network(format!("Failed to fetch user tracks page: {}", e))
+                })?;
 
             let json: serde_json::Value = serde_json::from_str(&result)
                 .map_err(|e| Error::Internal(format!("Failed to parse tracks response: {}", e)))?;
@@ -106,23 +122,20 @@ impl Soundcloud {
                 _ => break,
             };
 
-            let page_len = page_tracks.len();
             for track in page_tracks {
                 if seen_ids.insert(track.track.id) {
                     all_tracks.push(track);
                 }
             }
 
-            if page_len < limit as usize {
-                break;
+            // Follow the cursor SoundCloud gives us rather than assuming a page
+            // is "last" just because it returned fewer than `limit` items —
+            // pages can legitimately be short while more pages remain.
+            let next_href = json.get("next_href").and_then(|v| v.as_str());
+            match next_href.and_then(Self::extract_cursor_from_next_href) {
+                Some(next_cursor) => cursor = Some(next_cursor),
+                None => break,
             }
-
-            let has_next = json.get("next_href").and_then(|v| v.as_str()).is_some();
-            if !has_next {
-                break;
-            }
-
-            offset += limit;
         }
 
         tracing::info!(
@@ -131,21 +144,22 @@ impl Soundcloud {
         );
 
         // 2. Fetch tracks from the user's albums (these are not included in /tracks)
-        let mut album_offset = 0u32;
+        let mut album_cursor: Option<String> = None;
 
         loop {
             let uri = format!("/users/{}/albums", user_id);
             let mut query = std::collections::HashMap::new();
             query.insert("limit".to_string(), limit.to_string());
-            query.insert("offset".to_string(), album_offset.to_string());
             query.insert("linked_partitioning".to_string(), "1".to_string());
+            if let Some(ref c) = album_cursor {
+                query.insert("offset".to_string(), c.clone());
+            }
 
-            let result = self.client.api_get(&uri, query).await.map_err(|e| {
-                Error::Network(format!(
-                    "Failed to fetch user albums at offset {}: {}",
-                    album_offset, e
-                ))
-            })?;
+            let result = self
+                .client
+                .api_get(&uri, query)
+                .await
+                .map_err(|e| Error::Network(format!("Failed to fetch user albums: {}", e)))?;
 
             let json: serde_json::Value = serde_json::from_str(&result)
                 .map_err(|e| Error::Internal(format!("Failed to parse albums response: {}", e)))?;
@@ -155,8 +169,6 @@ impl Soundcloud {
                 Some(items) if !items.is_empty() => items.clone(),
                 _ => break,
             };
-
-            let page_len = albums.len();
 
             for album_value in &albums {
                 // Each album has a "tracks" array with track objects
@@ -179,16 +191,11 @@ impl Soundcloud {
                 }
             }
 
-            if page_len < limit as usize {
-                break;
+            let next_href = json.get("next_href").and_then(|v| v.as_str());
+            match next_href.and_then(Self::extract_cursor_from_next_href) {
+                Some(next_cursor) => album_cursor = Some(next_cursor),
+                None => break,
             }
-
-            let has_next = json.get("next_href").and_then(|v| v.as_str()).is_some();
-            if !has_next {
-                break;
-            }
-
-            album_offset += limit;
         }
 
         tracing::info!(
