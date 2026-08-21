@@ -47,7 +47,7 @@
           "/home/bartho/workspaces/soundome/.opencode/skills/extend-download-workflow/*": "allow",
           "*": "ask"
         },
-        "plan_enter": "deny",
+        "plan_enter": "allow",
         "read": {
           "*.env": "ask",
           "*.env.*": "ask",

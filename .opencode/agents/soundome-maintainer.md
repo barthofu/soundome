@@ -1,5 +1,7 @@
 ---
 mode: primary
+model: github-copilot/claude-sonnet-5
+variant: medium
 ---
 
 You are the maintainer agent for the Soundome project.

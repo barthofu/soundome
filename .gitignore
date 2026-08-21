@@ -28,6 +28,7 @@ tmp/
 /core
 rustypipe_cache.json
 rustypipe_reports/
+*openchamber.backup
 
 # logs
 out
