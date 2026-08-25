@@ -1,12 +1,13 @@
 import {
-  getTracks, updateTrack, deleteTrack,
-  getAlbums, updateAlbum, deleteAlbum, mergeAlbums,
-  getArtists, updateArtist, deleteArtist, mergeArtists,
+  getTracksPage, updateTrack, deleteTrack,
+  getAlbumsPage, updateAlbum, deleteAlbum, mergeAlbums, getAlbumNames, getAlbumTracks,
+  getArtistsPage, updateArtist, deleteArtist, mergeArtists, getArtistNames, getArtistTracks, getArtistAlbums,
   uploadArtistImage, uploadAlbumImage, uploadTrackImage,
   fetchArtistIconFromReferences, fetchAlbumCoverFromReferences,
   batchFetchArtistIcons, batchFetchAlbumCovers,
-  getPlaylists, getPlaylistTracks, deletePlaylist,
+  getPlaylistsPage, getPlaylistTracks, deletePlaylist,
   addEntityReference, deleteEntityReference,
+  getPendingCount,
 } from '../api';
 import type {
   LibraryTrackDto, UpdateTrackBody,
@@ -15,6 +16,8 @@ import type {
   LibraryPlaylistDto, PlaylistTrackDto,
   ReferenceDto, AddReferenceBody,
 } from '../types';
+import { entityCache } from './entityCache.svelte';
+import { debounce } from '../utils/debounce';
 
 export type Tab = 'artists' | 'albums' | 'tracks' | 'playlists';
 export type ViewMode = 'list' | 'grid';
@@ -30,7 +33,9 @@ export type EditState =
   | null;
 export type HoveredItem = { type: 'track' | 'album' | 'artist'; id: number } | null;
 
-// ── Artist name similarity helpers ────────────────────────────────────────────
+const PAGE_SIZE = 60;
+
+// ── Artist/album name similarity helpers ──────────────────────────────────────
 function _editDistance(a: string, b: string): number {
   const m = a.length, n = b.length;
   const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
@@ -45,68 +50,6 @@ function _editDistance(a: string, b: string): number {
   return dp[n];
 }
 
-// ── Sorting helpers ──────────────────────────────────────────────────────────
-function sortArtists(list: LibraryArtistDto[], by: ArtistSortBy, dir: SortDirection, tracks: LibraryTrackDto[], albums: LibraryAlbumDto[]): LibraryArtistDto[] {
-  const sorted = [...list].sort((a, b) => {
-    let cmp = 0;
-    if (by === 'name') {
-      cmp = a.name.localeCompare(b.name);
-    } else if (by === 'track_count') {
-      const aCount = tracks.filter(t => t.artists.some(ar => ar.id === a.id)).length;
-      const bCount = tracks.filter(t => t.artists.some(ar => ar.id === b.id)).length;
-      cmp = aCount - bCount;
-    } else if (by === 'album_count') {
-      const aCount = albums.filter(al => al.artists.some(ar => ar.id === a.id)).length;
-      const bCount = albums.filter(al => al.artists.some(ar => ar.id === b.id)).length;
-      cmp = aCount - bCount;
-    }
-    return dir === 'asc' ? cmp : -cmp;
-  });
-  return sorted;
-}
-
-function sortAlbums(list: LibraryAlbumDto[], by: AlbumSortBy, dir: SortDirection, tracks: LibraryTrackDto[]): LibraryAlbumDto[] {
-  const sorted = [...list].sort((a, b) => {
-    let cmp = 0;
-    if (by === 'title') {
-      cmp = a.title.localeCompare(b.title);
-    } else if (by === 'date') {
-      cmp = (a.date ?? '').localeCompare(b.date ?? '');
-    } else if (by === 'artist') {
-      const aArtist = a.artists.map(x => x.name).join(', ');
-      const bArtist = b.artists.map(x => x.name).join(', ');
-      cmp = aArtist.localeCompare(bArtist);
-    } else if (by === 'track_count') {
-      const aCount = tracks.filter(t => t.album?.id === a.id).length;
-      const bCount = tracks.filter(t => t.album?.id === b.id).length;
-      cmp = aCount - bCount;
-    }
-    return dir === 'asc' ? cmp : -cmp;
-  });
-  return sorted;
-}
-
-function sortTracks(list: LibraryTrackDto[], by: TrackSortBy, dir: SortDirection): LibraryTrackDto[] {
-  const sorted = [...list].sort((a, b) => {
-    let cmp = 0;
-    if (by === 'title') {
-      cmp = a.title.localeCompare(b.title);
-    } else if (by === 'artist') {
-      const aArtist = a.artists.map(x => x.name).join(', ');
-      const bArtist = b.artists.map(x => x.name).join(', ');
-      cmp = aArtist.localeCompare(bArtist);
-    } else if (by === 'album') {
-      cmp = (a.album?.title ?? '').localeCompare(b.album?.title ?? '');
-    } else if (by === 'date') {
-      cmp = (a.date ?? '').localeCompare(b.date ?? '');
-    } else if (by === 'duration') {
-      cmp = (a.duration ?? 0) - (b.duration ?? 0);
-    }
-    return dir === 'asc' ? cmp : -cmp;
-  });
-  return sorted;
-}
-
 export function areSimilarArtistNames(a: string, b: string): boolean {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const na = norm(a), nb = norm(b);
@@ -117,7 +60,7 @@ export function areSimilarArtistNames(a: string, b: string): boolean {
   return dist <= 2 || (maxLen >= 8 && dist / maxLen <= 0.2);
 }
 
-// ── Album title similarity helper (mirrors artist name similarity) ───────────
+// Album title similarity mirrors artist name similarity.
 export function areSimilarAlbumNames(a: string, b: string): boolean {
   return areSimilarArtistNames(a, b);
 }
@@ -141,51 +84,69 @@ function createLibraryStore() {
   let albumsView: ViewMode = $state('grid');
   let artistsView: ViewMode = $state('grid');
 
-  // Sort state
+  // Sort/filter/search state
   let artistsSortBy: ArtistSortBy = $state('name');
   let artistsSortDir: SortDirection = $state('asc');
   let albumsSortBy: AlbumSortBy = $state('title');
   let albumsSortDir: SortDirection = $state('asc');
   let tracksSortBy: TrackSortBy = $state('title');
   let tracksSortDir: SortDirection = $state('asc');
-
-  let tracks: LibraryTrackDto[] = $state([]);
-  let tracksLoaded = $state(false);
-  let tracksLoading = $state(false);
-  let tracksError: string | null = $state(null);
-
-  let albums: LibraryAlbumDto[] = $state([]);
-  let albumsLoaded = $state(false);
-  let albumsLoading = $state(false);
-  let albumsError: string | null = $state(null);
-
-  let artists: LibraryArtistDto[] = $state([]);
-  let artistsLoaded = $state(false);
-  let artistsLoading = $state(false);
-  let artistsError: string | null = $state(null);
-
-  let playlists: LibraryPlaylistDto[] = $state([]);
-  let playlistsLoaded = $state(false);
-  let playlistsLoading = $state(false);
-  let playlistsError: string | null = $state(null);
-
-  let drillPlaylistId: number | null = $state(_initHash.playlistId);
-  let drillPlaylistTracks: PlaylistTrackDto[] = $state([]);
-  let drillPlaylistTracksLoading = $state(false);
-  let drillPlaylistTracksError: string | null = $state(null);
-
-  // ── Global refresh state ───────────────────────────────────────────────────
-  let refreshing = $state(false);
-  let lastRefreshed: Date | null = $state(null);
-
   let trackSearch = $state('');
   let albumSearch = $state('');
   let artistSearch = $state('');
   let playlistSearch = $state('');
   let trackFilter: TrackFilter = $state('ok');
 
+  // ── Paginated list state (ids into the normalized entityCache) ─────────────
+  let trackIds: number[] = $state([]);
+  let tracksTotal = $state(0);
+  let tracksPage = $state(0);
+  let tracksLoaded = $state(false);
+  let tracksLoading = $state(false);
+  let tracksLoadingMore = $state(false);
+  let tracksError: string | null = $state(null);
+
+  let albumIds: number[] = $state([]);
+  let albumsTotal = $state(0);
+  let albumsPage = $state(0);
+  let albumsLoaded = $state(false);
+  let albumsLoading = $state(false);
+  let albumsLoadingMore = $state(false);
+  let albumsError: string | null = $state(null);
+
+  let artistIds: number[] = $state([]);
+  let artistsTotal = $state(0);
+  let artistsPage = $state(0);
+  let artistsLoaded = $state(false);
+  let artistsLoading = $state(false);
+  let artistsLoadingMore = $state(false);
+  let artistsError: string | null = $state(null);
+
+  let playlistIds: number[] = $state([]);
+  let playlistsTotal = $state(0);
+  let playlistsPage = $state(0);
+  let playlistsLoaded = $state(false);
+  let playlistsLoading = $state(false);
+  let playlistsLoadingMore = $state(false);
+  let playlistsError: string | null = $state(null);
+
+  let pendingCount = $state(0);
+
+  let drillPlaylistId: number | null = $state(_initHash.playlistId);
+  let drillPlaylistTracks: PlaylistTrackDto[] = $state([]);
+  let drillPlaylistTracksLoading = $state(false);
+  let drillPlaylistTracksError: string | null = $state(null);
+
   let drillArtistId: number | null = $state(_initHash.artistId);
   let drillAlbumId: number | null = $state(_initHash.albumId);
+  let drillArtistAlbumIds: number[] = $state([]);
+  let drillArtistTrackIds: number[] = $state([]);
+  let drillAlbumTrackIds: number[] = $state([]);
+  let drillDataLoading = $state(false);
+
+  // ── Global refresh state ───────────────────────────────────────────────────
+  let refreshing = $state(false);
+  let lastRefreshed: Date | null = $state(null);
 
   let editState: EditState = $state(null);
   let editSaving = $state(false);
@@ -213,82 +174,91 @@ function createLibraryStore() {
   let albumMergeSaving = $state(false);
   let albumSimilarFilterActive = $state(false);
 
-  // ── Derived ────────────────────────────────────────────────────────────────
-  let drillArtist = $derived(
-    drillArtistId != null ? (artists.find(a => a.id === drillArtistId) ?? null) : null
+  // ── Lightweight id+name lists (duplicate detection + artist autocomplete) ──
+  let artistNames: { id: number; name: string }[] = $state([]);
+  let artistNamesLoaded = $state(false);
+  let albumNames: { id: number; title: string }[] = $state([]);
+  let albumNamesLoaded = $state(false);
+
+  async function ensureArtistNames() {
+    if (artistNamesLoaded) return;
+    try { artistNames = await getArtistNames(); artistNamesLoaded = true; } catch { /* best-effort */ }
+  }
+  async function ensureAlbumNames() {
+    if (albumNamesLoaded) return;
+    try { albumNames = await getAlbumNames(); albumNamesLoaded = true; } catch { /* best-effort */ }
+  }
+  /** Called after an artist create/rename/merge so autocomplete stays fresh. */
+  function invalidateArtistNames() { artistNamesLoaded = false; }
+  function invalidateAlbumNames() { albumNamesLoaded = false; }
+
+  // ── Derived: resolve paginated ids through the normalized cache ────────────
+  let filteredTracks = $derived(
+    trackIds.map(id => entityCache.getTrack(id)).filter((t): t is LibraryTrackDto => t != null)
   );
-  let drillAlbum = $derived(
-    drillAlbumId != null ? (albums.find(a => a.id === drillAlbumId) ?? null) : null
+  let filteredAlbums = $derived(
+    albumIds.map(id => entityCache.getAlbum(id)).filter((a): a is LibraryAlbumDto => a != null)
   );
-  let drillPlaylist = $derived(
-    drillPlaylistId != null ? (playlists.find(p => p.id === drillPlaylistId) ?? null) : null
+  let filteredArtists = $derived(
+    artistIds.map(id => entityCache.getArtist(id)).filter((a): a is LibraryArtistDto => a != null)
   );
-  let artistAlbums = $derived.by(() => {
-    const d = drillArtist; if (!d) return [];
-    return albums.filter(a => a.artists.some(ar => ar.id === d.id));
-  });
-  let artistTracks = $derived.by(() => {
-    const d = drillArtist; if (!d) return [];
-    return tracks.filter(t => t.artists.some(a => a.id === d.id));
-  });
-  let albumTracks = $derived.by(() => {
-    const d = drillAlbum; if (!d) return [];
-    return tracks.filter(t => t.album?.id === d.id);
-  });
+  let filteredPlaylists = $derived(
+    playlistIds.map(id => entityCache.getPlaylist(id)).filter((p): p is LibraryPlaylistDto => p != null)
+  );
+
+  let tracksHasMore = $derived(trackIds.length < tracksTotal);
+  let albumsHasMore = $derived(albumIds.length < albumsTotal);
+  let artistsHasMore = $derived(artistIds.length < artistsTotal);
+  let playlistsHasMore = $derived(playlistIds.length < playlistsTotal);
+
+  let drillArtist = $derived(drillArtistId != null ? entityCache.getArtist(drillArtistId) ?? null : null);
+  let drillAlbum = $derived(drillAlbumId != null ? entityCache.getAlbum(drillAlbumId) ?? null : null);
+  let drillPlaylist = $derived(drillPlaylistId != null ? entityCache.getPlaylist(drillPlaylistId) ?? null : null);
+
+  let artistAlbums = $derived(
+    drillArtistAlbumIds.map(id => entityCache.getAlbum(id)).filter((a): a is LibraryAlbumDto => a != null)
+  );
+  let artistTracks = $derived(
+    drillArtistTrackIds.map(id => entityCache.getTrack(id)).filter((t): t is LibraryTrackDto => t != null)
+  );
+  let albumTracks = $derived(
+    drillAlbumTrackIds.map(id => entityCache.getTrack(id)).filter((t): t is LibraryTrackDto => t != null)
+  );
   let artistTracksByAlbum = $derived.by(() => {
-    if (!drillArtist) return [];
     type Group = { albumId: number | null; albumTitle: string | null; albumCover: string | null; tracks: LibraryTrackDto[] };
     const map = new Map<string, Group>();
     for (const t of artistTracks) {
       const key = t.album?.id != null ? String(t.album.id) : '__none__';
-      if (!map.has(key)) map.set(key, { albumId: t.album?.id ?? null, albumTitle: t.album?.title ?? null, albumCover: null, tracks: [] });
+      if (!map.has(key)) {
+        const full = t.album?.id != null ? entityCache.getAlbum(t.album.id) : null;
+        map.set(key, {
+          albumId: t.album?.id ?? null,
+          albumTitle: entityCache.albumTitle(t.album) ?? t.album?.title ?? null,
+          albumCover: full?.cover ?? null,
+          tracks: [],
+        });
+      }
       map.get(key)!.tracks.push(t);
     }
-    const result: Group[] = [];
-    for (const [, grp] of map) {
-      const fullAlbum = grp.albumId != null ? albums.find(a => a.id === grp.albumId) : null;
-      result.push({ ...grp, albumCover: fullAlbum?.cover ?? null });
-    }
+    const result = [...map.values()];
     result.sort((a, b) => {
       if (a.albumId === null) return 1;
       if (b.albumId === null) return -1;
-      const aDate = albums.find(x => x.id === a.albumId)?.date ?? '';
-      const bDate = albums.find(x => x.id === b.albumId)?.date ?? '';
+      const aDate = (a.albumId != null ? entityCache.getAlbum(a.albumId)?.date : null) ?? '';
+      const bDate = (b.albumId != null ? entityCache.getAlbum(b.albumId)?.date : null) ?? '';
       if (aDate !== bDate) return aDate < bDate ? -1 : 1;
       return (a.albumTitle ?? '') < (b.albumTitle ?? '') ? -1 : 1;
     });
     return result;
   });
-  let filteredTracks = $derived.by(() => {
-    let list = tracks;
-    const q = trackSearch.trim().toLowerCase();
-    if (q) list = list.filter(t => t.title.toLowerCase().includes(q) || t.artists.some(a => a.name.toLowerCase().includes(q)));
-    if (trackFilter === 'ok') list = list.filter(t => !t.needs_validation);
-    if (trackFilter === 'pending') list = list.filter(t => t.needs_validation);
-    return sortTracks(list, tracksSortBy, tracksSortDir);
-  });
-  let filteredAlbums = $derived.by(() => {
-    const q = albumSearch.trim().toLowerCase();
-    let list = !q ? albums : albums.filter(a => a.title.toLowerCase().includes(q) || a.artists.some(ar => ar.name.toLowerCase().includes(q)));
-    return sortAlbums(list, albumsSortBy, albumsSortDir, tracks);
-  });
-  let filteredArtists = $derived.by(() => {
-    const q = artistSearch.trim().toLowerCase();
-    let list = !q ? artists : artists.filter(a => a.name.toLowerCase().includes(q));
-    return sortArtists(list, artistsSortBy, artistsSortDir, tracks, albums);
-  });
-  let filteredPlaylists = $derived.by(() => {
-    const q = playlistSearch.trim().toLowerCase(); if (!q) return playlists;
-    return playlists.filter(p => p.name.toLowerCase().includes(q));
-  });
-  let pendingCount = $derived(tracks.filter(t => t.needs_validation).length);
+
   let similarArtistIds = $derived.by(() => {
     const ids = new Set<number>();
-    for (let i = 0; i < artists.length; i++) {
-      for (let j = i + 1; j < artists.length; j++) {
-        if (areSimilarArtistNames(artists[i].name, artists[j].name)) {
-          ids.add(artists[i].id);
-          ids.add(artists[j].id);
+    for (let i = 0; i < artistNames.length; i++) {
+      for (let j = i + 1; j < artistNames.length; j++) {
+        if (areSimilarArtistNames(artistNames[i].name, artistNames[j].name)) {
+          ids.add(artistNames[i].id);
+          ids.add(artistNames[j].id);
         }
       }
     }
@@ -296,11 +266,11 @@ function createLibraryStore() {
   });
   let similarAlbumIds = $derived.by(() => {
     const ids = new Set<number>();
-    for (let i = 0; i < albums.length; i++) {
-      for (let j = i + 1; j < albums.length; j++) {
-        if (areSimilarAlbumNames(albums[i].title, albums[j].title)) {
-          ids.add(albums[i].id);
-          ids.add(albums[j].id);
+    for (let i = 0; i < albumNames.length; i++) {
+      for (let j = i + 1; j < albumNames.length; j++) {
+        if (areSimilarAlbumNames(albumNames[i].title, albumNames[j].title)) {
+          ids.add(albumNames[i].id);
+          ids.add(albumNames[j].id);
         }
       }
     }
@@ -323,6 +293,7 @@ function createLibraryStore() {
     if (location.hash !== h) history.pushState(null, '', h);
     tab = t; drillArtistId = artistId ?? null; drillAlbumId = albumId ?? null;
     drillPlaylistId = playlistId ?? null; editState = null;
+    triggerDrillLoads();
   }
   function applyHash() {
     editState = null;
@@ -333,13 +304,26 @@ function createLibraryStore() {
     if (t === 'tracks') { tab = 'tracks'; drillArtistId = null; drillAlbumId = null; drillPlaylistId = null; return; }
     if (t === 'playlists') {
       tab = 'playlists'; drillArtistId = null; drillAlbumId = null;
-      drillPlaylistId = p[1] ? (parseInt(p[1]) || null) : null; return;
+      drillPlaylistId = p[1] ? (parseInt(p[1]) || null) : null;
+      triggerDrillLoads();
+      return;
     }
-    if (t === 'albums') { tab = 'albums'; drillArtistId = null; drillAlbumId = p[1] ? (parseInt(p[1]) || null) : null; drillPlaylistId = null; return; }
+    if (t === 'albums') {
+      tab = 'albums'; drillArtistId = null; drillAlbumId = p[1] ? (parseInt(p[1]) || null) : null; drillPlaylistId = null;
+      triggerDrillLoads();
+      return;
+    }
     tab = 'artists';
     drillArtistId = p[1] ? (parseInt(p[1]) || null) : null;
     drillAlbumId = (p[2] === 'album' && p[3]) ? (parseInt(p[3]) || null) : null;
     drillPlaylistId = null;
+    triggerDrillLoads();
+  }
+  /** Fetch whatever drill-down data the current URL/navigation state requires. */
+  function triggerDrillLoads() {
+    if (drillPlaylistId != null) loadDrillPlaylistTracks(drillPlaylistId);
+    if (drillArtistId != null) loadDrillArtist(drillArtistId);
+    if (drillAlbumId != null) loadDrillAlbum(drillAlbumId);
   }
   function switchTab(t: Tab) { navigate(t); clearArtistSelection(); clearAlbumSelection(); }
   function clearDrill() { navigate(tab); }
@@ -351,14 +335,17 @@ function createLibraryStore() {
 
   async function loadAll() {
     refreshing = true;
-    tracksLoaded = false; albumsLoaded = false; artistsLoaded = false; playlistsLoaded = false;
-    tracks = []; albums = []; artists = []; playlists = [];
     try {
-      await Promise.all([loadTracks(), loadAlbums(), loadArtists(), loadPlaylists()]);
+      await Promise.all([resetTracks(), resetAlbums(), resetArtists(), resetPlaylists(), loadPendingCount()]);
+      triggerDrillLoads();
       lastRefreshed = new Date();
     } finally {
       refreshing = false;
     }
+  }
+
+  async function loadPendingCount() {
+    try { pendingCount = await getPendingCount(); } catch { /* best-effort */ }
   }
 
   function drillIntoArtist(a: LibraryArtistDto) { navigate('artists', a.id); }
@@ -369,36 +356,213 @@ function createLibraryStore() {
   function backToArtist() { if (drillArtistId) navigate('artists', drillArtistId); }
   function backToRoot() { navigate(tab); }
 
-  // ── Data loading ───────────────────────────────────────────────────────────
-  async function loadTracks() {
-    tracksLoading = true; tracksError = null;
-    try { tracks = await getTracks(); tracksLoaded = true; }
-    catch (e) { tracksError = e instanceof Error ? e.message : String(e); tracksLoaded = true; }
-    finally { tracksLoading = false; }
+  // ── Data loading: paginated tracks ──────────────────────────────────────────
+  async function resetTracks() {
+    tracksLoading = true; tracksError = null; tracksPage = 0; trackIds = [];
+    try {
+      const result = await getTracksPage({
+        page: 1, pageSize: PAGE_SIZE,
+        q: trackSearch.trim() || undefined,
+        sortBy: tracksSortBy, sortDir: tracksSortDir, filter: trackFilter,
+      });
+      entityCache.upsertTracks(result.items);
+      trackIds = result.items.map(t => t.id);
+      tracksTotal = result.total;
+      tracksPage = 1;
+      tracksLoaded = true;
+    } catch (e) {
+      tracksError = e instanceof Error ? e.message : String(e);
+      tracksLoaded = true;
+    } finally {
+      tracksLoading = false;
+    }
   }
-  async function loadAlbums() {
-    albumsLoading = true; albumsError = null;
-    try { albums = await getAlbums(); albumsLoaded = true; }
-    catch (e) { albumsError = e instanceof Error ? e.message : String(e); albumsLoaded = true; }
-    finally { albumsLoading = false; }
+  async function loadMoreTracks() {
+    if (tracksLoadingMore || tracksLoading || !tracksHasMore) return;
+    tracksLoadingMore = true;
+    try {
+      const nextPage = tracksPage + 1;
+      const result = await getTracksPage({
+        page: nextPage, pageSize: PAGE_SIZE,
+        q: trackSearch.trim() || undefined,
+        sortBy: tracksSortBy, sortDir: tracksSortDir, filter: trackFilter,
+      });
+      entityCache.upsertTracks(result.items);
+      trackIds = [...trackIds, ...result.items.map(t => t.id)];
+      tracksTotal = result.total;
+      tracksPage = nextPage;
+    } catch {
+      // Non-fatal: leave the currently-loaded page(s) as-is.
+    } finally {
+      tracksLoadingMore = false;
+    }
   }
-  async function loadArtists() {
-    artistsLoading = true; artistsError = null;
-    try { artists = await getArtists(); artistsLoaded = true; }
-    catch (e) { artistsError = e instanceof Error ? e.message : String(e); artistsLoaded = true; }
-    finally { artistsLoading = false; }
+  const debouncedResetTracks = debounce(() => resetTracks(), 300);
+
+  // ── Data loading: paginated albums ──────────────────────────────────────────
+  async function resetAlbums() {
+    albumsLoading = true; albumsError = null; albumsPage = 0; albumIds = [];
+    try {
+      const result = await getAlbumsPage({
+        page: 1, pageSize: PAGE_SIZE,
+        q: albumSearch.trim() || undefined,
+        sortBy: albumsSortBy, sortDir: albumsSortDir,
+      });
+      entityCache.upsertAlbums(result.items);
+      albumIds = result.items.map(a => a.id);
+      albumsTotal = result.total;
+      albumsPage = 1;
+      albumsLoaded = true;
+    } catch (e) {
+      albumsError = e instanceof Error ? e.message : String(e);
+      albumsLoaded = true;
+    } finally {
+      albumsLoading = false;
+    }
   }
-  async function loadPlaylists() {
-    playlistsLoading = true; playlistsError = null;
-    try { playlists = await getPlaylists(); playlistsLoaded = true; }
-    catch (e) { playlistsError = e instanceof Error ? e.message : String(e); playlistsLoaded = true; }
-    finally { playlistsLoading = false; }
+  async function loadMoreAlbums() {
+    if (albumsLoadingMore || albumsLoading || !albumsHasMore) return;
+    albumsLoadingMore = true;
+    try {
+      const nextPage = albumsPage + 1;
+      const result = await getAlbumsPage({
+        page: nextPage, pageSize: PAGE_SIZE,
+        q: albumSearch.trim() || undefined,
+        sortBy: albumsSortBy, sortDir: albumsSortDir,
+      });
+      entityCache.upsertAlbums(result.items);
+      albumIds = [...albumIds, ...result.items.map(a => a.id)];
+      albumsTotal = result.total;
+      albumsPage = nextPage;
+    } catch {
+      // Non-fatal.
+    } finally {
+      albumsLoadingMore = false;
+    }
+  }
+  const debouncedResetAlbums = debounce(() => resetAlbums(), 300);
+
+  // ── Data loading: paginated artists ─────────────────────────────────────────
+  async function resetArtists() {
+    artistsLoading = true; artistsError = null; artistsPage = 0; artistIds = [];
+    try {
+      const result = await getArtistsPage({
+        page: 1, pageSize: PAGE_SIZE,
+        q: artistSearch.trim() || undefined,
+        sortBy: artistsSortBy, sortDir: artistsSortDir,
+      });
+      entityCache.upsertArtists(result.items);
+      artistIds = result.items.map(a => a.id);
+      artistsTotal = result.total;
+      artistsPage = 1;
+      artistsLoaded = true;
+    } catch (e) {
+      artistsError = e instanceof Error ? e.message : String(e);
+      artistsLoaded = true;
+    } finally {
+      artistsLoading = false;
+    }
+  }
+  async function loadMoreArtists() {
+    if (artistsLoadingMore || artistsLoading || !artistsHasMore) return;
+    artistsLoadingMore = true;
+    try {
+      const nextPage = artistsPage + 1;
+      const result = await getArtistsPage({
+        page: nextPage, pageSize: PAGE_SIZE,
+        q: artistSearch.trim() || undefined,
+        sortBy: artistsSortBy, sortDir: artistsSortDir,
+      });
+      entityCache.upsertArtists(result.items);
+      artistIds = [...artistIds, ...result.items.map(a => a.id)];
+      artistsTotal = result.total;
+      artistsPage = nextPage;
+    } catch {
+      // Non-fatal.
+    } finally {
+      artistsLoadingMore = false;
+    }
+  }
+  const debouncedResetArtists = debounce(() => resetArtists(), 300);
+
+  // ── Data loading: paginated playlists ───────────────────────────────────────
+  async function resetPlaylists() {
+    playlistsLoading = true; playlistsError = null; playlistsPage = 0; playlistIds = [];
+    try {
+      const result = await getPlaylistsPage({
+        page: 1, pageSize: PAGE_SIZE,
+        q: playlistSearch.trim() || undefined,
+      });
+      entityCache.upsertPlaylists(result.items);
+      playlistIds = result.items.map(p => p.id);
+      playlistsTotal = result.total;
+      playlistsPage = 1;
+      playlistsLoaded = true;
+    } catch (e) {
+      playlistsError = e instanceof Error ? e.message : String(e);
+      playlistsLoaded = true;
+    } finally {
+      playlistsLoading = false;
+    }
+  }
+  async function loadMorePlaylists() {
+    if (playlistsLoadingMore || playlistsLoading || !playlistsHasMore) return;
+    playlistsLoadingMore = true;
+    try {
+      const nextPage = playlistsPage + 1;
+      const result = await getPlaylistsPage({
+        page: nextPage, pageSize: PAGE_SIZE,
+        q: playlistSearch.trim() || undefined,
+      });
+      entityCache.upsertPlaylists(result.items);
+      playlistIds = [...playlistIds, ...result.items.map(p => p.id)];
+      playlistsTotal = result.total;
+      playlistsPage = nextPage;
+    } catch {
+      // Non-fatal.
+    } finally {
+      playlistsLoadingMore = false;
+    }
+  }
+  const debouncedResetPlaylists = debounce(() => resetPlaylists(), 300);
+
+  // ── Drill-down data (artist/album detail views) ─────────────────────────────
+  async function loadDrillArtist(id: number) {
+    drillDataLoading = true;
+    try {
+      const [albums, tracks] = await Promise.all([getArtistAlbums(id), getArtistTracks(id)]);
+      entityCache.upsertAlbums(albums);
+      entityCache.upsertTracks(tracks);
+      drillArtistAlbumIds = albums.map(a => a.id);
+      drillArtistTrackIds = tracks.map(t => t.id);
+    } catch {
+      drillArtistAlbumIds = [];
+      drillArtistTrackIds = [];
+    } finally {
+      drillDataLoading = false;
+    }
+  }
+  async function loadDrillAlbum(id: number) {
+    drillDataLoading = true;
+    try {
+      const tracks = await getAlbumTracks(id);
+      entityCache.upsertTracks(tracks);
+      drillAlbumTrackIds = tracks.map(t => t.id);
+    } catch {
+      drillAlbumTrackIds = [];
+    } finally {
+      drillDataLoading = false;
+    }
   }
   async function loadDrillPlaylistTracks(id: number) {
     drillPlaylistTracksLoading = true; drillPlaylistTracksError = null;
-    try { drillPlaylistTracks = await getPlaylistTracks(id); }
-    catch (e) { drillPlaylistTracksError = e instanceof Error ? e.message : String(e); }
-    finally { drillPlaylistTracksLoading = false; }
+    try {
+      drillPlaylistTracks = await getPlaylistTracks(id);
+    } catch (e) {
+      drillPlaylistTracksError = e instanceof Error ? e.message : String(e);
+    } finally {
+      drillPlaylistTracksLoading = false;
+    }
   }
   function drillIntoPlaylist(p: LibraryPlaylistDto) {
     drillPlaylistTracks = [];
@@ -427,9 +591,9 @@ function createLibraryStore() {
   }
   function openEditForHovered() {
     if (!hoveredItem) return;
-    if (hoveredItem.type === 'track') { const t = tracks.find(x => x.id === hoveredItem!.id); if (t) startEditTrack(t); }
-    else if (hoveredItem.type === 'album') { const a = albums.find(x => x.id === hoveredItem!.id); if (a) startEditAlbum(a); }
-    else { const a = artists.find(x => x.id === hoveredItem!.id); if (a) startEditArtist(a); }
+    if (hoveredItem.type === 'track') { const t = entityCache.getTrack(hoveredItem.id); if (t) startEditTrack(t); }
+    else if (hoveredItem.type === 'album') { const a = entityCache.getAlbum(hoveredItem.id); if (a) startEditAlbum(a); }
+    else { const a = entityCache.getArtist(hoveredItem.id); if (a) startEditArtist(a); }
   }
   async function saveEdit() {
     if (!editState) return;
@@ -438,13 +602,15 @@ function createLibraryStore() {
     try {
       if (state.type === 'track') {
         const updated = await updateTrack(state.item.id, trackDraft);
-        tracks = tracks.map(t => t.id === state.item.id ? updated : t);
+        entityCache.upsertTrack(updated);
       } else if (state.type === 'album') {
         const updated = await updateAlbum(state.item.id, albumDraft);
-        albums = albums.map(a => a.id === state.item.id ? updated : a);
+        entityCache.upsertAlbum(updated);
+        invalidateAlbumNames();
       } else {
         const updated = await updateArtist(state.item.id, artistDraft);
-        artists = artists.map(a => a.id === state.item.id ? updated : a);
+        entityCache.upsertArtist(updated);
+        invalidateArtistNames();
       }
       editState = null;
     } catch (err) {
@@ -461,19 +627,19 @@ function createLibraryStore() {
       if (state.type === 'artist') {
         const { url } = await uploadArtistImage(state.item.id, file);
         const updated = { ...state.item, icon: url };
-        artists = artists.map(a => a.id === state.item.id ? updated : a);
+        entityCache.upsertArtist(updated);
         editState = { type: 'artist', item: updated };
         artistDraft.icon = url;
       } else if (state.type === 'album') {
         const { url } = await uploadAlbumImage(state.item.id, file);
         const updated = { ...state.item, cover: url };
-        albums = albums.map(a => a.id === state.item.id ? updated : a);
+        entityCache.upsertAlbum(updated);
         editState = { type: 'album', item: updated };
         albumDraft.cover = url;
       } else {
         const { url } = await uploadTrackImage(state.item.id, file);
         const updated = { ...state.item, cover: url };
-        tracks = tracks.map(t => t.id === state.item.id ? updated : t);
+        entityCache.upsertTrack(updated);
         editState = { type: 'track', item: updated };
         trackDraft.cover = url;
       }
@@ -487,8 +653,7 @@ function createLibraryStore() {
   /**
    * Best-effort: ask the backend to resolve a thumbnail from the currently edited
    * entity's existing references (Spotify, SoundCloud, YouTube Music) and persist it.
-   * Only supported for artists (icon) and albums (cover) — the button that triggers
-   * this is hidden for tracks in the edit modal.
+   * Only supported for artists (icon) and albums (cover).
    */
   async function fetchThumbnailFromReferences() {
     if (!editState) return;
@@ -498,13 +663,13 @@ function createLibraryStore() {
       if (state.type === 'artist') {
         const { url } = await fetchArtistIconFromReferences(state.item.id);
         const updated = { ...state.item, icon: url };
-        artists = artists.map(a => a.id === state.item.id ? updated : a);
+        entityCache.upsertArtist(updated);
         editState = { type: 'artist', item: updated };
         artistDraft.icon = url;
       } else if (state.type === 'album') {
         const { url } = await fetchAlbumCoverFromReferences(state.item.id);
         const updated = { ...state.item, cover: url };
-        albums = albums.map(a => a.id === state.item.id ? updated : a);
+        entityCache.upsertAlbum(updated);
         editState = { type: 'album', item: updated };
         albumDraft.cover = url;
       }
@@ -525,8 +690,7 @@ function createLibraryStore() {
     try {
       const result = await batchFetchArtistIcons();
       batchFetchResult = result;
-      // Refresh artists list to reflect the batch updates
-      await loadArtists();
+      await resetArtists();
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     } finally {
@@ -544,8 +708,7 @@ function createLibraryStore() {
     try {
       const result = await batchFetchAlbumCovers();
       batchFetchResult = result;
-      // Refresh albums list to reflect the batch updates
-      await loadAlbums();
+      await resetAlbums();
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     } finally {
@@ -556,20 +719,37 @@ function createLibraryStore() {
   // ── Delete handlers ────────────────────────────────────────────────────────
   async function handleDeleteTrack(id: number) {
     if (!confirm('Delete this track from the library?')) return;
-    try { await deleteTrack(id); tracks = tracks.filter(t => t.id !== id); }
-    catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    try {
+      await deleteTrack(id);
+      entityCache.removeTrack(id);
+      trackIds = trackIds.filter(x => x !== id);
+      tracksTotal = Math.max(0, tracksTotal - 1);
+      drillArtistTrackIds = drillArtistTrackIds.filter(x => x !== id);
+      drillAlbumTrackIds = drillAlbumTrackIds.filter(x => x !== id);
+      drillPlaylistTracks = drillPlaylistTracks.filter(t => t.id !== id);
+      loadPendingCount();
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
   async function handleDeleteAlbum(id: number) {
     if (!confirm('Delete this album? Tracks will remain but lose their album association.')) return;
     try {
-      await deleteAlbum(id); albums = albums.filter(a => a.id !== id);
+      await deleteAlbum(id);
+      entityCache.removeAlbum(id);
+      albumIds = albumIds.filter(x => x !== id);
+      albumsTotal = Math.max(0, albumsTotal - 1);
+      drillArtistAlbumIds = drillArtistAlbumIds.filter(x => x !== id);
+      invalidateAlbumNames();
       if (drillAlbumId === id) navigate(tab, drillArtistId ?? undefined);
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
   async function handleDeleteArtist(id: number) {
     if (!confirm('Delete this artist?')) return;
     try {
-      await deleteArtist(id); artists = artists.filter(a => a.id !== id);
+      await deleteArtist(id);
+      entityCache.removeArtist(id);
+      artistIds = artistIds.filter(x => x !== id);
+      artistsTotal = Math.max(0, artistsTotal - 1);
+      invalidateArtistNames();
       if (drillArtistId === id) navigate('artists');
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
@@ -581,8 +761,6 @@ function createLibraryStore() {
       'Cancel → delete only the playlist (tracks are kept)'
     );
     try {
-      // If we need to remove tracks from local state but don't have them loaded yet,
-      // fetch the list before deleting so we know which IDs to purge.
       let trackIdsToRemove: Set<number> = new Set();
       if (deleteTracks) {
         const source =
@@ -593,15 +771,18 @@ function createLibraryStore() {
       }
 
       await deletePlaylist(id, deleteTracks);
-      playlists = playlists.filter(p => p.id !== id);
+      entityCache.removePlaylist(id);
+      playlistIds = playlistIds.filter(x => x !== id);
+      playlistsTotal = Math.max(0, playlistsTotal - 1);
 
       if (deleteTracks && trackIdsToRemove.size > 0) {
-        tracks = tracks.filter(t => !trackIdsToRemove.has(t.id));
+        for (const tid of trackIdsToRemove) entityCache.removeTrack(tid);
+        trackIds = trackIds.filter(x => !trackIdsToRemove.has(x));
       }
 
       if (drillPlaylistId === id) navigate('playlists');
-      
-      // Refresh all data after deletion
+
+      // Full refresh: playlist deletion can change track counts across tabs.
       loadAll();
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
@@ -627,15 +808,17 @@ function createLibraryStore() {
   async function pickMergeTarget(targetId: number) {
     if (!mergePicking || !selectedArtistIds.has(targetId)) return;
     const sourceIds = [...selectedArtistIds].filter(id => id !== targetId);
-    const targetName = artists.find(a => a.id === targetId)?.name ?? String(targetId);
-    const sourceNames = sourceIds.map(id => artists.find(a => a.id === id)?.name ?? String(id)).join(', ');
+    const targetName = entityCache.getArtist(targetId)?.name ?? String(targetId);
+    const sourceNames = sourceIds.map(id => entityCache.getArtist(id)?.name ?? String(id)).join(', ');
     if (!confirm(`Merge "${sourceNames}" into "${targetName}"?\n\nThis cannot be undone.`)) return;
     mergeSaving = true;
     try {
       const updated = await mergeArtists(sourceIds, targetId);
-      artists = artists
-        .filter(a => !sourceIds.includes(a.id))
-        .map(a => a.id === updated.id ? updated : a);
+      for (const sid of sourceIds) entityCache.removeArtist(sid);
+      entityCache.upsertArtist(updated);
+      artistIds = artistIds.filter(id => !sourceIds.includes(id));
+      artistsTotal = Math.max(0, artistsTotal - sourceIds.length);
+      invalidateArtistNames();
       clearArtistSelection();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
@@ -665,15 +848,17 @@ function createLibraryStore() {
   async function pickAlbumMergeTarget(targetId: number) {
     if (!albumMergePicking || !selectedAlbumIds.has(targetId)) return;
     const sourceIds = [...selectedAlbumIds].filter(id => id !== targetId);
-    const targetTitle = albums.find(a => a.id === targetId)?.title ?? String(targetId);
-    const sourceTitles = sourceIds.map(id => albums.find(a => a.id === id)?.title ?? String(id)).join(', ');
+    const targetTitle = entityCache.getAlbum(targetId)?.title ?? String(targetId);
+    const sourceTitles = sourceIds.map(id => entityCache.getAlbum(id)?.title ?? String(id)).join(', ');
     if (!confirm(`Merge "${sourceTitles}" into "${targetTitle}"?\n\nThis cannot be undone.`)) return;
     albumMergeSaving = true;
     try {
       const updated = await mergeAlbums(sourceIds, targetId);
-      albums = albums
-        .filter(a => !sourceIds.includes(a.id))
-        .map(a => a.id === updated.id ? updated : a);
+      for (const sid of sourceIds) entityCache.removeAlbum(sid);
+      entityCache.upsertAlbum(updated);
+      albumIds = albumIds.filter(id => !sourceIds.includes(id));
+      albumsTotal = Math.max(0, albumsTotal - sourceIds.length);
+      invalidateAlbumNames();
       clearAlbumSelection();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
@@ -699,12 +884,11 @@ function createLibraryStore() {
   ): Promise<void> {
     if (ref.id == null) return;
     await deleteEntityReference(entity, entityId, ref.id);
-    const updatedRefs = (entity === 'tracks'
-      ? tracks.find(t => t.id === entityId)?.references
-      : entity === 'albums'
-        ? albums.find(a => a.id === entityId)?.references
-        : artists.find(a => a.id === entityId)?.references
-    )?.filter(r => r.id !== ref.id) ?? [];
+    const current =
+      entity === 'tracks' ? entityCache.getTrack(entityId)?.references
+        : entity === 'albums' ? entityCache.getAlbum(entityId)?.references
+          : entityCache.getArtist(entityId)?.references;
+    const updatedRefs = (current ?? []).filter(r => r.id !== ref.id);
     _applyRefUpdate(entity, entityId, updatedRefs);
   }
 
@@ -714,17 +898,20 @@ function createLibraryStore() {
     refs: ReferenceDto[],
   ): void {
     if (entity === 'tracks') {
-      tracks = tracks.map(t => t.id === id ? { ...t, references: refs } : t);
+      const t = entityCache.getTrack(id);
+      if (t) entityCache.upsertTrack({ ...t, references: refs });
       if (editState?.type === 'track' && editState.item.id === id) {
         editState = { ...editState, item: { ...editState.item, references: refs } };
       }
     } else if (entity === 'albums') {
-      albums = albums.map(a => a.id === id ? { ...a, references: refs } : a);
+      const a = entityCache.getAlbum(id);
+      if (a) entityCache.upsertAlbum({ ...a, references: refs });
       if (editState?.type === 'album' && editState.item.id === id) {
         editState = { ...editState, item: { ...editState.item, references: refs } };
       }
     } else {
-      artists = artists.map(a => a.id === id ? { ...a, references: refs } : a);
+      const a = entityCache.getArtist(id);
+      if (a) entityCache.upsertArtist({ ...a, references: refs });
       if (editState?.type === 'artist' && editState.item.id === id) {
         editState = { ...editState, item: { ...editState.item, references: refs } };
       }
@@ -749,32 +936,54 @@ function createLibraryStore() {
     get albumsView() { return albumsView; }, set albumsView(v: ViewMode) { albumsView = v; },
     get artistsView() { return artistsView; }, set artistsView(v: ViewMode) { artistsView = v; },
 
-    get artistsSortBy() { return artistsSortBy; }, set artistsSortBy(v: ArtistSortBy) { artistsSortBy = v; },
-    get artistsSortDir() { return artistsSortDir; }, set artistsSortDir(v: SortDirection) { artistsSortDir = v; },
-    get albumsSortBy() { return albumsSortBy; }, set albumsSortBy(v: AlbumSortBy) { albumsSortBy = v; },
-    get albumsSortDir() { return albumsSortDir; }, set albumsSortDir(v: SortDirection) { albumsSortDir = v; },
-    get tracksSortBy() { return tracksSortBy; }, set tracksSortBy(v: TrackSortBy) { tracksSortBy = v; },
-    get tracksSortDir() { return tracksSortDir; }, set tracksSortDir(v: SortDirection) { tracksSortDir = v; },
+    get artistsSortBy() { return artistsSortBy; },
+    set artistsSortBy(v: ArtistSortBy) { artistsSortBy = v; resetArtists(); },
+    get artistsSortDir() { return artistsSortDir; },
+    set artistsSortDir(v: SortDirection) { artistsSortDir = v; resetArtists(); },
+    get albumsSortBy() { return albumsSortBy; },
+    set albumsSortBy(v: AlbumSortBy) { albumsSortBy = v; resetAlbums(); },
+    get albumsSortDir() { return albumsSortDir; },
+    set albumsSortDir(v: SortDirection) { albumsSortDir = v; resetAlbums(); },
+    get tracksSortBy() { return tracksSortBy; },
+    set tracksSortBy(v: TrackSortBy) { tracksSortBy = v; resetTracks(); },
+    get tracksSortDir() { return tracksSortDir; },
+    set tracksSortDir(v: SortDirection) { tracksSortDir = v; resetTracks(); },
 
-    get tracks() { return tracks; }, set tracks(v: LibraryTrackDto[]) { tracks = v; },
+    get tracks() { return filteredTracks; },
     get tracksLoaded() { return tracksLoaded; },
     get tracksLoading() { return tracksLoading; },
+    get tracksLoadingMore() { return tracksLoadingMore; },
     get tracksError() { return tracksError; },
+    get tracksTotal() { return tracksTotal; },
+    get tracksHasMore() { return tracksHasMore; },
+    loadMoreTracks,
 
-    get albums() { return albums; }, set albums(v: LibraryAlbumDto[]) { albums = v; },
+    get albums() { return filteredAlbums; },
     get albumsLoaded() { return albumsLoaded; },
     get albumsLoading() { return albumsLoading; },
+    get albumsLoadingMore() { return albumsLoadingMore; },
     get albumsError() { return albumsError; },
+    get albumsTotal() { return albumsTotal; },
+    get albumsHasMore() { return albumsHasMore; },
+    loadMoreAlbums,
 
-    get artists() { return artists; }, set artists(v: LibraryArtistDto[]) { artists = v; },
+    get artists() { return filteredArtists; },
     get artistsLoaded() { return artistsLoaded; },
     get artistsLoading() { return artistsLoading; },
+    get artistsLoadingMore() { return artistsLoadingMore; },
     get artistsError() { return artistsError; },
+    get artistsTotal() { return artistsTotal; },
+    get artistsHasMore() { return artistsHasMore; },
+    loadMoreArtists,
 
-    get playlists() { return playlists; }, set playlists(v: LibraryPlaylistDto[]) { playlists = v; },
+    get playlists() { return filteredPlaylists; },
     get playlistsLoaded() { return playlistsLoaded; },
     get playlistsLoading() { return playlistsLoading; },
+    get playlistsLoadingMore() { return playlistsLoadingMore; },
     get playlistsError() { return playlistsError; },
+    get playlistsTotal() { return playlistsTotal; },
+    get playlistsHasMore() { return playlistsHasMore; },
+    loadMorePlaylists,
 
     get drillPlaylistId() { return drillPlaylistId; },
     get drillPlaylist() { return drillPlaylist; },
@@ -782,16 +991,22 @@ function createLibraryStore() {
     get drillPlaylistTracksLoading() { return drillPlaylistTracksLoading; },
     get drillPlaylistTracksError() { return drillPlaylistTracksError; },
 
-    get trackSearch() { return trackSearch; }, set trackSearch(v: string) { trackSearch = v; },
-    get albumSearch() { return albumSearch; }, set albumSearch(v: string) { albumSearch = v; },
-    get artistSearch() { return artistSearch; }, set artistSearch(v: string) { artistSearch = v; },
-    get playlistSearch() { return playlistSearch; }, set playlistSearch(v: string) { playlistSearch = v; },
-    get trackFilter() { return trackFilter; }, set trackFilter(v: TrackFilter) { trackFilter = v; },
+    get trackSearch() { return trackSearch; },
+    set trackSearch(v: string) { trackSearch = v; debouncedResetTracks(); },
+    get albumSearch() { return albumSearch; },
+    set albumSearch(v: string) { albumSearch = v; debouncedResetAlbums(); },
+    get artistSearch() { return artistSearch; },
+    set artistSearch(v: string) { artistSearch = v; debouncedResetArtists(); },
+    get playlistSearch() { return playlistSearch; },
+    set playlistSearch(v: string) { playlistSearch = v; debouncedResetPlaylists(); },
+    get trackFilter() { return trackFilter; },
+    set trackFilter(v: TrackFilter) { trackFilter = v; resetTracks(); },
 
     get drillArtistId() { return drillArtistId; },
     get drillAlbumId() { return drillAlbumId; },
     get drillArtist() { return drillArtist; },
     get drillAlbum() { return drillAlbum; },
+    get drillDataLoading() { return drillDataLoading; },
     get artistAlbums() { return artistAlbums; },
     get artistTracks() { return artistTracks; },
     get albumTracks() { return albumTracks; },
@@ -819,19 +1034,33 @@ function createLibraryStore() {
     get selectedArtistIds() { return selectedArtistIds; },
     get mergePicking() { return mergePicking; },
     get mergeSaving() { return mergeSaving; },
-    get similarFilterActive() { return similarFilterActive; }, set similarFilterActive(v: boolean) { similarFilterActive = v; },
+    get similarFilterActive() { return similarFilterActive; },
+    set similarFilterActive(v: boolean) { similarFilterActive = v; if (v) ensureArtistNames(); },
     get similarArtistIds() { return similarArtistIds; },
 
     get selectedAlbumIds() { return selectedAlbumIds; },
     get albumMergePicking() { return albumMergePicking; },
     get albumMergeSaving() { return albumMergeSaving; },
-    get albumSimilarFilterActive() { return albumSimilarFilterActive; }, set albumSimilarFilterActive(v: boolean) { albumSimilarFilterActive = v; },
+    get albumSimilarFilterActive() { return albumSimilarFilterActive; },
+    set albumSimilarFilterActive(v: boolean) { albumSimilarFilterActive = v; if (v) ensureAlbumNames(); },
     get similarAlbumIds() { return similarAlbumIds; },
+
+    get artistNames() { return artistNames; },
+    ensureArtistNames,
+
+    // Cache passthroughs — used by templates that need to resolve an entity by
+    // id (e.g. a track's embedded artist/album stub) instead of trusting a
+    // possibly-stale snapshot fetched on a different page.
+    getTrack: entityCache.getTrack,
+    getAlbum: entityCache.getAlbum,
+    getArtist: entityCache.getArtist,
+    getPlaylist: entityCache.getPlaylist,
+    artistDisplayName: entityCache.artistName,
+    albumDisplayTitle: entityCache.albumTitle,
 
     navigate, applyHash, switchTab, clearDrill, handleRefresh, loadAll,
     drillIntoArtist, drillIntoAlbum, backToArtist, backToRoot,
     drillIntoPlaylist,
-    loadTracks, loadAlbums, loadArtists, loadPlaylists,
     startEditTrack, startEditAlbum, startEditArtist,
     openEditForHovered, saveEdit, uploadImage, fetchThumbnailFromReferences,
     batchFetchArtistIconsAction, batchFetchAlbumCoversAction,

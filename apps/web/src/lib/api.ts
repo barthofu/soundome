@@ -24,8 +24,10 @@ export async function getPendingValidations(): Promise<PendingValidationDto[]> {
 }
 
 export async function getPendingCount(): Promise<number> {
-  const tracks = await getPendingValidations();
-  return tracks.length;
+  const res = await fetch(`${BASE}/validations/count`);
+  if (!res.ok) throw new Error(`Failed to fetch validations count: ${res.statusText}`);
+  const data: { count: number } = await res.json();
+  return data.count;
 }
 
 export async function approveValidation(
@@ -146,16 +148,51 @@ export async function cancelTask(id: number): Promise<TaskDto> {
 }
 
 export async function getActiveTasksCount(): Promise<number> {
-  const tasks = await getTasks();
-  return tasks.filter((t) => t.status === 'Pending' || t.status === 'Running').length;
+  const res = await fetch(`${BASE}/tasks/active-count`);
+  if (!res.ok) throw new Error(`Failed to fetch active tasks count: ${res.statusText}`);
+  const data: { count: number } = await res.json();
+  return data.count;
 }
 
 // ================================================================================================
 // Library — Tracks
 // ================================================================================================
 
-export async function getTracks(): Promise<LibraryTrackDto[]> {
-  const res = await fetch(`${BASE}/tracks`);
+export interface PageResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface TrackListParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+  filter?: 'all' | 'ok' | 'pending';
+}
+
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== '') usp.set(k, String(v));
+  }
+  const s = usp.toString();
+  return s ? `?${s}` : '';
+}
+
+export async function getTracksPage(params: TrackListParams = {}): Promise<PageResult<LibraryTrackDto>> {
+  const qs = buildQuery({
+    page: params.page,
+    page_size: params.pageSize,
+    q: params.q,
+    sort_by: params.sortBy,
+    sort_dir: params.sortDir,
+    filter: params.filter,
+  });
+  const res = await fetch(`${BASE}/tracks${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch tracks: ${res.statusText}`);
   return res.json();
 }
@@ -185,9 +222,37 @@ export async function deleteTrack(id: number): Promise<void> {
 // Library — Albums
 // ================================================================================================
 
-export async function getAlbums(): Promise<LibraryAlbumDto[]> {
-  const res = await fetch(`${BASE}/albums`);
+export interface AlbumListParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+export async function getAlbumsPage(params: AlbumListParams = {}): Promise<PageResult<LibraryAlbumDto>> {
+  const qs = buildQuery({
+    page: params.page,
+    page_size: params.pageSize,
+    q: params.q,
+    sort_by: params.sortBy,
+    sort_dir: params.sortDir,
+  });
+  const res = await fetch(`${BASE}/albums${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch albums: ${res.statusText}`);
+  return res.json();
+}
+
+/** Lightweight `{id, title}` pairs for every album — used by the duplicate-detection workflow. */
+export async function getAlbumNames(): Promise<{ id: number; title: string }[]> {
+  const res = await fetch(`${BASE}/albums/names`);
+  if (!res.ok) throw new Error(`Failed to fetch album names: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getAlbumTracks(id: number): Promise<LibraryTrackDto[]> {
+  const res = await fetch(`${BASE}/albums/${id}/tracks`);
+  if (!res.ok) throw new Error(`Failed to fetch album tracks: ${res.statusText}`);
   return res.json();
 }
 
@@ -232,9 +297,43 @@ export async function mergeAlbums(
 // Library — Artists
 // ================================================================================================
 
-export async function getArtists(): Promise<LibraryArtistDto[]> {
-  const res = await fetch(`${BASE}/artists`);
+export interface ArtistListParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+export async function getArtistsPage(params: ArtistListParams = {}): Promise<PageResult<LibraryArtistDto>> {
+  const qs = buildQuery({
+    page: params.page,
+    page_size: params.pageSize,
+    q: params.q,
+    sort_by: params.sortBy,
+    sort_dir: params.sortDir,
+  });
+  const res = await fetch(`${BASE}/artists${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch artists: ${res.statusText}`);
+  return res.json();
+}
+
+/** Lightweight `{id, name}` pairs for every artist — used by the duplicate-detection workflow. */
+export async function getArtistNames(): Promise<{ id: number; name: string }[]> {
+  const res = await fetch(`${BASE}/artists/names`);
+  if (!res.ok) throw new Error(`Failed to fetch artist names: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getArtistTracks(id: number): Promise<LibraryTrackDto[]> {
+  const res = await fetch(`${BASE}/artists/${id}/tracks`);
+  if (!res.ok) throw new Error(`Failed to fetch artist tracks: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getArtistAlbums(id: number): Promise<LibraryAlbumDto[]> {
+  const res = await fetch(`${BASE}/artists/${id}/albums`);
+  if (!res.ok) throw new Error(`Failed to fetch artist albums: ${res.statusText}`);
   return res.json();
 }
 
@@ -371,8 +470,9 @@ export async function batchFetchAlbumCovers(): Promise<BatchThumbnailResult> {
 // Library — Playlists
 // ================================================================================================
 
-export async function getPlaylists(): Promise<LibraryPlaylistDto[]> {
-  const res = await fetch(`${BASE}/playlists`);
+export async function getPlaylistsPage(params: { page?: number; pageSize?: number; q?: string } = {}): Promise<PageResult<LibraryPlaylistDto>> {
+  const qs = buildQuery({ page: params.page, page_size: params.pageSize, q: params.q });
+  const res = await fetch(`${BASE}/playlists${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch playlists: ${res.statusText}`);
   return res.json();
 }

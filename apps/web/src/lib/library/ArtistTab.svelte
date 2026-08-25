@@ -3,6 +3,7 @@
   import TrackTable from './TrackTable.svelte';
   import SortDropdown from './SortDropdown.svelte';
   import ArtistSyncSources from './ArtistSyncSources.svelte';
+  import { infiniteScroll } from '../utils/infiniteScroll';
 
   function musicIcon() { return '\u266B'; } // unused, inline SVGs below
 
@@ -50,7 +51,7 @@
     <div class="detail-info">
       <div class="detail-type">{lib.drillAlbum.album_type}</div>
       <h2>{lib.drillAlbum.title}</h2>
-      <div class="detail-sub">{lib.drillAlbum.artists.map(a => a.name).join(', ')}</div>
+      <div class="detail-sub">{lib.drillAlbum.artists.map(a => lib.artistDisplayName(a)).join(', ')}</div>
       {#if lib.drillAlbum.date}<div class="detail-sub">{lib.drillAlbum.date}</div>{/if}
       <div class="detail-actions">
         <button class="btn-edit" onclick={() => lib.startEditAlbum(lib.drillAlbum!)}>Edit</button>
@@ -126,7 +127,7 @@
         <div class="album-section-header">
           {#if group.albumId != null}
             <div class="album-section-thumb">{@render coverWrap(group.albumCover, group.albumTitle ?? '')}</div>
-            {@const fullAlbum = lib.albums.find(x => x.id === group.albumId)}
+            {@const fullAlbum = lib.getAlbum(group.albumId)}
             {#if fullAlbum}
               <span class="album-section-name title-link"
                 onclick={() => lib.drillIntoAlbum(fullAlbum)}
@@ -198,7 +199,7 @@
         </svg>
       </button>
     </div>
-    <span class="count">{lib.filteredArtists.length} artist{lib.filteredArtists.length !== 1 ? 's' : ''}</span>
+    <span class="count">{lib.artistsTotal} artist{lib.artistsTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.artistsView === 'list'}
@@ -280,6 +281,11 @@
       {/each}
     </div>
   {/if}
+  {#if lib.artistsHasMore}
+    <div class="scroll-sentinel" use:infiniteScroll={() => lib.loadMoreArtists()}>
+      {#if lib.artistsLoadingMore}<span class="status">Loading more…</span>{/if}
+    </div>
+  {/if}
   {#if lib.filteredArtists.length === 0}<p class="status">No artists found.</p>{/if}
 
   <!-- Floating merge / pick-target button -->
@@ -307,6 +313,8 @@
 
 <style>
   h2 { font-size: 1.35rem; font-weight: 700; margin: 0 0 0.35rem; }
+  .scroll-sentinel { display: flex; justify-content: center; padding: 1.25rem 0; min-height: 1px; }
+  .scroll-sentinel .status { font-size: 0.8rem; color: var(--muted); }
   .album-section { margin-bottom: 2rem; }
   .album-section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.65rem; }
   .album-section-thumb { width: 36px; height: 36px; flex-shrink: 0; border-radius: 4px; overflow: hidden; }

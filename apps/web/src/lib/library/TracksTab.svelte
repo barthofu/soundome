@@ -2,6 +2,7 @@
   import { lib } from './store.svelte';
   import TrackTable from './TrackTable.svelte';
   import SortDropdown from './SortDropdown.svelte';
+  import { infiniteScroll } from '../utils/infiniteScroll';
 
   const trackSortOptions = [
     { value: 'title', label: 'Title' },
@@ -64,7 +65,7 @@
         </svg>
       </button>
     </div>
-    <span class="count">{lib.filteredTracks.length} track{lib.filteredTracks.length !== 1 ? 's' : ''}</span>
+    <span class="count">{lib.tracksTotal} track{lib.tracksTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.tracksView === 'list'}
@@ -82,7 +83,7 @@
           {@render coverWrap(t.cover, t.title)}
           <div class="card-body">
             <div class="card-title" title={t.title}>{t.title}</div>
-            <div class="card-sub">{t.artists.map(a => a.name).join(', ') || '\u2014'}</div>
+            <div class="card-sub">{t.artists.map(a => lib.artistDisplayName(a)).join(', ') || '\u2014'}</div>
             {#if t.duration != null}<div class="card-meta mono">{lib.fmtDuration(t.duration)}</div>{/if}
           </div>
           {#if t.needs_validation}<span class="card-badge badge-warn" title="Awaiting validation">!</span>{/if}
@@ -94,5 +95,10 @@
       {/each}
     </div>
     {#if lib.filteredTracks.length === 0}<p class="status">No tracks found.</p>{/if}
+  {/if}
+  {#if lib.tracksHasMore}
+    <div class="scroll-sentinel" use:infiniteScroll={() => lib.loadMoreTracks()}>
+      {#if lib.tracksLoadingMore}<span class="status">Loading more…</span>{/if}
+    </div>
   {/if}
 {/if}

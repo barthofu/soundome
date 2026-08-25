@@ -39,6 +39,32 @@ impl AlbumService {
         self.album_repo.get_all(conn)
     }
 
+    /// Paginated, searched, sorted listing for the library UI.
+    pub fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: crate::ports::repositories::AlbumQuery,
+    ) -> SoundomeResult<crate::ports::repositories::Page<shared::models::Album>> {
+        self.album_repo.get_page(conn, query)
+    }
+
+    /// Lightweight `(id, title)` pairs for every album (duplicate-detection workflow).
+    pub fn get_names(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Vec<crate::ports::repositories::NamePair>> {
+        self.album_repo.get_names(conn)
+    }
+
+    /// All albums linked to a given artist (artist drill-down view).
+    pub fn get_by_artist(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+    ) -> SoundomeResult<Vec<shared::models::Album>> {
+        self.album_repo.get_by_artist(conn, artist_id)
+    }
+
     pub fn create(
         &self,
         conn: &mut SqliteConnection,

@@ -157,6 +157,27 @@ pub async fn get_pending(
         })
 }
 
+/// Cheap `{ count }` used by the header badge poll, instead of fetching the
+/// full pending-validations payload just to read `.length`.
+#[openapi]
+#[get("/validations/count")]
+pub async fn get_pending_count(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<crate::utils::response::CountDto>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.track_service.count_pending_validations(conn))
+        .await
+        .map(|count| Json(crate::utils::response::CountDto { count }))
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
 #[openapi]
 #[patch("/validations/<id>", data = "<body>")]
 pub async fn approve_validation(

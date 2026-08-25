@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { lib } from './store.svelte';
 
   interface Props {
@@ -9,17 +10,20 @@
 
   let { value, onChange }: Props = $props();
 
+  onMount(() => { lib.ensureArtistNames(); });
+
   let query = $state('');
   let inputEl: HTMLInputElement | undefined = $state(undefined);
   let highlighted = $state(0);
   let focused = $state(false);
 
-  // Case-insensitive index over the already-loaded artist list (`lib.artists`),
-  // keyed by lowercased name for O(1) exact-match lookups. Rebuilt only when the
-  // underlying artist list changes, not on every keystroke.
+  // Case-insensitive index over the lightweight artist name list (fetched once,
+  // independent of whatever page of the Artists tab happens to be loaded),
+  // keyed by lowercased name for O(1) exact-match lookups. Rebuilt only when
+  // the underlying name list changes, not on every keystroke.
   let nameIndex = $derived.by(() => {
     const map = new Map<string, { id: number; name: string }>();
-    for (const a of lib.artists) map.set(a.name.toLowerCase(), { id: a.id, name: a.name });
+    for (const a of lib.artistNames) map.set(a.name.toLowerCase(), { id: a.id, name: a.name });
     return map;
   });
 
@@ -29,7 +33,7 @@
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const out: { id: number; name: string }[] = [];
-    for (const a of lib.artists) {
+    for (const a of lib.artistNames) {
       if (selectedLower.has(a.name.toLowerCase())) continue;
       if (a.name.toLowerCase().includes(q)) {
         out.push({ id: a.id, name: a.name });

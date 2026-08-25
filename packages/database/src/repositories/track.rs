@@ -1,6 +1,7 @@
-use domain::ports::repositories::TrackRepository;
+use domain::ports::repositories::{Page, SortDir, TrackQuery, TrackRepository, TrackSortBy};
 
 use diesel::prelude::*;
+use diesel::sql_types::{BigInt, Bool, Integer, Nullable, Text};
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use shared::{
     models::{Reference, Track},
@@ -16,12 +17,135 @@ use crate::{
     schema,
 };
 
+#[derive(QueryableByName)]
+struct IdRow {
+    #[diesel(sql_type = Integer)]
+    id: i32,
+}
+
 #[derive(Default)]
 pub struct DieselTrackRepository {}
 
 impl DieselTrackRepository {
     pub fn new() -> Self {
         Self {}
+    }
+
+    /// Hydrate a page of tracks (album + artists + references) given an
+    /// already-ordered list of ids, preserving that order.
+    fn hydrate_tracks_by_ids(
+        &self,
+        conn: &mut SqliteConnection,
+        ids: &[i32],
+    ) -> SoundomeResult<Vec<Track>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let entities: Vec<TrackEntity> = schema::track::table
+            .filter(schema::track::id.eq_any(ids.to_vec()))
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to load tracks page: {}", err))
+            })?;
+        let mut by_id: std::collections::HashMap<i32, TrackEntity> =
+            entities.into_iter().map(|e| (e.id, e)).collect();
+
+        let mut result = Vec::with_capacity(ids.len());
+        for id in ids {
+            let Some(track) = by_id.remove(id) else {
+                continue;
+            };
+
+            let album = if let Some(album_id) = track.album_id {
+                schema::album::table
+                    .filter(schema::album::id.eq(album_id))
+                    .first::<AlbumEntity>(conn)
+                    .ok()
+            } else {
+                None
+            };
+
+            let artists: Vec<ArtistEntity> = schema::artist_tracks::table
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                )
+                .filter(schema::artist_tracks::track_id.eq(track.id))
+                .select(schema::artist::all_columns)
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to load artists for track page: {}",
+                        err
+                    ))
+                })?;
+
+            let references: Vec<TrackRefEntity> = schema::track_ref::table
+                .filter(schema::track_ref::track_id.eq(track.id))
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to load references for track page: {}",
+                        err
+                    ))
+                })?;
+
+            result.push(TrackEntity::convert_to_domain(
+                track, album, artists, references,
+            ));
+        }
+
+        Ok(result)
+    }
+
+    /// Order+page track ids by their (first, alphabetically) linked artist name.
+    /// Raw SQL: many-to-many artist join + aggregate ordering isn't expressible
+    /// cleanly with the Diesel query builder for SQLite, so this is isolated here.
+    fn ordered_track_ids_by_artist(
+        &self,
+        conn: &mut SqliteConnection,
+        needs_validation: Option<bool>,
+        search: Option<&str>,
+        dir: SortDir,
+        limit: i64,
+        offset: i64,
+    ) -> SoundomeResult<Vec<i32>> {
+        let sql = format!(
+            "SELECT t.id AS id \
+             FROM track t \
+             LEFT JOIN ( \
+                 SELECT at.track_id AS track_id, MIN(ar.name) AS artist_name \
+                 FROM artist_tracks at JOIN artist ar ON at.artist_id = ar.id \
+                 GROUP BY at.track_id \
+             ) ta ON ta.track_id = t.id \
+             WHERE (? IS NULL OR t.needs_validation = ?) \
+               AND (? IS NULL OR t.title LIKE ? OR t.id IN ( \
+                     SELECT at2.track_id FROM artist_tracks at2 \
+                     JOIN artist ar2 ON at2.artist_id = ar2.id \
+                     WHERE ar2.name LIKE ? \
+                   )) \
+             ORDER BY ta.artist_name {} \
+             LIMIT ? OFFSET ?",
+            dir.as_sql()
+        );
+
+        let pattern = search.map(|s| format!("%{}%", s));
+
+        let rows: Vec<IdRow> = diesel::sql_query(sql)
+            .bind::<Nullable<Bool>, _>(needs_validation)
+            .bind::<Nullable<Bool>, _>(needs_validation)
+            .bind::<Nullable<Text>, _>(pattern.clone())
+            .bind::<Nullable<Text>, _>(pattern.clone())
+            .bind::<Nullable<Text>, _>(pattern)
+            .bind::<BigInt, _>(limit)
+            .bind::<BigInt, _>(offset)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to sort tracks by artist: {}", err))
+            })?;
+
+        Ok(rows.into_iter().map(|r| r.id).collect())
     }
 }
 
@@ -585,5 +709,162 @@ impl TrackRepository for DieselTrackRepository {
                 ))
             })?;
         Ok(())
+    }
+
+    // =================================================================================
+    // Pagination / search / sort (library UI)
+    // =================================================================================
+
+    fn get_page(&self, conn: &mut SqliteConnection, q: TrackQuery) -> SoundomeResult<Page<Track>> {
+        // Sub-query: track ids whose linked artist name matches the search pattern.
+        let build_artist_match = |term: &str| {
+            let like = format!("%{}%", term);
+            schema::artist_tracks::table
+                .inner_join(
+                    schema::artist::table
+                        .on(schema::artist_tracks::artist_id.eq(schema::artist::id)),
+                )
+                .filter(schema::artist::name.like(like))
+                .select(schema::artist_tracks::track_id)
+        };
+
+        // -- total count matching filters (independent of sort/order) --
+        let total: i64 = {
+            let mut count_q = schema::track::table.into_boxed();
+            if let Some(nv) = q.needs_validation {
+                count_q = count_q.filter(schema::track::needs_validation.eq(nv));
+            }
+            if let Some(term) = &q.search {
+                let like = format!("%{}%", term);
+                count_q = count_q.filter(
+                    schema::track::title
+                        .like(like)
+                        .or(schema::track::id.eq_any(build_artist_match(term))),
+                );
+            }
+            count_q.count().get_result(conn).map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to count tracks: {}", err))
+            })?
+        };
+
+        // -- ids for the requested page, in the requested order --
+        let ids: Vec<i32> = match q.sort_by {
+            TrackSortBy::Artist => self.ordered_track_ids_by_artist(
+                conn,
+                q.needs_validation,
+                q.search.as_deref(),
+                q.sort_dir,
+                q.limit,
+                q.offset,
+            )?,
+            TrackSortBy::Album => {
+                let mut query = schema::track::table
+                    .left_join(
+                        schema::album::table
+                            .on(schema::album::id.nullable().eq(schema::track::album_id)),
+                    )
+                    .into_boxed();
+                if let Some(nv) = q.needs_validation {
+                    query = query.filter(schema::track::needs_validation.eq(nv));
+                }
+                if let Some(term) = &q.search {
+                    let like = format!("%{}%", term);
+                    query = query.filter(
+                        schema::track::title
+                            .like(like)
+                            .or(schema::track::id.eq_any(build_artist_match(term))),
+                    );
+                }
+                query = match q.sort_dir {
+                    SortDir::Asc => query.order(schema::album::title.asc()),
+                    SortDir::Desc => query.order(schema::album::title.desc()),
+                };
+                query
+                    .select(schema::track::id)
+                    .limit(q.limit)
+                    .offset(q.offset)
+                    .load::<i32>(conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!(
+                            "Failed to page tracks by album: {}",
+                            err
+                        ))
+                    })?
+            }
+            TrackSortBy::Title | TrackSortBy::Date | TrackSortBy::Duration => {
+                let mut query = schema::track::table.into_boxed();
+                if let Some(nv) = q.needs_validation {
+                    query = query.filter(schema::track::needs_validation.eq(nv));
+                }
+                if let Some(term) = &q.search {
+                    let like = format!("%{}%", term);
+                    query = query.filter(
+                        schema::track::title
+                            .like(like)
+                            .or(schema::track::id.eq_any(build_artist_match(term))),
+                    );
+                }
+                query = match (q.sort_by, q.sort_dir) {
+                    (TrackSortBy::Title, SortDir::Asc) => query.order(schema::track::title.asc()),
+                    (TrackSortBy::Title, SortDir::Desc) => query.order(schema::track::title.desc()),
+                    (TrackSortBy::Date, SortDir::Asc) => query.order(schema::track::date.asc()),
+                    (TrackSortBy::Date, SortDir::Desc) => query.order(schema::track::date.desc()),
+                    (TrackSortBy::Duration, SortDir::Asc) => {
+                        query.order(schema::track::duration.asc())
+                    }
+                    (TrackSortBy::Duration, SortDir::Desc) => {
+                        query.order(schema::track::duration.desc())
+                    }
+                    _ => unreachable!("Artist/Album sorts are handled in dedicated branches"),
+                };
+                query
+                    .select(schema::track::id)
+                    .limit(q.limit)
+                    .offset(q.offset)
+                    .load::<i32>(conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!("Failed to page tracks: {}", err))
+                    })?
+            }
+        };
+
+        let items = self.hydrate_tracks_by_ids(conn, &ids)?;
+        Ok(Page { items, total })
+    }
+
+    fn get_by_artist(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+    ) -> SoundomeResult<Vec<Track>> {
+        let ids: Vec<i32> = schema::artist_tracks::table
+            .filter(schema::artist_tracks::artist_id.eq(artist_id))
+            .select(schema::artist_tracks::track_id)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to load tracks for artist {}: {}",
+                    artist_id, err
+                ))
+            })?;
+        self.hydrate_tracks_by_ids(conn, &ids)
+    }
+
+    fn get_by_album(
+        &self,
+        conn: &mut SqliteConnection,
+        album_id: i32,
+    ) -> SoundomeResult<Vec<Track>> {
+        let ids: Vec<i32> = schema::track::table
+            .filter(schema::track::album_id.eq(album_id))
+            .select(schema::track::id)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to load tracks for album {}: {}",
+                    album_id, err
+                ))
+            })?;
+        self.hydrate_tracks_by_ids(conn, &ids)
     }
 }

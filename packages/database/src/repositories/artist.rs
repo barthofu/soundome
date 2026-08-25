@@ -1,5 +1,9 @@
-use domain::ports::repositories::ArtistRepository;
+use domain::ports::repositories::{
+    ArtistQuery, ArtistRepository, ArtistSortBy, NamePair, Page, SortDir,
+};
 
+use diesel::prelude::*;
+use diesel::sql_types::{BigInt, Integer, Nullable, Text};
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
 use shared::{
     models::{Artist, Reference},
@@ -17,12 +21,130 @@ use crate::{
 
 use crate::diesel::Connection;
 
+#[derive(QueryableByName)]
+struct IdRow {
+    #[diesel(sql_type = Integer)]
+    id: i32,
+}
+
 #[derive(Default)]
 pub struct DieselArtistRepository {}
 
 impl DieselArtistRepository {
     pub fn new() -> Self {
         Self {}
+    }
+
+    /// Hydrate a page of artists (references) given an already-ordered list of
+    /// ids, preserving that order.
+    fn hydrate_artists_by_ids(
+        &self,
+        conn: &mut SqliteConnection,
+        ids: &[i32],
+    ) -> SoundomeResult<Vec<Artist>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let entities: Vec<ArtistEntity> = schema::artist::table
+            .filter(schema::artist::id.eq_any(ids.to_vec()))
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to load artists page: {}", err))
+            })?;
+        let mut by_id: std::collections::HashMap<i32, ArtistEntity> =
+            entities.into_iter().map(|e| (e.id, e)).collect();
+
+        let mut result = Vec::with_capacity(ids.len());
+        for id in ids {
+            let Some(artist) = by_id.remove(id) else {
+                continue;
+            };
+
+            let references: Vec<ArtistRefEntity> = schema::artist_ref::table
+                .filter(schema::artist_ref::artist_id.eq(artist.id))
+                .load(conn)
+                .map_err(|err| {
+                    shared::errors::Error::Database(format!(
+                        "Failed to load references for artist page: {}",
+                        err
+                    ))
+                })?;
+
+            result.push(ArtistEntity::convert_to_domain(artist, references));
+        }
+
+        Ok(result)
+    }
+
+    /// Order+page artist ids by their linked track count.
+    fn ordered_artist_ids_by_track_count(
+        &self,
+        conn: &mut SqliteConnection,
+        search: Option<&str>,
+        dir: SortDir,
+        limit: i64,
+        offset: i64,
+    ) -> SoundomeResult<Vec<i32>> {
+        let sql = format!(
+            "SELECT ar.id AS id \
+             FROM artist ar \
+             LEFT JOIN artist_tracks at ON at.artist_id = ar.id \
+             WHERE (? IS NULL OR ar.name LIKE ?) \
+             GROUP BY ar.id \
+             ORDER BY COUNT(at.track_id) {}, ar.name ASC \
+             LIMIT ? OFFSET ?",
+            dir.as_sql()
+        );
+        let pattern = search.map(|s| format!("%{}%", s));
+        let rows: Vec<IdRow> = diesel::sql_query(sql)
+            .bind::<Nullable<Text>, _>(pattern.clone())
+            .bind::<Nullable<Text>, _>(pattern)
+            .bind::<BigInt, _>(limit)
+            .bind::<BigInt, _>(offset)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to sort artists by track count: {}",
+                    err
+                ))
+            })?;
+        Ok(rows.into_iter().map(|r| r.id).collect())
+    }
+
+    /// Order+page artist ids by their linked album count.
+    fn ordered_artist_ids_by_album_count(
+        &self,
+        conn: &mut SqliteConnection,
+        search: Option<&str>,
+        dir: SortDir,
+        limit: i64,
+        offset: i64,
+    ) -> SoundomeResult<Vec<i32>> {
+        let sql = format!(
+            "SELECT ar.id AS id \
+             FROM artist ar \
+             LEFT JOIN artist_albums aa ON aa.artist_id = ar.id \
+             WHERE (? IS NULL OR ar.name LIKE ?) \
+             GROUP BY ar.id \
+             ORDER BY COUNT(aa.album_id) {}, ar.name ASC \
+             LIMIT ? OFFSET ?",
+            dir.as_sql()
+        );
+        let pattern = search.map(|s| format!("%{}%", s));
+        let rows: Vec<IdRow> = diesel::sql_query(sql)
+            .bind::<Nullable<Text>, _>(pattern.clone())
+            .bind::<Nullable<Text>, _>(pattern)
+            .bind::<BigInt, _>(limit)
+            .bind::<BigInt, _>(offset)
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!(
+                    "Failed to sort artists by album count: {}",
+                    err
+                ))
+            })?;
+        Ok(rows.into_iter().map(|r| r.id).collect())
     }
 
     /// Looks up an existing artist by matching any of `references` against stored
@@ -655,5 +777,78 @@ impl ArtistRepository for DieselArtistRepository {
                 ))
             })?;
         Ok(())
+    }
+
+    // =================================================================================
+    // Pagination / search / sort (library UI)
+    // =================================================================================
+
+    fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        q: ArtistQuery,
+    ) -> SoundomeResult<Page<Artist>> {
+        let total: i64 = {
+            let mut count_q = schema::artist::table.into_boxed();
+            if let Some(term) = &q.search {
+                let like = format!("%{}%", term);
+                count_q = count_q.filter(schema::artist::name.like(like));
+            }
+            count_q.count().get_result(conn).map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to count artists: {}", err))
+            })?
+        };
+
+        let ids: Vec<i32> = match q.sort_by {
+            ArtistSortBy::TrackCount => self.ordered_artist_ids_by_track_count(
+                conn,
+                q.search.as_deref(),
+                q.sort_dir,
+                q.limit,
+                q.offset,
+            )?,
+            ArtistSortBy::AlbumCount => self.ordered_artist_ids_by_album_count(
+                conn,
+                q.search.as_deref(),
+                q.sort_dir,
+                q.limit,
+                q.offset,
+            )?,
+            ArtistSortBy::Name => {
+                let mut query = schema::artist::table.into_boxed();
+                if let Some(term) = &q.search {
+                    let like = format!("%{}%", term);
+                    query = query.filter(schema::artist::name.like(like));
+                }
+                query = match q.sort_dir {
+                    SortDir::Asc => query.order(schema::artist::name.asc()),
+                    SortDir::Desc => query.order(schema::artist::name.desc()),
+                };
+                query
+                    .select(schema::artist::id)
+                    .limit(q.limit)
+                    .offset(q.offset)
+                    .load::<i32>(conn)
+                    .map_err(|err| {
+                        shared::errors::Error::Database(format!("Failed to page artists: {}", err))
+                    })?
+            }
+        };
+
+        let items = self.hydrate_artists_by_ids(conn, &ids)?;
+        Ok(Page { items, total })
+    }
+
+    fn get_names(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<NamePair>> {
+        let rows: Vec<(i32, String)> = schema::artist::table
+            .select((schema::artist::id, schema::artist::name))
+            .load(conn)
+            .map_err(|err| {
+                shared::errors::Error::Database(format!("Failed to load artist names: {}", err))
+            })?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, name)| NamePair { id, name })
+            .collect())
     }
 }

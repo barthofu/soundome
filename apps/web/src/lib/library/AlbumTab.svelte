@@ -2,6 +2,7 @@
   import { lib } from './store.svelte';
   import TrackTable from './TrackTable.svelte';
   import SortDropdown from './SortDropdown.svelte';
+  import { infiniteScroll } from '../utils/infiniteScroll';
 
   const albumSortOptions = [
     { value: 'title', label: 'Title' },
@@ -33,7 +34,7 @@
     <div class="detail-info">
       <div class="detail-type">{lib.drillAlbum.album_type}</div>
       <h2>{lib.drillAlbum.title}</h2>
-      <div class="detail-sub">{lib.drillAlbum.artists.map(a => a.name).join(', ')}</div>
+      <div class="detail-sub">{lib.drillAlbum.artists.map(a => lib.artistDisplayName(a)).join(', ')}</div>
       {#if lib.drillAlbum.date}<div class="detail-sub">{lib.drillAlbum.date}</div>{/if}
       <div class="detail-actions">
         <button class="btn-edit" onclick={() => lib.startEditAlbum(lib.drillAlbum!)}>Edit</button>
@@ -96,7 +97,7 @@
         </svg>
       </button>
     </div>
-    <span class="count">{lib.filteredAlbums.length} album{lib.filteredAlbums.length !== 1 ? 's' : ''}</span>
+    <span class="count">{lib.albumsTotal} album{lib.albumsTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.albumsView === 'list'}
@@ -126,7 +127,7 @@
                   onkeydown={(e) => e.key === 'Enter' && lib.drillIntoAlbum(a)}>{a.title}</span>
                 {#if sel}<span class="badge-sel">✓</span>{/if}
               </td>
-              <td class="muted">{a.artists.map(x => x.name).join(', ') || '\u2014'}</td>
+              <td class="muted">{a.artists.map(x => lib.artistDisplayName(x)).join(', ') || '\u2014'}</td>
               <td class="muted">{a.album_type}</td>
               <td class="muted">{a.date ?? '\u2014'}</td>
               <td class="actions">
@@ -169,7 +170,7 @@
           {@render coverWrap(a.cover, a.title)}
           <div class="card-body">
             <div class="card-title" title={a.title}>{a.title}</div>
-            <div class="card-sub">{a.artists.map(x => x.name).join(', ') || '\u2014'}</div>
+            <div class="card-sub">{a.artists.map(x => lib.artistDisplayName(x)).join(', ') || '\u2014'}</div>
             {#if a.date}<div class="card-meta">{a.date.slice(0, 4)}</div>{/if}
           </div>
           {#if sel}<span class="card-sel-badge">✓</span>{/if}
@@ -181,6 +182,11 @@
           {/if}
         </div>
       {/each}
+    </div>
+  {/if}
+  {#if lib.albumsHasMore}
+    <div class="scroll-sentinel" use:infiniteScroll={() => lib.loadMoreAlbums()}>
+      {#if lib.albumsLoadingMore}<span class="status">Loading more…</span>{/if}
     </div>
   {/if}
   {#if lib.filteredAlbums.length === 0}<p class="status">No albums found.</p>{/if}
@@ -210,6 +216,8 @@
 
 <style>
   h2 { font-size: 1.35rem; font-weight: 700; margin: 0 0 0.35rem; }
+  .scroll-sentinel { display: flex; justify-content: center; padding: 1.25rem 0; min-height: 1px; }
+  .scroll-sentinel .status { font-size: 0.8rem; color: var(--muted); }
   .detail-hero { display: flex; align-items: center; gap: 1.5rem; padding: 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; }
   .detail-cover { width: 110px; height: 110px; flex-shrink: 0; border-radius: 6px; overflow: hidden; }
   .detail-cover :global(.cover-wrap) { width: 100%; height: 100%; }

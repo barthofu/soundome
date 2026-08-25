@@ -2,6 +2,7 @@
   import { lib } from './store.svelte';
   import { getSyncSchedules, createSyncSchedule, deleteSyncSchedule } from '../api';
   import type { SyncScheduleDto } from '../api';
+  import { infiniteScroll } from '../utils/infiniteScroll';
 
   function fmtDuration(secs: number | null): string {
     if (secs == null) return '—';
@@ -144,7 +145,7 @@
 {:else}
   <div class="toolbar">
     <input class="search" placeholder="Search playlists…" bind:value={lib.playlistSearch} />
-    <span class="count">{lib.filteredPlaylists.length} playlist{lib.filteredPlaylists.length !== 1 ? 's' : ''}</span>
+    <span class="count">{lib.playlistsTotal} playlist{lib.playlistsTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.filteredPlaylists.length === 0}
@@ -166,6 +167,11 @@
         </div>
       {/each}
     </div>
+    {#if lib.playlistsHasMore}
+      <div class="scroll-sentinel" use:infiniteScroll={() => lib.loadMorePlaylists()}>
+        {#if lib.playlistsLoadingMore}<span class="status">Loading more…</span>{/if}
+      </div>
+    {/if}
   {/if}
 {/if}
 

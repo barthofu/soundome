@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use domain::ports::repositories::{SortDir, TrackQuery, TrackSortBy};
 use domain::services::ServiceLayer;
 use rocket::fs::NamedFile;
 use rocket::{delete, get, http::Status, patch, post, serde::json::Json};
@@ -8,7 +9,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared::models::{Album, Artist, Platform, Reference, ReferenceType, Track};
 
-use crate::utils::{database::Db, error::CustomError, response::Success};
+use crate::utils::{
+    database::Db,
+    error::CustomError,
+    response::{
+        is_desc, normalize_search, resolve_offset, resolve_page, resolve_page_size, PageDto,
+        Success,
+    },
+};
 
 // ================================================================================================
 // DTOs
@@ -123,7 +131,7 @@ pub struct TrackDto {
 }
 
 impl TrackDto {
-    fn from_track(track: Track) -> Option<Self> {
+    pub(crate) fn from_track(track: Track) -> Option<Self> {
         Some(Self {
             id: track.id?,
             title: track.title,
@@ -173,21 +181,61 @@ pub struct UpdateTrackBody {
 // ================================================================================================
 
 #[openapi]
-#[get("/tracks")]
+#[get("/tracks?<page>&<page_size>&<q>&<sort_by>&<sort_dir>&<filter>")]
+#[allow(clippy::too_many_arguments)]
 pub async fn get_all(
+    page: Option<i64>,
+    page_size: Option<i64>,
+    q: Option<String>,
+    sort_by: Option<String>,
+    sort_dir: Option<String>,
+    filter: Option<String>,
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
-) -> Result<Json<Vec<TrackDto>>, crate::utils::error::Error> {
+) -> Result<Json<PageDto<TrackDto>>, crate::utils::error::Error> {
     let services = Arc::clone(services);
-    db.run(move |conn| services.track_service.get_all(conn))
+
+    let sort_by = match sort_by.as_deref() {
+        Some("artist") => TrackSortBy::Artist,
+        Some("album") => TrackSortBy::Album,
+        Some("date") => TrackSortBy::Date,
+        Some("duration") => TrackSortBy::Duration,
+        _ => TrackSortBy::Title,
+    };
+    let sort_dir = if is_desc(&sort_dir) {
+        SortDir::Desc
+    } else {
+        SortDir::Asc
+    };
+    let needs_validation = match filter.as_deref() {
+        Some("ok") => Some(false),
+        Some("pending") => Some(true),
+        _ => None,
+    };
+    let page = resolve_page(page);
+    let page_size = resolve_page_size(page_size);
+    let query = TrackQuery {
+        offset: resolve_offset(page, page_size),
+        limit: page_size,
+        search: normalize_search(&q),
+        sort_by,
+        sort_dir,
+        needs_validation,
+    };
+
+    db.run(move |conn| services.track_service.get_page(conn, query))
         .await
-        .map(|tracks| {
-            Json(
-                tracks
+        .map(|result| {
+            Json(PageDto {
+                items: result
+                    .items
                     .into_iter()
                     .filter_map(TrackDto::from_track)
                     .collect(),
-            )
+                total: result.total,
+                page,
+                page_size,
+            })
         })
         .map_err(|err| {
             crate::utils::error::Error::Custom(CustomError {
