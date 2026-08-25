@@ -79,11 +79,11 @@
     {#each (['artists', 'albums', 'tracks', 'playlists'] as const) as t}
       <button class="tab" class:active={lib.tab === t} onclick={() => lib.switchTab(t)}>
         {t === 'artists' ? 'Artists' : t === 'albums' ? 'Albums' : t === 'tracks' ? 'Tracks' : 'Playlists'}
-        {#if t === 'artists' && lib.artistsLoaded}<span class="tab-count">{lib.artists.length}</span>{/if}
-        {#if t === 'albums' && lib.albumsLoaded}<span class="tab-count">{lib.albums.length}</span>{/if}
-        {#if t === 'tracks' && lib.tracksLoaded}<span class="tab-count">{lib.tracks.length}</span>{/if}
+        {#if t === 'artists' && lib.artistsLoaded}<span class="tab-count">{lib.artistsTotal}</span>{/if}
+        {#if t === 'albums' && lib.albumsLoaded}<span class="tab-count">{lib.albumsTotal}</span>{/if}
+        {#if t === 'tracks' && lib.tracksLoaded}<span class="tab-count">{lib.tracksTotal}</span>{/if}
         {#if t === 'tracks' && lib.pendingCount > 0}<span class="tab-badge">{lib.pendingCount}</span>{/if}
-        {#if t === 'playlists' && lib.playlistsLoaded}<span class="tab-count">{lib.playlists.length}</span>{/if}
+        {#if t === 'playlists' && lib.playlistsLoaded}<span class="tab-count">{lib.playlistsTotal}</span>{/if}
       </button>
     {/each}
   </div>

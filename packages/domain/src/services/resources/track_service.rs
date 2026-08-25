@@ -59,6 +59,33 @@ impl TrackService {
         self.track_repo.get_all(conn)
     }
 
+    /// Paginated, searched, sorted, filtered listing for the library UI.
+    pub fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: crate::ports::repositories::TrackQuery,
+    ) -> SoundomeResult<crate::ports::repositories::Page<Track>> {
+        self.track_repo.get_page(conn, query)
+    }
+
+    /// All tracks linked to a given artist (artist drill-down view).
+    pub fn get_by_artist(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+    ) -> SoundomeResult<Vec<Track>> {
+        self.track_repo.get_by_artist(conn, artist_id)
+    }
+
+    /// All tracks linked to a given album (album drill-down view).
+    pub fn get_by_album(
+        &self,
+        conn: &mut SqliteConnection,
+        album_id: i32,
+    ) -> SoundomeResult<Vec<Track>> {
+        self.track_repo.get_by_album(conn, album_id)
+    }
+
     pub fn create(&self, conn: &mut SqliteConnection, new_track: &Track) -> SoundomeResult<Track> {
         self.track_repo.create(conn, new_track)
     }

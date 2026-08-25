@@ -522,12 +522,12 @@
     color: var(--muted);
   }
 
-  .hint {
+  /* .hint {
     font-weight: 400;
     text-transform: none;
     letter-spacing: 0;
     opacity: 0.7;
-  }
+  } */
 
   input {
     padding: 0.35rem 0.5rem;

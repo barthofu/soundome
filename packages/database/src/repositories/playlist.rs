@@ -1,4 +1,4 @@
-use domain::ports::repositories::PlaylistRepository;
+use domain::ports::repositories::{Page, PlaylistQuery, PlaylistRepository};
 
 use diesel::prelude::*;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
@@ -187,5 +187,36 @@ impl PlaylistRepository for DieselPlaylistRepository {
             .count()
             .get_result(conn)
             .map_err(map_error)
+    }
+
+    fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        q: PlaylistQuery,
+    ) -> SoundomeResult<Page<Playlist>> {
+        let mut count_q = schema::playlist::table.into_boxed();
+        if let Some(term) = &q.search {
+            let like = format!("%{}%", term);
+            count_q = count_q.filter(schema::playlist::name.like(like));
+        }
+        let total: i64 = count_q.count().get_result(conn).map_err(map_error)?;
+
+        let mut query = schema::playlist::table.into_boxed();
+        if let Some(term) = &q.search {
+            let like = format!("%{}%", term);
+            query = query.filter(schema::playlist::name.like(like));
+        }
+        let entities: Vec<PlaylistEntity> = query
+            .order(schema::playlist::name.asc())
+            .limit(q.limit)
+            .offset(q.offset)
+            .load(conn)
+            .map_err(map_error)?;
+
+        let items = entities
+            .into_iter()
+            .map(PlaylistEntity::convert_to_domain)
+            .collect();
+        Ok(Page { items, total })
     }
 }

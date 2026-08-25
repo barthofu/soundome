@@ -29,6 +29,24 @@ impl ArtistService {
         self.artist_repo.get_all(conn)
     }
 
+    /// Paginated, searched, sorted listing for the library UI.
+    pub fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: crate::ports::repositories::ArtistQuery,
+    ) -> shared::types::SoundomeResult<crate::ports::repositories::Page<shared::models::Artist>>
+    {
+        self.artist_repo.get_page(conn, query)
+    }
+
+    /// Lightweight `(id, name)` pairs for every artist (duplicate-detection workflow).
+    pub fn get_names(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> shared::types::SoundomeResult<Vec<crate::ports::repositories::NamePair>> {
+        self.artist_repo.get_names(conn)
+    }
+
     pub fn create(
         &self,
         conn: &mut SqliteConnection,

@@ -1,12 +1,19 @@
 use std::sync::Arc;
 
+use domain::ports::repositories::PlaylistQuery;
 use domain::services::ServiceLayer;
 use rocket::{delete, get, http::Status, post, serde::json::Json};
 use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::utils::{database::Db, error::CustomError, response::Success};
+use crate::utils::{
+    database::Db,
+    error::CustomError,
+    response::{
+        normalize_search, resolve_offset, resolve_page, resolve_page_size, PageDto, Success,
+    },
+};
 
 // ================================================================================================
 // DTOs
@@ -56,18 +63,30 @@ pub struct ExportResult {
 
 /// List all playlists in the library.
 #[openapi]
-#[get("/playlists")]
+#[get("/playlists?<page>&<page_size>&<q>")]
 pub async fn get_all(
+    page: Option<i64>,
+    page_size: Option<i64>,
+    q: Option<String>,
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
-) -> Result<Json<Vec<PlaylistDto>>, crate::utils::error::Error> {
+) -> Result<Json<PageDto<PlaylistDto>>, crate::utils::error::Error> {
     let services = Arc::clone(services);
 
-    db.run(move |conn| services.playlist_service.get_all(conn))
+    let page = resolve_page(page);
+    let page_size = resolve_page_size(page_size);
+    let query = PlaylistQuery {
+        offset: resolve_offset(page, page_size),
+        limit: page_size,
+        search: normalize_search(&q),
+    };
+
+    db.run(move |conn| services.playlist_service.get_page(conn, query))
         .await
-        .map(|playlists| {
-            Json(
-                playlists
+        .map(|result| {
+            Json(PageDto {
+                items: result
+                    .items
                     .into_iter()
                     .filter_map(|p| {
                         Some(PlaylistDto {
@@ -79,7 +98,10 @@ pub async fn get_all(
                         })
                     })
                     .collect(),
-            )
+                total: result.total,
+                page,
+                page_size,
+            })
         })
         .map_err(|err: shared::errors::Error| {
             crate::utils::error::Error::Custom(CustomError {

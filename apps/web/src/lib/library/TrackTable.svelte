@@ -29,8 +29,8 @@
             {t.title}
             {#if t.needs_validation}<span class="badge-warn" title="Awaiting validation">!</span>{/if}
           </td>
-          <td class="muted">{t.artists.map(a => a.name).join(', ') || '\u2014'}</td>
-          {#if showAlbumCol}<td class="muted">{t.album?.title ?? '\u2014'}</td>{/if}
+          <td class="muted">{t.artists.map(a => lib.artistDisplayName(a)).join(', ') || '\u2014'}</td>
+          {#if showAlbumCol}<td class="muted">{lib.albumDisplayTitle(t.album) ?? '\u2014'}</td>{/if}
           <td class="muted">{t.genre ?? '\u2014'}</td>
           <td class="muted mono">{lib.fmtDuration(t.duration)}</td>
           <td class="actions">

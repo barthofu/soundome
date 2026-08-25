@@ -144,6 +144,31 @@ pub async fn get_all(
         })
 }
 
+/// Cheap `{ count }` used by the header badge poll, instead of fetching every
+/// task just to filter by status client-side.
+#[openapi]
+#[get("/tasks/active-count")]
+pub async fn get_active_count(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<crate::utils::response::CountDto>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| {
+        let pending = services.task_service.count_by_status(conn, "Pending")?;
+        let running = services.task_service.count_by_status(conn, "Running")?;
+        Ok::<i64, shared::errors::Error>(pending + running)
+    })
+    .await
+    .map(|count| Json(crate::utils::response::CountDto { count }))
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
+}
+
 /// Get a single task by ID (use for polling).
 #[openapi]
 #[get("/tasks/<id>")]

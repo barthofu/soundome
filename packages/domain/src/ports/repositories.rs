@@ -17,6 +17,102 @@ pub struct RepositoryLayer {
 }
 
 // ================================================================================================
+// Pagination / search / sort — shared shapes for list endpoints
+// ================================================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortDir {
+    Asc,
+    Desc,
+}
+
+impl SortDir {
+    pub fn as_sql(&self) -> &'static str {
+        match self {
+            SortDir::Asc => "ASC",
+            SortDir::Desc => "DESC",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrackSortBy {
+    Title,
+    Artist,
+    Album,
+    Date,
+    Duration,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlbumSortBy {
+    Title,
+    Date,
+    Artist,
+    TrackCount,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArtistSortBy {
+    Name,
+    TrackCount,
+    AlbumCount,
+}
+
+/// A page of results plus the total row count matching the same filters
+/// (used by the frontend to know when it has reached the end of a list).
+pub struct Page<T> {
+    pub items: Vec<T>,
+    pub total: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct TrackQuery {
+    pub offset: i64,
+    pub limit: i64,
+    /// Matches against title OR any linked artist's name.
+    pub search: Option<String>,
+    pub sort_by: TrackSortBy,
+    pub sort_dir: SortDir,
+    /// `Some(true)`/`Some(false)` restricts to validated/pending tracks; `None` = all.
+    pub needs_validation: Option<bool>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AlbumQuery {
+    pub offset: i64,
+    pub limit: i64,
+    /// Matches against title OR any linked artist's name.
+    pub search: Option<String>,
+    pub sort_by: AlbumSortBy,
+    pub sort_dir: SortDir,
+}
+
+#[derive(Debug, Clone)]
+pub struct ArtistQuery {
+    pub offset: i64,
+    pub limit: i64,
+    pub search: Option<String>,
+    pub sort_by: ArtistSortBy,
+    pub sort_dir: SortDir,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlaylistQuery {
+    pub offset: i64,
+    pub limit: i64,
+    pub search: Option<String>,
+}
+
+/// Lightweight `(id, name)` pair used by the duplicate-detection ("find similar")
+/// workflow, which needs every row's identity but none of its heavy fields.
+#[derive(Debug, Clone)]
+pub struct NamePair {
+    pub id: i32,
+    pub name: String,
+}
+
+// ================================================================================================
 
 pub trait TrackRepository: Send + Sync {
     fn get_by_id(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<Track>;
@@ -58,6 +154,25 @@ pub trait TrackRepository: Send + Sync {
     fn get_all_finalized(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<Track>>;
     /// Delete a single reference row by its own ID.
     fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()>;
+    /// Paginated, searched, sorted, filtered listing for the library UI.
+    /// Returns the hydrated page plus the total count matching the same filters.
+    fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: TrackQuery,
+    ) -> SoundomeResult<Page<Track>>;
+    /// All tracks linked to a given artist (used by the artist drill-down view).
+    fn get_by_artist(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+    ) -> SoundomeResult<Vec<Track>>;
+    /// All tracks linked to a given album (used by the album drill-down view).
+    fn get_by_album(
+        &self,
+        conn: &mut SqliteConnection,
+        album_id: i32,
+    ) -> SoundomeResult<Vec<Track>>;
     // /// Find a track by unique fields (e.g. title + artists + album)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Option<Track>>;
 }
@@ -115,6 +230,20 @@ pub trait AlbumRepository: Send + Sync {
         source_ids: &[i32],
         target_id: i32,
     ) -> SoundomeResult<()>;
+    /// Paginated, searched, sorted listing for the library UI.
+    fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: AlbumQuery,
+    ) -> SoundomeResult<Page<Album>>;
+    /// Lightweight `(id, title)` pairs for every album — used by the duplicate-detection workflow.
+    fn get_names(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<NamePair>>;
+    /// All albums linked to a given artist (used by the artist drill-down view).
+    fn get_by_artist(
+        &self,
+        conn: &mut SqliteConnection,
+        artist_id: i32,
+    ) -> SoundomeResult<Vec<Album>>;
 }
 
 pub trait ArtistRepository: Send + Sync {
@@ -186,6 +315,14 @@ pub trait ArtistRepository: Send + Sync {
     fn count_tracks(&self, conn: &mut SqliteConnection, artist_id: i32) -> SoundomeResult<i64>;
     /// Delete a single reference row by its own ID.
     fn delete_reference(&self, conn: &mut SqliteConnection, ref_id: i32) -> SoundomeResult<()>;
+    /// Paginated, searched, sorted listing for the library UI.
+    fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: ArtistQuery,
+    ) -> SoundomeResult<Page<Artist>>;
+    /// Lightweight `(id, name)` pairs for every artist — used by the duplicate-detection workflow.
+    fn get_names(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<NamePair>>;
     // /// Find an artist by unique fields (e.g. name)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, artist: &Artist) -> SoundomeResult<Option<Artist>>;
 }
@@ -219,6 +356,12 @@ pub trait PlaylistRepository: Send + Sync {
     ) -> SoundomeResult<Vec<Track>>;
     fn delete(&self, conn: &mut SqliteConnection, id: i32) -> SoundomeResult<()>;
     fn count(&self, conn: &mut SqliteConnection) -> SoundomeResult<i64>;
+    /// Paginated, searched listing for the library UI.
+    fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: PlaylistQuery,
+    ) -> SoundomeResult<Page<Playlist>>;
 }
 
 // ================================================================================================

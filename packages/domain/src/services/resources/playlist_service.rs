@@ -37,6 +37,16 @@ impl PlaylistService {
         self.playlist_repo.get_all(conn)
     }
 
+    /// Paginated, searched listing for the library UI.
+    pub fn get_page(
+        &self,
+        conn: &mut SqliteConnection,
+        query: crate::ports::repositories::PlaylistQuery,
+    ) -> shared::types::SoundomeResult<crate::ports::repositories::Page<shared::models::Playlist>>
+    {
+        self.playlist_repo.get_page(conn, query)
+    }
+
     pub fn get_by_id(
         &self,
         conn: &mut SqliteConnection,

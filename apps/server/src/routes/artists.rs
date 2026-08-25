@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use domain::ports::repositories::{ArtistQuery, ArtistSortBy, SortDir};
 use domain::services::ServiceLayer;
 use rocket::{delete, get, http::Status, patch, post, serde::json::Json};
 use rocket_okapi::openapi;
@@ -7,8 +8,16 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared::models::Artist;
 
-use crate::routes::tracks::{reference_to_dto, AddReferenceBody, ReferenceDto};
-use crate::utils::{database::Db, error::CustomError, response::Success};
+use crate::routes::albums::AlbumDto;
+use crate::routes::tracks::{reference_to_dto, AddReferenceBody, ReferenceDto, TrackDto};
+use crate::utils::{
+    database::Db,
+    error::CustomError,
+    response::{
+        is_desc, normalize_search, resolve_offset, resolve_page, resolve_page_size, PageDto,
+        Success,
+    },
+};
 
 // ================================================================================================
 // DTOs
@@ -51,24 +60,148 @@ pub struct MergeArtistsBody {
     pub target_id: i32,
 }
 
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct NamePairDto {
+    pub id: i32,
+    pub name: String,
+}
+
 // ================================================================================================
 // Routes
 // ================================================================================================
 
 #[openapi]
-#[get("/artists")]
+#[get("/artists?<page>&<page_size>&<q>&<sort_by>&<sort_dir>")]
 pub async fn get_all(
+    page: Option<i64>,
+    page_size: Option<i64>,
+    q: Option<String>,
+    sort_by: Option<String>,
+    sort_dir: Option<String>,
     db: Db,
     services: &rocket::State<Arc<ServiceLayer>>,
-) -> Result<Json<Vec<ArtistDto>>, crate::utils::error::Error> {
+) -> Result<Json<PageDto<ArtistDto>>, crate::utils::error::Error> {
     let services = Arc::clone(services);
-    db.run(move |conn| services.artist_service.get_all(conn))
+
+    let sort_by = match sort_by.as_deref() {
+        Some("track_count") => ArtistSortBy::TrackCount,
+        Some("album_count") => ArtistSortBy::AlbumCount,
+        _ => ArtistSortBy::Name,
+    };
+    let sort_dir = if is_desc(&sort_dir) {
+        SortDir::Desc
+    } else {
+        SortDir::Asc
+    };
+    let page = resolve_page(page);
+    let page_size = resolve_page_size(page_size);
+    let query = ArtistQuery {
+        offset: resolve_offset(page, page_size),
+        limit: page_size,
+        search: normalize_search(&q),
+        sort_by,
+        sort_dir,
+    };
+
+    db.run(move |conn| services.artist_service.get_page(conn, query))
         .await
-        .map(|artists| {
-            Json(
-                artists
+        .map(|result| {
+            Json(PageDto {
+                items: result
+                    .items
                     .into_iter()
                     .filter_map(ArtistDto::from_artist)
+                    .collect(),
+                total: result.total,
+                page,
+                page_size,
+            })
+        })
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
+/// Lightweight `(id, name)` pairs for every artist — used by the "find similar"
+/// duplicate-detection workflow, which needs the full library's identity but
+/// none of its heavy fields (icons, references, ...).
+#[openapi]
+#[get("/artists/names")]
+pub async fn get_names(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<NamePairDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.artist_service.get_names(conn))
+        .await
+        .map(|pairs| {
+            Json(
+                pairs
+                    .into_iter()
+                    .map(|p| NamePairDto {
+                        id: p.id,
+                        name: p.name,
+                    })
+                    .collect(),
+            )
+        })
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
+/// All tracks belonging to an artist (artist drill-down view).
+#[openapi]
+#[get("/artists/<id>/tracks")]
+pub async fn get_tracks(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<TrackDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.track_service.get_by_artist(conn, id))
+        .await
+        .map(|tracks| {
+            Json(
+                tracks
+                    .into_iter()
+                    .filter_map(TrackDto::from_track)
+                    .collect(),
+            )
+        })
+        .map_err(|err| {
+            crate::utils::error::Error::Custom(CustomError {
+                status: Status::InternalServerError,
+                code: "Internal".to_string(),
+                message: err.to_string(),
+            })
+        })
+}
+
+/// All albums belonging to an artist (artist drill-down view).
+#[openapi]
+#[get("/artists/<id>/albums")]
+pub async fn get_albums(
+    id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<AlbumDto>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.album_service.get_by_artist(conn, id))
+        .await
+        .map(|albums| {
+            Json(
+                albums
+                    .into_iter()
+                    .filter_map(AlbumDto::from_album)
                     .collect(),
             )
         })
