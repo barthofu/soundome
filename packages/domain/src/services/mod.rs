@@ -20,6 +20,7 @@ pub struct ServiceLayer {
     pub sync_schedule_service: Arc<sync_schedule_service::SyncScheduleService>,
     pub sync_settings_service: Arc<sync_settings_service::SyncSettingsService>,
     pub task_service: Arc<task_service::TaskService>,
+    pub data_quality_service: Arc<data_quality_service::DataQualityService>,
 
     pub download_service: Arc<download_service::DownloadService>,
     pub scan_service: Arc<scan_service::ScanService>,
@@ -53,6 +54,9 @@ impl ServiceLayer {
             repositories.sync_settings.clone(),
         ));
         let task_service = Arc::new(task_service::TaskService::new(repositories.task.clone()));
+        let data_quality_service = Arc::new(data_quality_service::DataQualityService::new(
+            repositories.data_quality.clone(),
+        ));
 
         // Services
         let download_service = Arc::new(download_service::DownloadService::new(
@@ -73,6 +77,7 @@ impl ServiceLayer {
             sync_schedule_service,
             sync_settings_service,
             task_service,
+            data_quality_service,
 
             download_service,
             scan_service,

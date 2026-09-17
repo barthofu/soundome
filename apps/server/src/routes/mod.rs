@@ -1,4 +1,5 @@
 /* other */
+pub mod data_quality;
 pub mod download;
 pub mod errors;
 pub mod images;
