@@ -87,6 +87,41 @@ impl TrackService {
         )
     }
 
+    /// Delete a pending-validation track and its staged audio file.
+    ///
+    /// The file is removed before the database row so a filesystem failure
+    /// leaves the validation row available for retry instead of orphaning the
+    /// staged audio file.
+    pub fn delete_pending_validation(
+        &self,
+        conn: &mut SqliteConnection,
+        id: i32,
+    ) -> SoundomeResult<()> {
+        let track = self.track_repo.get_by_id(conn, id)?;
+
+        if !track.needs_validation {
+            return Err(Error::Custom(format!(
+                "track {} is not pending validation",
+                id
+            )));
+        }
+
+        if let Some(file_path) = track.file_path {
+            match std::fs::remove_file(&file_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(Error::Custom(format!(
+                        "Failed to delete staged audio file {:?}: {}",
+                        file_path, error
+                    )));
+                }
+            }
+        }
+
+        self.delete_by_id(conn, id)
+    }
+
     // Getters
 
     pub fn get_by_url(&self, conn: &mut SqliteConnection, url: &str) -> Option<Track> {
@@ -366,7 +401,16 @@ impl TrackService {
     /// Delete track file
     pub fn delete_track_file(&self, track: &Track) -> SoundomeResult<bool> {
         let file_deleted = if let Some(file_path) = &track.file_path {
-            std::fs::remove_file(file_path).is_ok()
+            match std::fs::remove_file(file_path) {
+                Ok(()) => true,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+                Err(error) => {
+                    return Err(Error::Custom(format!(
+                        "Failed to delete audio file {:?}: {}",
+                        file_path, error
+                    )));
+                }
+            }
         } else {
             false
         };

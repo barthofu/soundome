@@ -213,7 +213,11 @@ pub async fn reject_validation(
 ) -> Result<Json<serde_json::Value>, crate::utils::error::Error> {
     let services = Arc::clone(services);
 
-    db.run(move |conn| services.track_service.delete_by_id(conn, id))
+    db.run(move |conn| {
+        services
+            .track_service
+            .delete_pending_validation(conn, id)
+    })
         .await
         .map(|_| Json(serde_json::json!({ "deleted": true })))
         .map_err(|err| {
