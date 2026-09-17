@@ -313,9 +313,29 @@ impl ArtistRepository for DieselArtistRepository {
         // matching below. This prevents duplicate artists when the same platform
         // reference is synced again under a slightly different display name, and
         // avoids wrongly merging two distinct artists that only share a name.
+        let mut candidate = artist.clone();
         if let Some(existing_id) = self.find_artist_id_by_any_reference(conn, &artist.references)? {
-            self.set_references(conn, existing_id, &artist.references)?;
-            return self.get_by_id(conn, existing_id);
+            let existing = self.get_by_id(conn, existing_id)?;
+            let name_similarity = existing.compare(artist);
+            if name_similarity >= 0.8 {
+                self.set_references(conn, existing_id, &artist.references)?;
+                return Ok(existing);
+            }
+
+            // A reference can be corrupted by an upstream metadata mapping bug.
+            // Do not silently return an unrelated existing artist in that case.
+            // Falling through lets the incoming name be persisted independently and
+            // makes the mismatch visible in logs without changing old data.
+            tracing::warn!(
+                existing_artist_id = existing_id,
+                existing_artist = %existing.name,
+                incoming_artist = %artist.name,
+                name_similarity,
+                "Artist reference matched an incompatible name; ignoring reference fast path"
+            );
+            // Do not let the suspicious reference follow the name-based fallback
+            // and become attached to a newly created artist either.
+            candidate.references.clear();
         }
         // Exact-name fast path
         let exact: Option<ArtistEntity> = schema::artist::table
@@ -327,7 +347,7 @@ impl ArtistRepository for DieselArtistRepository {
             })?;
         if let Some(entity) = exact {
             // Merge references when finding an existing artist by exact name
-            self.set_references(conn, entity.id, &artist.references)?;
+            self.set_references(conn, entity.id, &candidate.references)?;
             return self.get_by_id(conn, entity.id);
         }
         // Case-insensitive fallback (Unicode-safe: compare lowercased in Rust)
@@ -340,13 +360,13 @@ impl ArtistRepository for DieselArtistRepository {
             .find(|e| e.name.to_lowercase() == name_lower)
         {
             // Merge references when finding an existing artist by case-insensitive name
-            self.set_references(conn, entity.id, &artist.references)?;
+            self.set_references(conn, entity.id, &candidate.references)?;
             return self.get_by_id(conn, entity.id);
         }
         // Not found: create the artist and its references
-        let created_artist = self.create(conn, artist)?;
+        let created_artist = self.create(conn, &candidate)?;
         let artist_id = created_artist.id.unwrap();
-        self.create_references(conn, artist_id, &artist.references)?;
+        self.create_references(conn, artist_id, &candidate.references)?;
         self.get_by_id(conn, artist_id)
     }
 

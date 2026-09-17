@@ -311,23 +311,7 @@ impl Soundcloud {
                 };
 
                 chunk[idx].title = processed.title.clone();
-                chunk[idx].artists = final_artists
-                    .iter()
-                    .enumerate()
-                    .map(|(j, name)| Artist {
-                        id: None,
-                        name: name.clone(),
-                        icon: chunk[idx]
-                            .artists
-                            .get(j)
-                            .and_then(|artist| artist.icon.clone()),
-                        references: chunk[idx]
-                            .artists
-                            .get(j)
-                            .map(|artist| artist.references.clone())
-                            .unwrap_or_default(),
-                    })
-                    .collect();
+                chunk[idx].artists = Self::map_cleaned_artists(&chunk[idx].artists, &final_artists);
             }
 
             i += chunk_size;
@@ -369,6 +353,41 @@ impl Soundcloud {
             .artists
             .iter()
             .any(|a| normalize_for_comparison(a).contains(&normalized_name))
+    }
+
+    fn artist_names_match(left: &str, right: &str) -> bool {
+        let normalize = |value: &str| {
+            shared::utils::string::normalize_string(value).replace([' ', '_', '-'], "")
+        };
+        let left = normalize(left);
+        let right = normalize(right);
+        !left.is_empty() && left == right
+    }
+
+    fn map_cleaned_artists(original: &[Artist], cleaned_names: &[String]) -> Vec<Artist> {
+        cleaned_names
+            .iter()
+            .map(|name| {
+                // A cleaned track may contain more artists than the original uploader
+                // list. Only carry metadata when the names identify the same artist;
+                // never attach the uploader reference to a title collaborator.
+                original
+                    .iter()
+                    .find(|artist| Self::artist_names_match(&artist.name, name))
+                    .map(|artist| Artist {
+                        id: None,
+                        name: name.clone(),
+                        icon: artist.icon.clone(),
+                        references: artist.references.clone(),
+                    })
+                    .unwrap_or_else(|| Artist {
+                        id: None,
+                        name: name.clone(),
+                        icon: None,
+                        references: Vec::new(),
+                    })
+            })
+            .collect()
     }
 }
 
@@ -635,5 +654,26 @@ mod tests {
         // Emoji-only or whitespace-only names cannot be validated.
         assert!(!Soundcloud::artist_name_is_supported("🎵", &input));
         assert!(!Soundcloud::artist_name_is_supported("   ", &input));
+    }
+
+    #[test]
+    fn artist_reference_is_only_preserved_for_the_same_cleaned_artist() {
+        let original = vec![Artist {
+            id: None,
+            name: "SaTu".to_string(),
+            icon: None,
+            references: vec![shared::models::Reference {
+                id: None,
+                ref_type: shared::models::ReferenceType::Metadata,
+                platform: Platform::SoundCloud,
+                external_id: Some("uploader-id".to_string()),
+                external_url: None,
+            }],
+        }];
+        let cleaned = vec!["Le Mouton Noir".to_string(), "SaTu".to_string()];
+        let mapped = Soundcloud::map_cleaned_artists(&original, &cleaned);
+
+        assert!(mapped[0].references.is_empty());
+        assert_eq!(mapped[1].references[0].external_id.as_deref(), Some("uploader-id"));
     }
 }
