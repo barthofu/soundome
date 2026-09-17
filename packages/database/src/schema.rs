@@ -1,6 +1,21 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    ai_cleanup_log (id) {
+        id -> Integer,
+        track_id -> Nullable<Integer>,
+        platform -> Text,
+        source_external_id -> Nullable<Text>,
+        before_title -> Text,
+        before_artists -> Text,
+        after_title -> Text,
+        after_artists -> Text,
+        rejected_artists -> Nullable<Text>,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     album (id) {
         id -> Integer,
         title -> Text,
@@ -57,6 +72,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    dedup_ignore (id) {
+        id -> Integer,
+        entity_type -> Text,
+        id_a -> Integer,
+        id_b -> Integer,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     genre (id) {
         id -> Integer,
         name -> Text,
@@ -79,6 +104,19 @@ diesel::table! {
         track_id -> Integer,
         playlist_id -> Integer,
         position -> Nullable<Integer>,
+    }
+}
+
+diesel::table! {
+    reference_audit_cache (id) {
+        id -> Integer,
+        entity_type -> Text,
+        entity_id -> Integer,
+        reference_id -> Integer,
+        remote_name -> Nullable<Text>,
+        similarity_score -> Nullable<Float>,
+        status -> Text,
+        checked_at -> Timestamp,
     }
 }
 
@@ -176,15 +214,18 @@ diesel::joinable!(track_genres -> track (track_id));
 diesel::joinable!(track_ref -> track (track_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    ai_cleanup_log,
     album,
     album_ref,
     artist,
     artist_albums,
     artist_ref,
     artist_tracks,
+    dedup_ignore,
     genre,
     playlist,
     playlist_tracks,
+    reference_audit_cache,
     sync_schedule,
     sync_settings,
     task,

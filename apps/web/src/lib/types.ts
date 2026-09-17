@@ -193,3 +193,23 @@ export interface PlaylistTrackDto {
   cover: string | null;
   genre: string | null;
 }
+
+// ── Data Quality ─────────────────────────────────────────────────────────────
+
+export interface StructuralFindingEntityDto {
+  entity_type: 'artist' | 'album' | 'track';
+  id: number;
+  name: string;
+}
+
+export interface StructuralFindingDto {
+  kind:
+    | 'conflicting_reference'
+    | 'multiple_platform_references'
+    | 'platform_url_mismatch'
+    | 'track_missing_source_reference';
+  message: string;
+  entities: StructuralFindingEntityDto[];
+  platform: string | null;
+  reference_id: number | null;
+}

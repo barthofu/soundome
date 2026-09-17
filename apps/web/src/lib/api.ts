@@ -13,6 +13,7 @@ import type {
   PlaylistTrackDto,
   ReferenceDto,
   AddReferenceBody,
+  StructuralFindingDto,
 } from './types';
 
 const BASE = '/api';
@@ -738,5 +739,13 @@ export async function getVersion(): Promise<string> {
   if (!res.ok) return '';
   const data: { version: string } = await res.json();
   return data.version;
+}
+
+// ── Data Quality ─────────────────────────────────────────────────────────────
+
+export async function getStructuralFindings(): Promise<StructuralFindingDto[]> {
+  const res = await fetch(`${BASE}/data-quality/audit/structural`);
+  if (!res.ok) throw new Error(`Failed to fetch structural findings: ${res.statusText}`);
+  return res.json();
 }
 

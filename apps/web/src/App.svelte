@@ -7,10 +7,11 @@
   import Library from './pages/Library.svelte';
   import Tools from './pages/Tools.svelte';
   import Ingest from './pages/Ingest.svelte';
+  import DataQuality from './pages/DataQuality.svelte';
   import HelpModal from './lib/HelpModal.svelte';
   import PWAUpdatePrompt from './components/PWAUpdatePrompt.svelte';
 
-  type Page = 'download' | 'validations' | 'tasks' | 'library' | 'tools' | 'ingest';
+  type Page = 'download' | 'validations' | 'tasks' | 'library' | 'tools' | 'ingest' | 'data-quality';
 
   let page: Page = $state('library');
   let pendingCount = $state(0);
@@ -116,6 +117,13 @@
         <span class="badge">{pendingCount}</span>
       {/if}
     </button>
+    <button
+      class="nav-link"
+      class:active={page === 'data-quality'}
+      onclick={() => navigate('data-quality')}
+    >
+      Data Quality
+    </button>
 
     <!-- Separator -->
     <span class="nav-sep" aria-hidden="true"></span>
@@ -179,6 +187,8 @@
     <Validations onDownloaded={refreshCounts} />
   {:else if page === 'ingest'}
     <Ingest />
+  {:else if page === 'data-quality'}
+    <DataQuality />
   {:else}
     <Tasks onNavigateValidations={() => navigate('validations')} />
   {/if}

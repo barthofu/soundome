@@ -71,6 +71,8 @@ fn rocket() -> _ {
         Arc::new(repositories::sync_schedule::DieselSyncScheduleRepository::new());
     let sync_settings_repo =
         Arc::new(repositories::sync_settings::DieselSyncSettingsRepository::new());
+    let data_quality_repo =
+        Arc::new(repositories::data_quality::DieselDataQualityRepository::new());
 
     let repositories = Arc::new(RepositoryLayer {
         track: track_repo.clone(),
@@ -80,6 +82,7 @@ fn rocket() -> _ {
         task: task_repo.clone(),
         sync_schedule: sync_schedule_repo.clone(),
         sync_settings: sync_settings_repo.clone(),
+        data_quality: data_quality_repo.clone(),
     });
 
     let services = Arc::new(ServiceLayer::new(repositories));
@@ -303,6 +306,7 @@ fn rocket() -> _ {
                 routes::misc::get_all,
                 routes::misc::get_providers,
                 routes::misc::get_version,
+                routes::data_quality::get_structural_findings,
                 routes::validations::get_pending,
                 routes::validations::get_pending_count,
                 routes::validations::get_recent,
