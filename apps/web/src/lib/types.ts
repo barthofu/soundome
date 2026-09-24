@@ -213,3 +213,32 @@ export interface StructuralFindingDto {
   platform: string | null;
   reference_id: number | null;
 }
+
+export type DuplicateEntityType = 'artists' | 'albums' | 'tracks';
+
+export interface DuplicateCandidateDto {
+  id: number;
+  name: string;
+  artists: string[];
+  album_title: string | null;
+  date: string | null;
+  duration: number | null;
+  track_count: number;
+  album_count: number;
+  reference_count: number;
+  similarity_score: number;
+  quality_value: number | null;
+  references: ReferenceDto[];
+}
+
+export interface DuplicateGroupDto {
+  entity_type: 'artist' | 'album' | 'track';
+  suggested_target_id: number;
+  candidates: DuplicateCandidateDto[];
+}
+
+export interface DedupIgnoreDto {
+  entity_type: string;
+  id_a: number;
+  id_b: number;
+}

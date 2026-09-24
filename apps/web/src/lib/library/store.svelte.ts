@@ -1,7 +1,7 @@
 import {
   getTracksPage, updateTrack, deleteTrack,
-  getAlbumsPage, updateAlbum, deleteAlbum, mergeAlbums, getAlbumNames, getAlbumTracks,
-  getArtistsPage, updateArtist, deleteArtist, mergeArtists, getArtistNames, getArtistTracks, getArtistAlbums,
+  getAlbumsPage, updateAlbum, deleteAlbum, getAlbumTracks,
+  getArtistsPage, updateArtist, deleteArtist, getArtistNames, getArtistTracks, getArtistAlbums,
   uploadArtistImage, uploadAlbumImage, uploadTrackImage,
   fetchArtistIconFromReferences, fetchAlbumCoverFromReferences,
   batchFetchArtistIcons, batchFetchAlbumCovers,
@@ -35,36 +35,6 @@ export type HoveredItem = { type: 'track' | 'album' | 'artist'; id: number } | n
 
 const PAGE_SIZE = 60;
 const SEARCH_DEBOUNCE_MS = 500;
-
-// ── Artist/album name similarity helpers ──────────────────────────────────────
-function _editDistance(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = dp[0]; dp[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const tmp = dp[j];
-      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
-      prev = tmp;
-    }
-  }
-  return dp[n];
-}
-
-export function areSimilarArtistNames(a: string, b: string): boolean {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const na = norm(a), nb = norm(b);
-  if (na === nb) return true;
-  if (na.length < 2 || nb.length < 2) return false;
-  const dist = _editDistance(na, nb);
-  const maxLen = Math.max(na.length, nb.length);
-  return dist <= 2 || (maxLen >= 8 && dist / maxLen <= 0.2);
-}
-
-// Album title similarity mirrors artist name similarity.
-export function areSimilarAlbumNames(a: string, b: string): boolean {
-  return areSimilarArtistNames(a, b);
-}
 
 function createLibraryStore() {
   const _initHash = (() => {
@@ -167,35 +137,15 @@ function createLibraryStore() {
 
   let hoveredItem: HoveredItem = $state(null);
 
-  // ── Artist selection / merge state ─────────────────────────────────────────
-  let selectedArtistIds: Set<number> = $state(new Set());
-  let mergePicking = $state(false);
-  let mergeSaving = $state(false);
-  let similarFilterActive = $state(false);
-
-  // ── Album selection / merge state ──────────────────────────────────────────
-  let selectedAlbumIds: Set<number> = $state(new Set());
-  let albumMergePicking = $state(false);
-  let albumMergeSaving = $state(false);
-  let albumSimilarFilterActive = $state(false);
-
   // ── Lightweight id+name lists (duplicate detection + artist autocomplete) ──
   let artistNames: { id: number; name: string }[] = $state([]);
   let artistNamesLoaded = $state(false);
-  let albumNames: { id: number; title: string }[] = $state([]);
-  let albumNamesLoaded = $state(false);
-
   async function ensureArtistNames() {
     if (artistNamesLoaded) return;
     try { artistNames = await getArtistNames(); artistNamesLoaded = true; } catch { /* best-effort */ }
   }
-  async function ensureAlbumNames() {
-    if (albumNamesLoaded) return;
-    try { albumNames = await getAlbumNames(); albumNamesLoaded = true; } catch { /* best-effort */ }
-  }
   /** Called after an artist create/rename/merge so autocomplete stays fresh. */
   function invalidateArtistNames() { artistNamesLoaded = false; }
-  function invalidateAlbumNames() { albumNamesLoaded = false; }
 
   // ── Derived: resolve paginated ids through the normalized cache ────────────
   let filteredTracks = $derived(
@@ -257,31 +207,6 @@ function createLibraryStore() {
     return result;
   });
 
-  let similarArtistIds = $derived.by(() => {
-    const ids = new Set<number>();
-    for (let i = 0; i < artistNames.length; i++) {
-      for (let j = i + 1; j < artistNames.length; j++) {
-        if (areSimilarArtistNames(artistNames[i].name, artistNames[j].name)) {
-          ids.add(artistNames[i].id);
-          ids.add(artistNames[j].id);
-        }
-      }
-    }
-    return ids;
-  });
-  let similarAlbumIds = $derived.by(() => {
-    const ids = new Set<number>();
-    for (let i = 0; i < albumNames.length; i++) {
-      for (let j = i + 1; j < albumNames.length; j++) {
-        if (areSimilarAlbumNames(albumNames[i].title, albumNames[j].title)) {
-          ids.add(albumNames[i].id);
-          ids.add(albumNames[j].id);
-        }
-      }
-    }
-    return ids;
-  });
-
   // ── URL navigation ─────────────────────────────────────────────────────────
   function buildHash(t: Tab, artistId?: number, albumId?: number, playlistId?: number): string {
     if (t === 'artists') {
@@ -330,7 +255,7 @@ function createLibraryStore() {
     if (drillArtistId != null) loadDrillArtist(drillArtistId);
     if (drillAlbumId != null) loadDrillAlbum(drillAlbumId);
   }
-  function switchTab(t: Tab) { navigate(t); clearArtistSelection(); clearAlbumSelection(); }
+  function switchTab(t: Tab) { navigate(t); }
   function clearDrill() { navigate(tab); }
 
   function handleRefresh() {
@@ -635,7 +560,6 @@ function createLibraryStore() {
       } else if (state.type === 'album') {
         const updated = await updateAlbum(state.item.id, albumDraft);
         entityCache.upsertAlbum(updated);
-        invalidateAlbumNames();
       } else {
         const updated = await updateArtist(state.item.id, artistDraft);
         entityCache.upsertArtist(updated);
@@ -767,7 +691,6 @@ function createLibraryStore() {
       albumIds = albumIds.filter(x => x !== id);
       albumsTotal = Math.max(0, albumsTotal - 1);
       drillArtistAlbumIds = drillArtistAlbumIds.filter(x => x !== id);
-      invalidateAlbumNames();
       if (drillAlbumId === id) navigate(tab, drillArtistId ?? undefined);
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
@@ -814,86 +737,6 @@ function createLibraryStore() {
       // Full refresh: playlist deletion can change track counts across tabs.
       loadAll();
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
-  }
-
-  // ── Artist selection helpers ───────────────────────────────────────────────
-  function toggleArtistSelection(id: number) {
-    const next = new Set(selectedArtistIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    selectedArtistIds = next;
-    if (selectedArtistIds.size < 2) mergePicking = false;
-  }
-  function clearArtistSelection() {
-    selectedArtistIds = new Set();
-    mergePicking = false;
-  }
-  function startMergePicking() {
-    if (selectedArtistIds.size >= 2) mergePicking = true;
-  }
-  function cancelMergePicking() {
-    mergePicking = false;
-  }
-  async function pickMergeTarget(targetId: number) {
-    if (!mergePicking || !selectedArtistIds.has(targetId)) return;
-    const sourceIds = [...selectedArtistIds].filter(id => id !== targetId);
-    const targetName = entityCache.getArtist(targetId)?.name ?? String(targetId);
-    const sourceNames = sourceIds.map(id => entityCache.getArtist(id)?.name ?? String(id)).join(', ');
-    if (!confirm(`Merge "${sourceNames}" into "${targetName}"?\n\nThis cannot be undone.`)) return;
-    mergeSaving = true;
-    try {
-      const updated = await mergeArtists(sourceIds, targetId);
-      for (const sid of sourceIds) entityCache.removeArtist(sid);
-      entityCache.upsertArtist(updated);
-      artistIds = artistIds.filter(id => !sourceIds.includes(id));
-      artistsTotal = Math.max(0, artistsTotal - sourceIds.length);
-      invalidateArtistNames();
-      clearArtistSelection();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    } finally {
-      mergeSaving = false;
-    }
-  }
-
-  // ── Album selection helpers ────────────────────────────────────────────────
-  function toggleAlbumSelection(id: number) {
-    const next = new Set(selectedAlbumIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    selectedAlbumIds = next;
-    if (selectedAlbumIds.size < 2) albumMergePicking = false;
-  }
-  function clearAlbumSelection() {
-    selectedAlbumIds = new Set();
-    albumMergePicking = false;
-  }
-  function startAlbumMergePicking() {
-    if (selectedAlbumIds.size >= 2) albumMergePicking = true;
-  }
-  function cancelAlbumMergePicking() {
-    albumMergePicking = false;
-  }
-  async function pickAlbumMergeTarget(targetId: number) {
-    if (!albumMergePicking || !selectedAlbumIds.has(targetId)) return;
-    const sourceIds = [...selectedAlbumIds].filter(id => id !== targetId);
-    const targetTitle = entityCache.getAlbum(targetId)?.title ?? String(targetId);
-    const sourceTitles = sourceIds.map(id => entityCache.getAlbum(id)?.title ?? String(id)).join(', ');
-    if (!confirm(`Merge "${sourceTitles}" into "${targetTitle}"?\n\nThis cannot be undone.`)) return;
-    albumMergeSaving = true;
-    try {
-      const updated = await mergeAlbums(sourceIds, targetId);
-      for (const sid of sourceIds) entityCache.removeAlbum(sid);
-      entityCache.upsertAlbum(updated);
-      albumIds = albumIds.filter(id => !sourceIds.includes(id));
-      albumsTotal = Math.max(0, albumsTotal - sourceIds.length);
-      invalidateAlbumNames();
-      clearAlbumSelection();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    } finally {
-      albumMergeSaving = false;
-    }
   }
 
   // ── Reference helpers ─────────────────────────────────────────────────────
@@ -1092,20 +935,6 @@ function createLibraryStore() {
 
     get hoveredItem() { return hoveredItem; }, set hoveredItem(v: HoveredItem) { hoveredItem = v; },
 
-    get selectedArtistIds() { return selectedArtistIds; },
-    get mergePicking() { return mergePicking; },
-    get mergeSaving() { return mergeSaving; },
-    get similarFilterActive() { return similarFilterActive; },
-    set similarFilterActive(v: boolean) { similarFilterActive = v; if (v) ensureArtistNames(); },
-    get similarArtistIds() { return similarArtistIds; },
-
-    get selectedAlbumIds() { return selectedAlbumIds; },
-    get albumMergePicking() { return albumMergePicking; },
-    get albumMergeSaving() { return albumMergeSaving; },
-    get albumSimilarFilterActive() { return albumSimilarFilterActive; },
-    set albumSimilarFilterActive(v: boolean) { albumSimilarFilterActive = v; if (v) ensureAlbumNames(); },
-    get similarAlbumIds() { return similarAlbumIds; },
-
     get artistNames() { return artistNames; },
     ensureArtistNames,
 
@@ -1126,8 +955,6 @@ function createLibraryStore() {
     openEditForHovered, saveEdit, uploadImage, fetchThumbnailFromReferences,
     batchFetchArtistIconsAction, batchFetchAlbumCoversAction,
     handleDeleteTrack, handleDeleteAlbum, handleDeleteArtist, handleDeletePlaylist,
-    toggleArtistSelection, clearArtistSelection, startMergePicking, cancelMergePicking, pickMergeTarget,
-    toggleAlbumSelection, clearAlbumSelection, startAlbumMergePicking, cancelAlbumMergePicking, pickAlbumMergeTarget,
     fmtDuration, isRemote,
     addReference, deleteReference,
 

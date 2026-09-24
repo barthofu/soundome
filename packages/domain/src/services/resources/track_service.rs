@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use diesel::{Connection, SqliteConnection};
 use shared::{
@@ -423,6 +423,149 @@ impl TrackService {
             // if we can't determine, default to false
             _ => false,
         }
+    }
+
+    /// Merge duplicate finalized tracks into one survivor. The recording
+    /// selected by the existing quality comparator used during download-time deduplication
+    /// supplies the surviving metadata and audio path. Playlist memberships
+    /// and durable metadata references from every duplicate are preserved.
+    pub fn merge_into(
+        &self,
+        conn: &mut SqliteConnection,
+        source_ids: &[i32],
+        target_id: i32,
+    ) -> SoundomeResult<Track> {
+        if source_ids.is_empty() || source_ids.contains(&target_id) {
+            return Err(Error::Custom(
+                "Track merge requires source ids distinct from the target".to_string(),
+            ));
+        }
+        let mut seen = HashSet::with_capacity(source_ids.len());
+        if source_ids.iter().any(|id| !seen.insert(*id)) {
+            return Err(Error::Custom(
+                "Track merge source ids must be unique".to_string(),
+            ));
+        }
+
+        let target = self.track_repo.get_by_id(conn, target_id)?;
+        let mut tracks = Vec::with_capacity(source_ids.len() + 1);
+        tracks.push(target);
+        for source_id in source_ids {
+            let source = self.track_repo.get_by_id(conn, *source_id)?;
+            if source.needs_validation || source.file_path.is_none() {
+                return Err(Error::Custom(format!(
+                    "Track {} is not finalized and cannot be merged from the duplicate queue",
+                    source_id
+                )));
+            }
+            tracks.push(source);
+        }
+        if tracks[0].needs_validation || tracks[0].file_path.is_none() {
+            return Err(Error::Custom(format!(
+                "Track {} is not finalized and cannot be merged from the duplicate queue",
+                target_id
+            )));
+        }
+
+        // Keep the requested target row id, but select the actual best-quality
+        // recording/metadata as the content for that survivor.
+        let mut winner = tracks[0].clone();
+        for track in tracks.iter().skip(1) {
+            if self.is_better_quality(&winner, track) {
+                winner = track.clone();
+            }
+        }
+
+        let winner_id = winner.id;
+        let winner_path = winner.file_path.clone();
+        let mut merged_references = Vec::new();
+        for track in &tracks {
+            let is_winner = track.id == winner_id;
+            for reference in &track.references {
+                // Source/Provider describe the selected audio path. Keep those
+                // only from the quality winner; Metadata/Reference are durable
+                // and are merged from all duplicate rows.
+                if !is_winner
+                    && (reference.ref_type == ReferenceType::Source
+                        || reference.ref_type == ReferenceType::Provider)
+                {
+                    continue;
+                }
+                let already_present = merged_references.iter().any(|existing: &Reference| {
+                    existing.ref_type == reference.ref_type
+                        && existing.platform == reference.platform
+                        && existing.external_id == reference.external_id
+                        && existing.external_url == reference.external_url
+                });
+                if !already_present {
+                    let mut reference = reference.clone();
+                    reference.id = None;
+                    merged_references.push(reference);
+                }
+            }
+        }
+
+        // A reference setter replaces Source/Provider only when it receives an
+        // entry of that type. If the selected recording has no reference of a
+        // type that an inferior duplicate did have, pass an empty sentinel so
+        // the stale audio-path reference is cleared rather than left on target.
+        for ref_type in [ReferenceType::Source, ReferenceType::Provider] {
+            let winner_has_type = winner
+                .references
+                .iter()
+                .any(|reference| reference.ref_type == ref_type);
+            let duplicate_had_type = tracks.iter().any(|track| {
+                track
+                    .references
+                    .iter()
+                    .any(|reference| reference.ref_type == ref_type)
+            });
+            if !winner_has_type && duplicate_had_type {
+                if let Some(mut sentinel) = tracks
+                    .iter()
+                    .flat_map(|track| track.references.iter())
+                    .find(|reference| reference.ref_type == ref_type)
+                    .cloned()
+                {
+                    sentinel.id = None;
+                    sentinel.external_id = None;
+                    sentinel.external_url = None;
+                    merged_references.push(sentinel);
+                }
+            }
+        }
+
+        let mut merged_track = winner.clone();
+        merged_track.id = Some(target_id);
+        merged_track.references = merged_references;
+        let losing_paths: Vec<_> = tracks
+            .iter()
+            .filter(|track| track.id != winner_id)
+            .filter_map(|track| track.file_path.clone())
+            .filter(|path| Some(path) != winner_path.as_ref())
+            .collect();
+
+        self.track_repo
+            .merge_into(conn, source_ids, target_id, &merged_track)?;
+
+        // Database state is committed at this point. File cleanup is best
+        // effort: a filesystem error must not undo or obscure the successful DB
+        // merge; it is logged so an orphan file can be cleaned up later.
+        let mut removed = HashSet::new();
+        for path in losing_paths {
+            if !removed.insert(path.clone()) {
+                continue;
+            }
+            match std::fs::remove_file(&path) {
+                Ok(()) => tracing::info!(?path, "Removed inferior duplicate track audio"),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    tracing::warn!(?path, %error, "Could not remove inferior duplicate track audio")
+                }
+            }
+        }
+
+        self.track_repo.get_by_id(conn, target_id)
     }
 
     /// Delete track file

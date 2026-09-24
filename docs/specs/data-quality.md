@@ -2,9 +2,9 @@
 
 ## Status
 
-In progress. Phases 1 and 2 implemented (see [Implementation status](#implementation-status)).
+In progress. Phases 1–4 implemented (see [Implementation status](#implementation-status)).
 Tracked in GitHub issue [#28](https://github.com/barthofu/soundome/issues/28).
-Phase 1+2 shipped via PR [#29](https://github.com/barthofu/soundome/pull/29).
+Phases 1+2 shipped via PR [#29](https://github.com/barthofu/soundome/pull/29).
 
 ## Context
 
@@ -43,7 +43,7 @@ These were confirmed with the maintainer before implementation:
 |---|---|---|
 | 1 | Duplicate-review remote audit trigger | Manual only — a button ("Run audit"), never a scheduled/automatic job. |
 | 2 | Similarity threshold used to group track duplicates | Reuse `Track::compare(other) >= 0.8`, the exact same call and threshold already used by `TrackService::find_track_by_title_and_artist`, `TrackService::SIMILARITY_THRESHOLD`, and `Track::transpose_metadata_impl`. This keeps "is a duplicate" consistent between the download-time dedup pipeline and the manual review queue — no new arbitrary threshold. |
-| 3 | Track merge behavior | Reuses `TrackService::is_better_quality` (bitrate-based), exactly like the automatic dedup pipeline in `DownloadService`. No manual "pick which file to keep" UI. |
+| 3 | Track merge behavior | Reuses `TrackService::is_better_quality`, exactly like the automatic dedup pipeline in `DownloadService`. No manual "pick which file to keep" UI. |
 | 4 | Track merge and playlists | Merging tracks also re-points `playlist_tracks` rows from the source track(s) to the target track (deduplicating position if the target is already in the same playlist). |
 | 5 | Ignore-list persistence | A dedicated DB table (`dedup_ignore`), not `localStorage` — the app is single-user but the ignore list should survive across devices/browsers. |
 | 6 | `genre`/`track_genres` tables | Left inert. They exist in the schema but are unused (`track.genre` is a free-text column); out of scope for this feature. |
@@ -217,6 +217,13 @@ suggestion), the new queue:
   references, then the cleanest name (no special characters).
 - Persists "not a duplicate" decisions in `dedup_ignore` so a rejected pair
   never resurfaces.
+- For groups with more than two candidates, the UI can exclude one candidate
+  by persisting its pairwise "not a duplicate" decision against each other
+  current member. The entity remains eligible for future comparisons with
+  other entities.
+- After a merge, group ignore, or candidate exclusion, update the visible
+  queue locally; only the explicit **Re-scan** action reruns duplicate
+  analysis on the server.
 - Reuses the existing `ArtistRepository::merge_into` /
   `AlbumRepository::merge_into` for artists/albums, and adds a new
   `TrackRepository::merge_into` for tracks (quality-aware via
@@ -264,9 +271,16 @@ suggestion), the new queue:
   `GET /api/data-quality/audit/structural`, and the `Data Quality` page/nav
   entry (`apps/web/src/pages/DataQuality.svelte`) with a manual re-scan
   button.
-- ⬜ **Phase 3** — Duplicate review queue (Artists/Albums). Not started.
-- ⬜ **Phase 4** — Duplicate review queue (Tracks) + `TrackRepository::merge_into`.
-  Not started.
+- ✅ **Phase 3** — Duplicate review queue for Artists/Albums/Tracks,
+  connected-component suggestions, persisted "not a duplicate" decisions
+  with undo, and migration of the old Library-tab Similar/Shift-click merge
+  controls into Data Quality.
+- ✅ **Phase 4** — Track merge endpoint and repository flow. Finalized duplicate
+  tracks are merged using `TrackService::is_better_quality`; the best-quality
+  row supplies the surviving audio metadata/path while the selected target
+  row id survives. Playlist memberships, existing genre join rows, and
+  durable metadata references are preserved; inferior audio files are
+  deleted best-effort after the database transaction.
 - ⬜ **Phase 5** — Remote reference audit. Not started. The
   `reference_audit_cache` table and `ReferenceAuditResult` model already
   exist (phase 1) but no route or provider-querying logic exists yet.
@@ -284,6 +298,12 @@ suggestion), the new queue:
 - Check (C) (`PlatformUrlMismatch`) may produce false positives on
   manually-added references whose URL isn't in the platform's canonical
   domain form.
+- Track merges deliberately call the existing `TrackService::is_better_quality`
+  per the product decision. Its current `Track::get_bitrate` implementation
+  reads Symphonia's `bits_per_coded_sample` value, despite the bitrate naming;
+  this phase preserves that existing comparator rather than changing audio
+  quality policy. The UI labels its displayed value generically as a quality
+  metric for the same reason.
 - No existing data is modified by phases 1-2 — purely additive/read-only.
 - Repairing already-corrupted historical data (e.g. an existing artist row
   with a wrong name attached to a valid reference) still requires manual

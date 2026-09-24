@@ -42,14 +42,43 @@ Tabbed view for browsing and editing the entire library.
 
 - List or grid view; toggle with the view buttons in the toolbar
 - Search by name (`S` to focus)
-- **Similar filter** — highlights artists whose names differ by only a few characters, useful for spotting duplicates
 - Click an artist to drill into their albums and tracks
-- **Multi-select** (`Shift`+click) to select two or more artists; a floating action bar appears to **merge** them into one
 
 **Albums tab**
 
 - Grid or list view; search by title or artist
 - Click an album to see its tracks
+
+### Data Quality
+
+Dedicated review area, separate from Library.
+
+**Duplicates**
+
+- Tabs for Artists, Albums, and Tracks. The server computes connected groups
+  using the domain similarity methods; finalized track duplicates use the
+  same `Track::compare >= 0.8` threshold as download-time deduplication.
+- Each group suggests a record to keep (most linked tracks, then references,
+  then a clean name); the user can select any member as the survivor.
+- **Merge** reuses existing artist/album merges. For tracks, the highest
+  quality recording according to `TrackService::is_better_quality` supplies
+  the surviving metadata and audio path, while the selected row ID survives;
+  playlist membership is combined and inferior files are removed best-effort.
+- **Not a duplicate** persists all pairs in that group in SQLite; ignored pairs
+  can be restored from the collapsible ignored-pairs list.
+- For groups with more than two items, **Exclude from group** persistently
+  marks one candidate as unrelated to every other current member and refreshes
+  the queue. It can still be suggested with different entities later.
+- After a merge, group ignore, or candidate exclusion, the current queue is
+  updated locally. Use **Re-scan** to recompute suggestions; these actions do
+  not automatically rerun the full duplicate analysis.
+
+**Reference audit**
+
+- Structural checks (no network calls): conflicting references, multiple IDs
+  for the same entity/platform/reference type, platform/URL mismatches, and
+  tracks missing a `Source` reference.
+- Remote provider verification is planned separately and is not available yet.
 
 **Tracks tab**
 
@@ -129,9 +158,6 @@ Everything is synchronized in one pass on a single global cron schedule.
 | `S` | Focus the search field |
 | `E` | Edit the item under the cursor |
 | `Backspace` | Go up one level (album → artist → list) |
-| `Shift`+click | Select an artist for merge |
-| `M` | Start merge (requires ≥ 2 artists selected) |
-| `Esc` | Cancel merge picking / clear selection |
 
 ### Validations (TrackCard)
 
@@ -185,9 +211,15 @@ All routes are documented interactively at `/swagger`.
 |---|---|---|
 | `POST` | `/api/download` | Submit a track or playlist URL |
 | `GET` | `/api/tracks` | List all library tracks |
+| `POST` | `/api/tracks/merge` | Merge finalized duplicate tracks, preserving playlist links and the highest-quality recording |
 | `GET` | `/api/tracks/recent?limit=N` | List the most recent tracks |
 | `GET` | `/api/albums` | List all albums |
 | `GET` | `/api/artists` | List all artists |
+| `GET` | `/api/data-quality/duplicates/:entity_type` | Find duplicate groups (`artists`, `albums`, `tracks`) |
+| `GET` | `/api/data-quality/duplicates/:entity_type/ignored` | List ignored duplicate pairs |
+| `POST` | `/api/data-quality/duplicates/:entity_type/ignore` | Mark an entity pair as not a duplicate |
+| `DELETE` | `/api/data-quality/duplicates/:entity_type/ignore/:id_a/:id_b` | Restore an ignored pair to duplicate suggestions |
+| `GET` | `/api/data-quality/audit/structural` | Find structural reference anomalies |
 | `GET` | `/api/playlists` | List all playlists |
 | `GET` | `/api/validations` | List tracks pending validation |
 | `PATCH` | `/api/validations/:id` | Approve and finalize a pending track |

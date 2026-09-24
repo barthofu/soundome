@@ -176,6 +176,15 @@ pub struct UpdateTrackBody {
     pub cover: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct MergeTracksBody {
+    /// Duplicate tracks to remove after merging into `target_id`.
+    pub source_ids: Vec<i32>,
+    /// Track row to keep. The best-quality recording supplies the surviving
+    /// metadata/audio path, while this row's id remains the survivor id.
+    pub target_id: i32,
+}
+
 // ================================================================================================
 // Routes
 // ================================================================================================
@@ -244,6 +253,54 @@ pub async fn get_all(
                 message: err.to_string(),
             })
         })
+}
+
+/// Merge finalized duplicate tracks. The surviving row id is selected by the
+/// caller; the best-quality audio recording (using the same quality comparator
+/// as download-time deduplication) supplies the metadata and file path.
+#[openapi]
+#[post("/tracks/merge", format = "application/json", data = "<body>")]
+pub async fn merge(
+    body: Json<MergeTracksBody>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<TrackDto>, crate::utils::error::Error> {
+    let body = body.into_inner();
+    if body.source_ids.is_empty() || body.source_ids.contains(&body.target_id) {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BadRequest".to_string(),
+            message: "source_ids must not be empty or contain target_id".to_string(),
+        }));
+    }
+    let mut seen = std::collections::HashSet::with_capacity(body.source_ids.len());
+    if body.source_ids.iter().any(|id| !seen.insert(*id)) {
+        return Err(crate::utils::error::Error::Custom(CustomError {
+            status: Status::BadRequest,
+            code: "BadRequest".to_string(),
+            message: "source_ids must be unique".to_string(),
+        }));
+    }
+
+    let services = Arc::clone(services);
+    db.run(move |conn| {
+        services
+            .track_service
+            .merge_into(conn, &body.source_ids, body.target_id)
+    })
+    .await
+    .and_then(|track| {
+        TrackDto::from_track(track)
+            .ok_or_else(|| shared::errors::Error::Database("Track has no id".to_string()))
+    })
+    .map(Json)
+    .map_err(|err| {
+        crate::utils::error::Error::Custom(CustomError {
+            status: Status::InternalServerError,
+            code: "Internal".to_string(),
+            message: err.to_string(),
+        })
+    })
 }
 
 #[openapi]

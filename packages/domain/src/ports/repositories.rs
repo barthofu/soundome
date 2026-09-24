@@ -177,6 +177,15 @@ pub trait TrackRepository: Send + Sync {
         conn: &mut SqliteConnection,
         album_id: i32,
     ) -> SoundomeResult<Vec<Track>>;
+    /// Merge source tracks into `target_id`, applying the already-selected
+    /// quality winner's metadata/references while preserving playlist links.
+    fn merge_into(
+        &self,
+        conn: &mut SqliteConnection,
+        source_ids: &[i32],
+        target_id: i32,
+        merged_track: &Track,
+    ) -> SoundomeResult<()>;
     // /// Find a track by unique fields (e.g. title + artists + album)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Option<Track>>;
 }
@@ -484,6 +493,15 @@ pub trait DataQualityRepository: Send + Sync {
         conn: &mut SqliteConnection,
         entity_type: DataQualityEntityType,
     ) -> SoundomeResult<Vec<DedupIgnoreEntry>>;
+
+    /// Removes a previously ignored pair so it can be suggested again.
+    fn remove_dedup_ignore(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: DataQualityEntityType,
+        id_a: i32,
+        id_b: i32,
+    ) -> SoundomeResult<()>;
 
     /// Inserts or refreshes the cached remote-audit result for a single reference.
     fn upsert_reference_audit(
