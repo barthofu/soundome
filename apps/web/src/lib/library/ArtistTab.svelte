@@ -153,7 +153,7 @@
 <!-- ── LOADING / ERROR ────────────────────────────────────────────────────── -->
 {:else if lib.drillArtistId != null && !lib.artistsLoaded}
   <p class="status">Loading…</p>
-{:else if lib.artistsLoading}
+{:else if lib.artistsLoading && !lib.artistsLoaded}
   <p class="status">Loading…</p>
 {:else if lib.artistsError}
   <p class="status error">{lib.artistsError}</p>
@@ -199,7 +199,7 @@
         </svg>
       </button>
     </div>
-    <span class="count">{lib.artistsTotal} artist{lib.artistsTotal !== 1 ? 's' : ''}</span>
+    <span class="count" aria-live="polite">{#if lib.artistsLoading}Updating… · {/if}{lib.artistsTotal} artist{lib.artistsTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.artistsView === 'list'}
