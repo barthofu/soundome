@@ -56,6 +56,9 @@ impl ServiceLayer {
         let task_service = Arc::new(task_service::TaskService::new(repositories.task.clone()));
         let data_quality_service = Arc::new(data_quality_service::DataQualityService::new(
             repositories.data_quality.clone(),
+            repositories.artist.clone(),
+            repositories.album.clone(),
+            repositories.track.clone(),
         ));
 
         // Services

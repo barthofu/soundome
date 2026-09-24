@@ -1,4 +1,5 @@
 use domain::ports::repositories::{Page, SortDir, TrackQuery, TrackRepository, TrackSortBy};
+use std::collections::{HashMap, HashSet};
 
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Bool, Integer, Nullable, Text};
@@ -11,8 +12,8 @@ use shared::{
 use crate::{
     delete_with_relations,
     entities::{
-        AlbumEntity, ArtistEntity, NewTrackEntity, NewTrackRefEntity, TrackEntity, TrackRefEntity,
-        UpdateTrackEntity,
+        AlbumEntity, ArtistEntity, ArtistTrackEntity, NewTrackEntity, NewTrackRefEntity,
+        TrackEntity, TrackRefEntity, UpdateTrackEntity,
     },
     schema,
 };
@@ -866,5 +867,163 @@ impl TrackRepository for DieselTrackRepository {
                 ))
             })?;
         self.hydrate_tracks_by_ids(conn, &ids)
+    }
+
+    fn merge_into(
+        &self,
+        conn: &mut SqliteConnection,
+        source_ids: &[i32],
+        target_id: i32,
+        merged_track: &Track,
+    ) -> SoundomeResult<()> {
+        use diesel::Connection as _;
+
+        if source_ids.is_empty() || source_ids.contains(&target_id) {
+            return Err(shared::errors::Error::Custom(
+                "Track merge requires source ids distinct from the target".to_string(),
+            ));
+        }
+        let mut unique_sources = HashSet::with_capacity(source_ids.len());
+        if source_ids.iter().any(|id| !unique_sources.insert(*id)) {
+            return Err(shared::errors::Error::Custom(
+                "Track merge source ids must be unique".to_string(),
+            ));
+        }
+
+        conn.transaction(|tx| {
+            // Apply the quality winner's metadata/path to the surviving row.
+            self.update(tx, target_id, merged_track)?;
+
+            // Keep the winner's artist relationships; artist associations from
+            // inferior duplicate recordings are not copied onto the survivor.
+            diesel::delete(
+                schema::artist_tracks::table.filter(schema::artist_tracks::track_id.eq(target_id)),
+            )
+            .execute(tx)
+            .map_err(|e| {
+                shared::errors::Error::Database(format!("merge: clear target artists: {e}"))
+            })?;
+            let mut artist_ids = HashSet::new();
+            for artist_id in merged_track.artists.iter().filter_map(|artist| artist.id) {
+                if artist_ids.insert(artist_id) {
+                    diesel::insert_into(schema::artist_tracks::table)
+                        .values(ArtistTrackEntity {
+                            track_id: target_id,
+                            artist_id,
+                        })
+                        .execute(tx)
+                        .map_err(|e| {
+                            shared::errors::Error::Database(format!(
+                                "merge: set target artists: {e}"
+                            ))
+                        })?;
+                }
+            }
+
+            // Preserve the union of playlist memberships. When two duplicate
+            // tracks occur in the same playlist, keep the target's existing
+            // position; otherwise keep the first source position encountered.
+            let all_ids: Vec<i32> = std::iter::once(target_id)
+                .chain(source_ids.iter().copied())
+                .collect();
+            let playlist_rows: Vec<(i32, i32, Option<i32>)> = schema::playlist_tracks::table
+                .filter(schema::playlist_tracks::track_id.eq_any(&all_ids))
+                .select((
+                    schema::playlist_tracks::track_id,
+                    schema::playlist_tracks::playlist_id,
+                    schema::playlist_tracks::position,
+                ))
+                .load(tx)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!("merge: load playlist links: {e}"))
+                })?;
+            let mut playlist_positions: HashMap<i32, Option<i32>> = HashMap::new();
+            for (track_id, playlist_id, position) in &playlist_rows {
+                if *track_id == target_id {
+                    playlist_positions.insert(*playlist_id, *position);
+                }
+            }
+            for (_, playlist_id, position) in &playlist_rows {
+                playlist_positions.entry(*playlist_id).or_insert(*position);
+            }
+            for (playlist_id, position) in playlist_positions {
+                diesel::insert_or_ignore_into(schema::playlist_tracks::table)
+                    .values((
+                        schema::playlist_tracks::track_id.eq(target_id),
+                        schema::playlist_tracks::playlist_id.eq(playlist_id),
+                        schema::playlist_tracks::position.eq(position),
+                    ))
+                    .execute(tx)
+                    .map_err(|e| {
+                        shared::errors::Error::Database(format!(
+                            "merge: preserve playlist link: {e}"
+                        ))
+                    })?;
+            }
+
+            // `track_genres` is currently unused by Soundome's model, but keep
+            // any existing rows rather than dropping them during a merge.
+            let genre_ids: Vec<i32> = schema::track_genres::table
+                .filter(schema::track_genres::track_id.eq_any(&all_ids))
+                .select(schema::track_genres::genre_id)
+                .distinct()
+                .load(tx)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!("merge: load track genres: {e}"))
+                })?;
+            for genre_id in genre_ids {
+                diesel::insert_or_ignore_into(schema::track_genres::table)
+                    .values((
+                        schema::track_genres::track_id.eq(target_id),
+                        schema::track_genres::genre_id.eq(genre_id),
+                    ))
+                    .execute(tx)
+                    .map_err(|e| {
+                        shared::errors::Error::Database(format!("merge: preserve track genre: {e}"))
+                    })?;
+            }
+
+            // References supplied by the domain service already follow the
+            // Source/Provider replacement and Metadata/Reference merge rules.
+            self.set_references(tx, target_id, &merged_track.references)?;
+
+            diesel::delete(
+                schema::dedup_ignore::table
+                    .filter(schema::dedup_ignore::entity_type.eq("track"))
+                    .filter(
+                        schema::dedup_ignore::id_a
+                            .eq_any(source_ids)
+                            .or(schema::dedup_ignore::id_b.eq_any(source_ids)),
+                    ),
+            )
+            .execute(tx)
+            .map_err(|e| {
+                shared::errors::Error::Database(format!("merge: delete stale track ignores: {e}"))
+            })?;
+
+            for &source_id in source_ids {
+                diesel::delete(
+                    schema::playlist_tracks::table
+                        .filter(schema::playlist_tracks::track_id.eq(source_id)),
+                )
+                .execute(tx)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!(
+                        "merge: remove source playlist links: {e}"
+                    ))
+                })?;
+                diesel::delete(
+                    schema::track_genres::table
+                        .filter(schema::track_genres::track_id.eq(source_id)),
+                )
+                .execute(tx)
+                .map_err(|e| {
+                    shared::errors::Error::Database(format!("merge: remove source genres: {e}"))
+                })?;
+                self.delete(tx, source_id)?;
+            }
+
+            Ok(())
+        })
     }
 }

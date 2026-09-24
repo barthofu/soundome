@@ -712,6 +712,20 @@ impl AlbumRepository for DieselAlbumRepository {
             }
 
             // --- Delete source albums --------------------------------------------------------
+            diesel::delete(
+                schema::dedup_ignore::table
+                    .filter(schema::dedup_ignore::entity_type.eq("album"))
+                    .filter(
+                        schema::dedup_ignore::id_a
+                            .eq_any(source_ids)
+                            .or(schema::dedup_ignore::id_b.eq_any(source_ids)),
+                    ),
+            )
+            .execute(conn)
+            .map_err(|e| {
+                shared::errors::Error::Database(format!("merge: delete stale album ignores: {e}"))
+            })?;
+
             for &src in source_ids {
                 diesel::delete(schema::album::table.filter(schema::album::id.eq(src)))
                     .execute(conn)

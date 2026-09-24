@@ -162,20 +162,6 @@
 {:else}
   <div class="toolbar">
     <input class="search" placeholder="Search artists… (S)" bind:value={lib.artistSearch} />
-    <button
-      class="btn-similar"
-      class:active={lib.similarFilterActive}
-      onclick={() => { lib.similarFilterActive = !lib.similarFilterActive; }}
-      title="Dim artists that have no similar-named peer — helps spot duplicates"
-    >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      Similar
-      {#if lib.similarFilterActive && lib.similarArtistIds.size > 0}
-        <span class="similar-badge">{lib.similarArtistIds.size}</span>
-      {/if}
-    </button>
     <SortDropdown
       value={lib.artistsSortBy}
       direction={lib.artistsSortDir}
@@ -208,32 +194,16 @@
         <thead><tr><th>#</th><th>Name</th><th class="col-actions">Actions</th></tr></thead>
         <tbody>
           {#each lib.filteredArtists as a (a.id)}
-            {@const sel = lib.selectedArtistIds.has(a.id)}
-            {@const dimmed = lib.similarFilterActive && !lib.similarArtistIds.has(a.id)}
-            {@const pickable = lib.mergePicking && sel}
             <tr
-              class:row-selected={sel}
-              class:row-dimmed={dimmed}
-              class:row-pickable={pickable}
-              style={lib.mergePicking && !sel ? 'opacity:0.3;pointer-events:none' : ''}
               onmouseenter={() => (lib.hoveredItem = { type: 'artist', id: a.id })}
               onmouseleave={() => (lib.hoveredItem = null)}
-              onclick={(e) => {
-                if (lib.mergePicking) { if (sel) lib.pickMergeTarget(a.id); }
-                else if (e.shiftKey) { e.preventDefault(); lib.toggleArtistSelection(a.id); }
-                else { lib.drillIntoArtist(a); }
-              }}
+              onclick={() => lib.drillIntoArtist(a)}
             >
               <td class="muted">{a.id}</td>
-              <td>
-                <span class:muted={dimmed}>{a.name}</span>
-                {#if sel}<span class="badge-sel">✓</span>{/if}
-              </td>
+              <td>{a.name}</td>
               <td class="actions">
-                {#if !lib.mergePicking}
-                  <button class="btn-edit" onclick={(e) => { e.stopPropagation(); lib.startEditArtist(a); }}>Edit</button>
-                  <button class="btn-delete" onclick={(e) => { e.stopPropagation(); lib.handleDeleteArtist(a.id); }}>Delete</button>
-                {/if}
+                <button class="btn-edit" onclick={(e) => { e.stopPropagation(); lib.startEditArtist(a); }}>Edit</button>
+                <button class="btn-delete" onclick={(e) => { e.stopPropagation(); lib.handleDeleteArtist(a.id); }}>Delete</button>
               </td>
             </tr>
           {/each}
@@ -241,42 +211,23 @@
       </table>
     </div>
   {:else}
-    <div class="card-grid">
-      {#each lib.filteredArtists as a (a.id)}
-        {@const sel = lib.selectedArtistIds.has(a.id)}
-        {@const dimmed = lib.similarFilterActive && !lib.similarArtistIds.has(a.id)}
-        {@const pickable = lib.mergePicking && sel}
-        <div class="card"
-          class:card-selected={sel}
-          class:card-dimmed={dimmed}
-          class:card-pickable={pickable}
-          style={lib.mergePicking && !sel ? 'opacity:0.3;pointer-events:none' : ''}
+      <div class="card-grid">
+        {#each lib.filteredArtists as a (a.id)}
+        <div class="card clickable"
           onmouseenter={() => (lib.hoveredItem = { type: 'artist', id: a.id })}
           onmouseleave={() => (lib.hoveredItem = null)}
-          onclick={(e) => {
-            if (lib.mergePicking) { if (sel) lib.pickMergeTarget(a.id); }
-            else if (e.shiftKey) { e.preventDefault(); lib.toggleArtistSelection(a.id); }
-            else { lib.drillIntoArtist(a); }
-          }}
+          onclick={() => lib.drillIntoArtist(a)}
           role="button" tabindex="0"
-          onkeydown={(e) => {
-            if (e.key === 'Enter') {
-              if (lib.mergePicking && sel) lib.pickMergeTarget(a.id);
-              else if (!lib.mergePicking) lib.drillIntoArtist(a);
-            } else if (e.key === ' ') { e.preventDefault(); lib.toggleArtistSelection(a.id); }
-          }}
+          onkeydown={(e) => e.key === 'Enter' && lib.drillIntoArtist(a)}
         >
           {@render artistCover(a.icon, a.name)}
           <div class="card-body">
             <div class="card-title" title={a.name}>{a.name}</div>
           </div>
-          {#if sel}<span class="card-sel-badge">✓</span>{/if}
-          {#if !lib.mergePicking}
-            <div class="card-hover-actions">
-              <button class="btn-edit" onclick={(e) => { e.stopPropagation(); lib.startEditArtist(a); }}>Edit</button>
-              <button class="btn-delete" onclick={(e) => { e.stopPropagation(); lib.handleDeleteArtist(a.id); }}>Delete</button>
-            </div>
-          {/if}
+          <div class="card-hover-actions">
+            <button class="btn-edit" onclick={(e) => { e.stopPropagation(); lib.startEditArtist(a); }}>Edit</button>
+            <button class="btn-delete" onclick={(e) => { e.stopPropagation(); lib.handleDeleteArtist(a.id); }}>Delete</button>
+          </div>
         </div>
       {/each}
     </div>
@@ -288,27 +239,6 @@
   {/if}
   {#if lib.filteredArtists.length === 0}<p class="status">No artists found.</p>{/if}
 
-  <!-- Floating merge / pick-target button -->
-  {#if lib.selectedArtistIds.size >= 2}
-    <div class="merge-fab" class:fab-picking={lib.mergePicking}>
-      {#if lib.mergePicking}
-        <span class="fab-hint">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-          Click the artist to keep
-        </span>
-        <button class="fab-btn-cancel" onclick={lib.cancelMergePicking} disabled={lib.mergeSaving}>Cancel</button>
-      {:else}
-        <span class="fab-count">{lib.selectedArtistIds.size}</span>
-        <button class="fab-btn-merge" onclick={lib.startMergePicking} disabled={lib.mergeSaving}>
-          {lib.mergeSaving ? 'Merging…' : 'Merge'}
-        </button>
-        <button class="fab-btn-cancel" onclick={lib.clearArtistSelection} title="Cancel selection">✕</button>
-      {/if}
-    </div>
-  {/if}
 {/if}
 
 <style>
@@ -331,67 +261,5 @@
   .detail-actions button { padding: 0.3rem 0.75rem; border-radius: 5px; border: 1px solid var(--border); cursor: pointer; font-size: 0.8rem; font-family: inherit; background: var(--surface-2); color: var(--text); }
   .detail-actions button:hover { background: var(--surface); }
 
-  /* Similar filter */
-  .btn-similar {
-    display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap;
-    padding: 0.28rem 0.65rem; border-radius: 5px; border: 1px solid var(--border);
-    background: var(--surface-2); color: var(--muted); cursor: pointer; font-size: 0.8rem; font-family: inherit;
-  }
-  .btn-similar:hover { color: var(--text); }
-  .btn-similar.active { background: color-mix(in srgb, #f59e0b 12%, var(--surface)); color: #f59e0b; border-color: color-mix(in srgb, #f59e0b 40%, transparent); }
-  .similar-badge { background: #f59e0b; color: #000; border-radius: 999px; padding: 0 0.35rem; font-size: 0.7rem; font-weight: 700; }
-
-  /* Row selection */
-  tr.row-selected td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
-  tr.row-dimmed { opacity: 0.2; }
-  tr.row-pickable { cursor: pointer; }
-  tr.row-pickable:hover td { background: color-mix(in srgb, #22c55e 14%, transparent) !important; }
-  .badge-sel {
-    display: inline-block; margin-left: 0.35rem; vertical-align: middle;
-    background: var(--accent); color: #fff; border-radius: 3px;
-    padding: 0 0.28rem; font-size: 0.66rem; font-weight: 700;
-  }
-  tr.row-pickable .badge-sel { background: #22c55e; }
-
-  /* Card selection */
   .card { position: relative; }
-  .card-selected { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .card-dimmed { opacity: 0.2; }
-  .card-pickable { cursor: pointer; }
-  .card-pickable:hover { outline-color: #22c55e !important; background: color-mix(in srgb, #22c55e 10%, var(--surface)); }
-  .card-sel-badge {
-    position: absolute; top: 0.3rem; right: 0.3rem; z-index: 2;
-    background: var(--accent); color: #fff; border-radius: 50%;
-    width: 1.2rem; height: 1.2rem; font-size: 0.65rem; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .card-pickable .card-sel-badge { background: #22c55e; }
-
-  /* Floating merge button */
-  .merge-fab {
-    position: fixed; bottom: 1.75rem; left: 50%; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;
-    padding: 0.55rem 0.9rem;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 999px; box-shadow: 0 4px 22px rgba(0,0,0,0.35);
-    z-index: 200; font-size: 0.875rem;
-  }
-  .merge-fab.fab-picking {
-    background: color-mix(in srgb, #22c55e 12%, var(--surface));
-    border-color: color-mix(in srgb, #22c55e 50%, transparent);
-  }
-  .fab-count { background: var(--accent); color: #fff; border-radius: 999px; padding: 0.05rem 0.55rem; font-size: 0.75rem; font-weight: 700; }
-  .fab-btn-merge {
-    padding: 0.35rem 1rem; border-radius: 999px; border: none; cursor: pointer;
-    background: var(--accent); color: #fff; font-weight: 600; font-family: inherit; font-size: 0.875rem;
-  }
-  .fab-btn-merge:hover:not(:disabled) { filter: brightness(1.12); }
-  .fab-btn-merge:disabled { opacity: 0.5; cursor: not-allowed; }
-  .fab-hint { display: flex; align-items: center; gap: 0.4rem; color: #22c55e; font-weight: 600; }
-  .fab-btn-cancel {
-    padding: 0.3rem 0.65rem; border-radius: 999px; border: 1px solid var(--border);
-    background: none; color: var(--muted); cursor: pointer; font-family: inherit; font-size: 0.8rem;
-  }
-  .fab-btn-cancel:hover { color: var(--text); background: var(--surface-2); }
-  .fab-btn-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use rocket_okapi::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::Platform;
+use super::{Platform, Reference};
 
 /// The three library entity kinds the Data Quality area operates on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -151,4 +151,40 @@ pub struct AiCleanupLogEntry {
     pub after_artists: Vec<String>,
     pub rejected_artists: Vec<String>,
     pub created_at: Option<NaiveDateTime>,
+}
+
+// ================================================================================================
+// Duplicate review queue
+// ================================================================================================
+
+/// One entity displayed in a duplicate-review group. Keep this deliberately
+/// lightweight: it contains enough context for an operator to choose a merge
+/// target without returning file paths or other internal filesystem details.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DuplicateCandidate {
+    pub id: i32,
+    pub name: String,
+    pub artists: Vec<String>,
+    pub album_title: Option<String>,
+    pub date: Option<String>,
+    pub duration: Option<i32>,
+    /// Number of tracks linked to this artist/album; for tracks this is 1.
+    pub track_count: usize,
+    /// Number of albums linked to an artist; zero for album/track candidates.
+    pub album_count: usize,
+    pub reference_count: usize,
+    /// Best similarity score to another candidate in this group (0..=1).
+    pub similarity_score: f64,
+    /// Value exposed by the existing quality comparator for finalized tracks.
+    pub quality_value: Option<u32>,
+    pub references: Vec<Reference>,
+}
+
+/// A connected component of the duplicate-similarity graph. The proposed
+/// target is only a suggestion; the user may choose any member to keep.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DuplicateGroup {
+    pub entity_type: DataQualityEntityType,
+    pub suggested_target_id: i32,
+    pub candidates: Vec<DuplicateCandidate>,
 }

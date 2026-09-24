@@ -344,6 +344,29 @@ impl DataQualityRepository for DieselDataQualityRepository {
             .collect())
     }
 
+    fn remove_dedup_ignore(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: DataQualityEntityType,
+        id_a: i32,
+        id_b: i32,
+    ) -> SoundomeResult<()> {
+        let (id_a, id_b) = if id_a <= id_b {
+            (id_a, id_b)
+        } else {
+            (id_b, id_a)
+        };
+        diesel::delete(
+            schema::dedup_ignore::table
+                .filter(schema::dedup_ignore::entity_type.eq(entity_type.as_str()))
+                .filter(schema::dedup_ignore::id_a.eq(id_a))
+                .filter(schema::dedup_ignore::id_b.eq(id_b)),
+        )
+        .execute(conn)
+        .map_err(map_error)?;
+        Ok(())
+    }
+
     fn upsert_reference_audit(
         &self,
         conn: &mut SqliteConnection,
