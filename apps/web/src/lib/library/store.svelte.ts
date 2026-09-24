@@ -34,6 +34,7 @@ export type EditState =
 export type HoveredItem = { type: 'track' | 'album' | 'artist'; id: number } | null;
 
 const PAGE_SIZE = 60;
+const SEARCH_DEBOUNCE_MS = 500;
 
 // ── Artist/album name similarity helpers ──────────────────────────────────────
 function _editDistance(a: string, b: string): number {
@@ -105,6 +106,7 @@ function createLibraryStore() {
   let tracksLoading = $state(false);
   let tracksLoadingMore = $state(false);
   let tracksError: string | null = $state(null);
+  let tracksRequestId = 0;
 
   let albumIds: number[] = $state([]);
   let albumsTotal = $state(0);
@@ -113,6 +115,7 @@ function createLibraryStore() {
   let albumsLoading = $state(false);
   let albumsLoadingMore = $state(false);
   let albumsError: string | null = $state(null);
+  let albumsRequestId = 0;
 
   let artistIds: number[] = $state([]);
   let artistsTotal = $state(0);
@@ -121,6 +124,7 @@ function createLibraryStore() {
   let artistsLoading = $state(false);
   let artistsLoadingMore = $state(false);
   let artistsError: string | null = $state(null);
+  let artistsRequestId = 0;
 
   let playlistIds: number[] = $state([]);
   let playlistsTotal = $state(0);
@@ -129,6 +133,7 @@ function createLibraryStore() {
   let playlistsLoading = $state(false);
   let playlistsLoadingMore = $state(false);
   let playlistsError: string | null = $state(null);
+  let playlistsRequestId = 0;
 
   let pendingCount = $state(0);
 
@@ -358,35 +363,41 @@ function createLibraryStore() {
 
   // ── Data loading: paginated tracks ──────────────────────────────────────────
   async function resetTracks() {
-    tracksLoading = true; tracksError = null; tracksPage = 0; trackIds = [];
+    debouncedResetTracks.cancel();
+    const requestId = ++tracksRequestId;
+    tracksLoading = true; tracksLoadingMore = false; tracksError = null;
     try {
       const result = await getTracksPage({
         page: 1, pageSize: PAGE_SIZE,
         q: trackSearch.trim() || undefined,
         sortBy: tracksSortBy, sortDir: tracksSortDir, filter: trackFilter,
       });
+      if (requestId !== tracksRequestId) return;
       entityCache.upsertTracks(result.items);
       trackIds = result.items.map(t => t.id);
       tracksTotal = result.total;
       tracksPage = 1;
       tracksLoaded = true;
     } catch (e) {
+      if (requestId !== tracksRequestId) return;
       tracksError = e instanceof Error ? e.message : String(e);
       tracksLoaded = true;
     } finally {
-      tracksLoading = false;
+      if (requestId === tracksRequestId) tracksLoading = false;
     }
   }
   async function loadMoreTracks() {
     if (tracksLoadingMore || tracksLoading || !tracksHasMore) return;
+    const requestId = tracksRequestId;
+    const nextPage = tracksPage + 1;
     tracksLoadingMore = true;
     try {
-      const nextPage = tracksPage + 1;
       const result = await getTracksPage({
         page: nextPage, pageSize: PAGE_SIZE,
         q: trackSearch.trim() || undefined,
         sortBy: tracksSortBy, sortDir: tracksSortDir, filter: trackFilter,
       });
+      if (requestId !== tracksRequestId) return;
       entityCache.upsertTracks(result.items);
       trackIds = [...trackIds, ...result.items.map(t => t.id)];
       tracksTotal = result.total;
@@ -394,42 +405,48 @@ function createLibraryStore() {
     } catch {
       // Non-fatal: leave the currently-loaded page(s) as-is.
     } finally {
-      tracksLoadingMore = false;
+      if (requestId === tracksRequestId) tracksLoadingMore = false;
     }
   }
-  const debouncedResetTracks = debounce(() => resetTracks(), 300);
+  const debouncedResetTracks = debounce(() => resetTracks(), SEARCH_DEBOUNCE_MS);
 
   // ── Data loading: paginated albums ──────────────────────────────────────────
   async function resetAlbums() {
-    albumsLoading = true; albumsError = null; albumsPage = 0; albumIds = [];
+    debouncedResetAlbums.cancel();
+    const requestId = ++albumsRequestId;
+    albumsLoading = true; albumsLoadingMore = false; albumsError = null;
     try {
       const result = await getAlbumsPage({
         page: 1, pageSize: PAGE_SIZE,
         q: albumSearch.trim() || undefined,
         sortBy: albumsSortBy, sortDir: albumsSortDir,
       });
+      if (requestId !== albumsRequestId) return;
       entityCache.upsertAlbums(result.items);
       albumIds = result.items.map(a => a.id);
       albumsTotal = result.total;
       albumsPage = 1;
       albumsLoaded = true;
     } catch (e) {
+      if (requestId !== albumsRequestId) return;
       albumsError = e instanceof Error ? e.message : String(e);
       albumsLoaded = true;
     } finally {
-      albumsLoading = false;
+      if (requestId === albumsRequestId) albumsLoading = false;
     }
   }
   async function loadMoreAlbums() {
     if (albumsLoadingMore || albumsLoading || !albumsHasMore) return;
+    const requestId = albumsRequestId;
+    const nextPage = albumsPage + 1;
     albumsLoadingMore = true;
     try {
-      const nextPage = albumsPage + 1;
       const result = await getAlbumsPage({
         page: nextPage, pageSize: PAGE_SIZE,
         q: albumSearch.trim() || undefined,
         sortBy: albumsSortBy, sortDir: albumsSortDir,
       });
+      if (requestId !== albumsRequestId) return;
       entityCache.upsertAlbums(result.items);
       albumIds = [...albumIds, ...result.items.map(a => a.id)];
       albumsTotal = result.total;
@@ -437,42 +454,48 @@ function createLibraryStore() {
     } catch {
       // Non-fatal.
     } finally {
-      albumsLoadingMore = false;
+      if (requestId === albumsRequestId) albumsLoadingMore = false;
     }
   }
-  const debouncedResetAlbums = debounce(() => resetAlbums(), 300);
+  const debouncedResetAlbums = debounce(() => resetAlbums(), SEARCH_DEBOUNCE_MS);
 
   // ── Data loading: paginated artists ─────────────────────────────────────────
   async function resetArtists() {
-    artistsLoading = true; artistsError = null; artistsPage = 0; artistIds = [];
+    debouncedResetArtists.cancel();
+    const requestId = ++artistsRequestId;
+    artistsLoading = true; artistsLoadingMore = false; artistsError = null;
     try {
       const result = await getArtistsPage({
         page: 1, pageSize: PAGE_SIZE,
         q: artistSearch.trim() || undefined,
         sortBy: artistsSortBy, sortDir: artistsSortDir,
       });
+      if (requestId !== artistsRequestId) return;
       entityCache.upsertArtists(result.items);
       artistIds = result.items.map(a => a.id);
       artistsTotal = result.total;
       artistsPage = 1;
       artistsLoaded = true;
     } catch (e) {
+      if (requestId !== artistsRequestId) return;
       artistsError = e instanceof Error ? e.message : String(e);
       artistsLoaded = true;
     } finally {
-      artistsLoading = false;
+      if (requestId === artistsRequestId) artistsLoading = false;
     }
   }
   async function loadMoreArtists() {
     if (artistsLoadingMore || artistsLoading || !artistsHasMore) return;
+    const requestId = artistsRequestId;
+    const nextPage = artistsPage + 1;
     artistsLoadingMore = true;
     try {
-      const nextPage = artistsPage + 1;
       const result = await getArtistsPage({
         page: nextPage, pageSize: PAGE_SIZE,
         q: artistSearch.trim() || undefined,
         sortBy: artistsSortBy, sortDir: artistsSortDir,
       });
+      if (requestId !== artistsRequestId) return;
       entityCache.upsertArtists(result.items);
       artistIds = [...artistIds, ...result.items.map(a => a.id)];
       artistsTotal = result.total;
@@ -480,40 +503,46 @@ function createLibraryStore() {
     } catch {
       // Non-fatal.
     } finally {
-      artistsLoadingMore = false;
+      if (requestId === artistsRequestId) artistsLoadingMore = false;
     }
   }
-  const debouncedResetArtists = debounce(() => resetArtists(), 300);
+  const debouncedResetArtists = debounce(() => resetArtists(), SEARCH_DEBOUNCE_MS);
 
   // ── Data loading: paginated playlists ───────────────────────────────────────
   async function resetPlaylists() {
-    playlistsLoading = true; playlistsError = null; playlistsPage = 0; playlistIds = [];
+    debouncedResetPlaylists.cancel();
+    const requestId = ++playlistsRequestId;
+    playlistsLoading = true; playlistsLoadingMore = false; playlistsError = null;
     try {
       const result = await getPlaylistsPage({
         page: 1, pageSize: PAGE_SIZE,
         q: playlistSearch.trim() || undefined,
       });
+      if (requestId !== playlistsRequestId) return;
       entityCache.upsertPlaylists(result.items);
       playlistIds = result.items.map(p => p.id);
       playlistsTotal = result.total;
       playlistsPage = 1;
       playlistsLoaded = true;
     } catch (e) {
+      if (requestId !== playlistsRequestId) return;
       playlistsError = e instanceof Error ? e.message : String(e);
       playlistsLoaded = true;
     } finally {
-      playlistsLoading = false;
+      if (requestId === playlistsRequestId) playlistsLoading = false;
     }
   }
   async function loadMorePlaylists() {
     if (playlistsLoadingMore || playlistsLoading || !playlistsHasMore) return;
+    const requestId = playlistsRequestId;
+    const nextPage = playlistsPage + 1;
     playlistsLoadingMore = true;
     try {
-      const nextPage = playlistsPage + 1;
       const result = await getPlaylistsPage({
         page: nextPage, pageSize: PAGE_SIZE,
         q: playlistSearch.trim() || undefined,
       });
+      if (requestId !== playlistsRequestId) return;
       entityCache.upsertPlaylists(result.items);
       playlistIds = [...playlistIds, ...result.items.map(p => p.id)];
       playlistsTotal = result.total;
@@ -521,10 +550,10 @@ function createLibraryStore() {
     } catch {
       // Non-fatal.
     } finally {
-      playlistsLoadingMore = false;
+      if (requestId === playlistsRequestId) playlistsLoadingMore = false;
     }
   }
-  const debouncedResetPlaylists = debounce(() => resetPlaylists(), 300);
+  const debouncedResetPlaylists = debounce(() => resetPlaylists(), SEARCH_DEBOUNCE_MS);
 
   // ── Drill-down data (artist/album detail views) ─────────────────────────────
   async function loadDrillArtist(id: number) {
@@ -992,13 +1021,45 @@ function createLibraryStore() {
     get drillPlaylistTracksError() { return drillPlaylistTracksError; },
 
     get trackSearch() { return trackSearch; },
-    set trackSearch(v: string) { trackSearch = v; debouncedResetTracks(); },
+    set trackSearch(v: string) {
+      if (v === trackSearch) return;
+      trackSearch = v;
+      ++tracksRequestId;
+      tracksLoading = true;
+      tracksLoadingMore = false;
+      tracksError = null;
+      debouncedResetTracks();
+    },
     get albumSearch() { return albumSearch; },
-    set albumSearch(v: string) { albumSearch = v; debouncedResetAlbums(); },
+    set albumSearch(v: string) {
+      if (v === albumSearch) return;
+      albumSearch = v;
+      ++albumsRequestId;
+      albumsLoading = true;
+      albumsLoadingMore = false;
+      albumsError = null;
+      debouncedResetAlbums();
+    },
     get artistSearch() { return artistSearch; },
-    set artistSearch(v: string) { artistSearch = v; debouncedResetArtists(); },
+    set artistSearch(v: string) {
+      if (v === artistSearch) return;
+      artistSearch = v;
+      ++artistsRequestId;
+      artistsLoading = true;
+      artistsLoadingMore = false;
+      artistsError = null;
+      debouncedResetArtists();
+    },
     get playlistSearch() { return playlistSearch; },
-    set playlistSearch(v: string) { playlistSearch = v; debouncedResetPlaylists(); },
+    set playlistSearch(v: string) {
+      if (v === playlistSearch) return;
+      playlistSearch = v;
+      ++playlistsRequestId;
+      playlistsLoading = true;
+      playlistsLoadingMore = false;
+      playlistsError = null;
+      debouncedResetPlaylists();
+    },
     get trackFilter() { return trackFilter; },
     set trackFilter(v: TrackFilter) { trackFilter = v; resetTracks(); },
 

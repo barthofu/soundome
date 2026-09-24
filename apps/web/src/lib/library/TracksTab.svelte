@@ -28,7 +28,7 @@
   </div>
 {/snippet}
 
-{#if lib.tracksLoading}
+{#if lib.tracksLoading && !lib.tracksLoaded}
   <p class="status">Loading…</p>
 {:else if lib.tracksError}
   <p class="status error">{lib.tracksError}</p>
@@ -65,7 +65,7 @@
         </svg>
       </button>
     </div>
-    <span class="count">{lib.tracksTotal} track{lib.tracksTotal !== 1 ? 's' : ''}</span>
+    <span class="count" aria-live="polite">{#if lib.tracksLoading}Updating… · {/if}{lib.tracksTotal} track{lib.tracksTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.tracksView === 'list'}

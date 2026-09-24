@@ -674,6 +674,9 @@ mod tests {
         let mapped = Soundcloud::map_cleaned_artists(&original, &cleaned);
 
         assert!(mapped[0].references.is_empty());
-        assert_eq!(mapped[1].references[0].external_id.as_deref(), Some("uploader-id"));
+        assert_eq!(
+            mapped[1].references[0].external_id.as_deref(),
+            Some("uploader-id")
+        );
     }
 }

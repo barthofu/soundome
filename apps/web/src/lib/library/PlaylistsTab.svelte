@@ -138,14 +138,14 @@
   {/if}
 
 <!-- ── PLAYLISTS GRID ─────────────────────────────────────────────────────── -->
-{:else if lib.playlistsLoading}
+{:else if lib.playlistsLoading && !lib.playlistsLoaded}
   <p class="status">Loading…</p>
 {:else if lib.playlistsError}
   <p class="status error">{lib.playlistsError}</p>
 {:else}
   <div class="toolbar">
     <input class="search" placeholder="Search playlists…" bind:value={lib.playlistSearch} />
-    <span class="count">{lib.playlistsTotal} playlist{lib.playlistsTotal !== 1 ? 's' : ''}</span>
+    <span class="count" aria-live="polite">{#if lib.playlistsLoading}Updating… · {/if}{lib.playlistsTotal} playlist{lib.playlistsTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.filteredPlaylists.length === 0}

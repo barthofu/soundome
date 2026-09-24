@@ -51,7 +51,7 @@
 <!-- ── LOADING / ERROR ────────────────────────────────────────────────────── -->
 {:else if lib.drillAlbumId != null && !lib.albumsLoaded}
   <p class="status">Loading…</p>
-{:else if lib.albumsLoading}
+{:else if lib.albumsLoading && !lib.albumsLoaded}
   <p class="status">Loading…</p>
 {:else if lib.albumsError}
   <p class="status error">{lib.albumsError}</p>
@@ -97,7 +97,7 @@
         </svg>
       </button>
     </div>
-    <span class="count">{lib.albumsTotal} album{lib.albumsTotal !== 1 ? 's' : ''}</span>
+    <span class="count" aria-live="polite">{#if lib.albumsLoading}Updating… · {/if}{lib.albumsTotal} album{lib.albumsTotal !== 1 ? 's' : ''}</span>
   </div>
 
   {#if lib.albumsView === 'list'}
