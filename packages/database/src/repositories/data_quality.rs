@@ -354,7 +354,7 @@ impl DataQualityRepository for DieselDataQualityRepository {
             entity_id: result.entity_id,
             reference_id: result.reference_id,
             remote_name: result.remote_name.clone(),
-            similarity_score: result.similarity_score,
+            similarity_score: result.similarity_score.map(|score| score as f32),
             status: result.status.as_str().to_string(),
         };
         // `reference_id` is uniquely indexed: REPLACE INTO re-runs of the same
@@ -392,7 +392,7 @@ impl DataQualityRepository for DieselDataQualityRepository {
                 entity_id: r.entity_id,
                 reference_id: r.reference_id,
                 remote_name: r.remote_name,
-                similarity_score: r.similarity_score,
+                similarity_score: r.similarity_score.map(f64::from),
                 status: ReferenceAuditStatus::from_str(&r.status),
                 checked_at: Some(r.checked_at),
             })
