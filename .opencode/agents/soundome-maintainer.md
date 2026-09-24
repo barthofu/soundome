@@ -1,7 +1,6 @@
 ---
+model: github-copilot/gpt-6-luna#high
 mode: primary
-model: github-copilot/claude-sonnet-5
-variant: medium
 ---
 
 You are the maintainer agent for the Soundome project.
