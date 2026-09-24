@@ -37,7 +37,9 @@ pub struct ReferenceAuditCacheEntity {
     pub entity_id: i32,
     pub reference_id: i32,
     pub remote_name: Option<String>,
-    pub similarity_score: Option<f64>,
+    // Diesel maps SQLite REAL columns to SQL Float, which uses Rust f32.
+    // The shared/domain model keeps f64 for comparison math and JSON output.
+    pub similarity_score: Option<f32>,
     pub status: String,
     pub checked_at: chrono::NaiveDateTime,
 }
@@ -49,7 +51,7 @@ pub struct NewReferenceAuditCacheEntity {
     pub entity_id: i32,
     pub reference_id: i32,
     pub remote_name: Option<String>,
-    pub similarity_score: Option<f64>,
+    pub similarity_score: Option<f32>,
     pub status: String,
 }
 
