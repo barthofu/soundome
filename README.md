@@ -20,10 +20,10 @@ services:
   soundome:
     image: ghcr.io/barthofu/soundome:latest
     ports:
-      - 8000:8000
+      - 8777:8777
     environment:
       - SOUNDOME__SERVER__HOST=0.0.0.0
-      - SOUNDOME__SERVER__PORT=8000
+      - SOUNDOME__SERVER__PORT=8777
       - SOUNDOME__DATABASE__URL=/data/soundome.db
       - SOUNDOME__GENERAL__BASE_LIBRARY_DIR=/library
       - SOUNDOME__GENERAL__TEMP_DOWNLOAD_DIR=/temp
@@ -43,7 +43,7 @@ services:
 docker compose up -d
 ```
 
-UI available at <http://localhost:8000>. Paste a YouTube, SoundCloud, or YouTube Music URL in the **Download** tab.
+UI available at <http://localhost:8777>. Paste a YouTube, SoundCloud, or YouTube Music URL in the **Download** tab.
 
 ---
 
