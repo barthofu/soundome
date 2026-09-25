@@ -1,5 +1,6 @@
 mod album;
 mod artist;
+mod data_quality;
 mod playlist;
 mod reference;
 mod sync_schedule;
@@ -8,6 +9,7 @@ mod track;
 
 pub use album::*;
 pub use artist::*;
+pub use data_quality::*;
 pub use playlist::*;
 pub use reference::*;
 pub use sync_schedule::*;

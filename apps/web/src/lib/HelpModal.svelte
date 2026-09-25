@@ -38,7 +38,11 @@
           </tr>
           <tr>
             <td class="page-name">Library</td>
-            <td>Browse and edit artists, albums, tracks, and playlists. Drill into an artist or album to see its content. Merge duplicate artists via multi-select.</td>
+            <td>Browse and edit artists, albums, tracks, and playlists. Drill into an artist or album to see its content. Review and merge duplicate entities from Data Quality.</td>
+          </tr>
+          <tr>
+            <td class="page-name">Data Quality</td>
+            <td>Review duplicate artist, album, and track groups; merge records, exclude an item from a larger group, persistently ignore false-positive pairs, and inspect structural reference issues.</td>
           </tr>
           <tr>
             <td class="page-name">Validations</td>
@@ -66,9 +70,6 @@
           <tr><td><kbd>S</kbd></td><td>Focus the search field</td></tr>
           <tr><td><kbd>E</kbd></td><td>Edit the item under the cursor</td></tr>
           <tr><td><kbd>⌫ Backspace</kbd></td><td>Go up one level (album → artist → list)</td></tr>
-          <tr><td><kbd>Shift</kbd> + click</td><td>Select an artist or album for merge</td></tr>
-          <tr><td><kbd>M</kbd></td><td>Start merge (requires ≥ 2 artists or albums selected)</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Cancel merge / clear selection</td></tr>
         </tbody>
       </table>
 
@@ -103,7 +104,7 @@
         <li>Playlist URLs queue a background sync task — follow progress in <strong>Tasks</strong>.</li>
         <li>Tracks marked <span class="badge-warn">review</span> in the recent-downloads list are waiting in <strong>Validations</strong>.</li>
         <li>In the Validations page, <strong>Show matches</strong> fetches alternative metadata candidates when the reason is a partial match.</li>
-        <li>In Library → Artists or Albums, the <strong>Similar</strong> filter highlights items whose names/titles are close — useful for spotting duplicates before merging.</li>
+        <li>Use <strong>Data Quality → Duplicates</strong> to review server-generated duplicate groups, merge them, exclude one item from a group of three or more, or persistently mark pairs as unrelated.</li>
         <li>Full API docs are available at <a href="/swagger" target="_blank" rel="noopener noreferrer">/swagger</a>.</li>
       </ul>
     </section>

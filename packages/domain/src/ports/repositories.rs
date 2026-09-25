@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use diesel::SqliteConnection;
 use shared::{
-    models::{Album, Artist, Playlist, SyncSchedule, SyncSettings, Task, Track},
+    models::{
+        AiCleanupLogEntry, Album, Artist, DataQualityEntityType, DedupIgnoreEntry, Playlist,
+        ReferenceAuditResult, StructuralFinding, SyncSchedule, SyncSettings, Task, Track,
+    },
     types::SoundomeResult,
 };
 
@@ -14,6 +17,7 @@ pub struct RepositoryLayer {
     pub task: Arc<dyn TaskRepository>,
     pub sync_schedule: Arc<dyn SyncScheduleRepository>,
     pub sync_settings: Arc<dyn SyncSettingsRepository>,
+    pub data_quality: Arc<dyn DataQualityRepository>,
 }
 
 // ================================================================================================
@@ -173,6 +177,15 @@ pub trait TrackRepository: Send + Sync {
         conn: &mut SqliteConnection,
         album_id: i32,
     ) -> SoundomeResult<Vec<Track>>;
+    /// Merge source tracks into `target_id`, applying the already-selected
+    /// quality winner's metadata/references while preserving playlist links.
+    fn merge_into(
+        &self,
+        conn: &mut SqliteConnection,
+        source_ids: &[i32],
+        target_id: i32,
+        merged_track: &Track,
+    ) -> SoundomeResult<()>;
     // /// Find a track by unique fields (e.g. title + artists + album)
     // fn find_by_unique_fields(&self, conn: &mut SqliteConnection, track: &Track) -> SoundomeResult<Option<Track>>;
 }
@@ -445,4 +458,76 @@ pub trait SyncSettingsRepository: Send + Sync {
     ) -> SoundomeResult<SyncSettings>;
     /// Record that the global cron pass ran now and compute the next run time.
     fn mark_ran(&self, conn: &mut SqliteConnection) -> SoundomeResult<()>;
+}
+
+// ================================================================================================
+
+/// Backs the "Data Quality" area: structural reference audits, the manual
+/// duplicate-review ignore list, the remote reference audit cache, and the AI
+/// cleanup change log. See `docs/workflows/download.md` and the Data Quality
+/// implementation plan for the full picture.
+pub trait DataQualityRepository: Send + Sync {
+    /// Runs every structural check (A-D) directly against current data:
+    /// conflicting references, multiple platform references on one entity,
+    /// platform/URL mismatches, and tracks missing a `Source` reference.
+    /// Pure reads, no network calls, safe to run on every page load.
+    fn find_structural_findings(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Vec<StructuralFinding>>;
+
+    /// Marks a pair of entities as "not a duplicate" so future duplicate scans
+    /// exclude this pair. `id_a`/`id_b` are normalized (`id_a < id_b`) by the
+    /// implementation, so callers do not need to worry about ordering.
+    fn add_dedup_ignore(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: DataQualityEntityType,
+        id_a: i32,
+        id_b: i32,
+    ) -> SoundomeResult<()>;
+
+    /// Returns every ignored pair for a given entity type.
+    fn list_dedup_ignored(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: DataQualityEntityType,
+    ) -> SoundomeResult<Vec<DedupIgnoreEntry>>;
+
+    /// Removes a previously ignored pair so it can be suggested again.
+    fn remove_dedup_ignore(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: DataQualityEntityType,
+        id_a: i32,
+        id_b: i32,
+    ) -> SoundomeResult<()>;
+
+    /// Inserts or refreshes the cached remote-audit result for a single reference.
+    fn upsert_reference_audit(
+        &self,
+        conn: &mut SqliteConnection,
+        result: &ReferenceAuditResult,
+    ) -> SoundomeResult<()>;
+
+    /// Lists cached remote-audit results, optionally filtered by entity type.
+    fn list_reference_audit(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: Option<DataQualityEntityType>,
+    ) -> SoundomeResult<Vec<ReferenceAuditResult>>;
+
+    /// Appends one entry to the AI cleanup change log.
+    fn create_ai_cleanup_log(
+        &self,
+        conn: &mut SqliteConnection,
+        entry: &AiCleanupLogEntry,
+    ) -> SoundomeResult<()>;
+
+    /// Returns the most recent AI cleanup log entries, newest first.
+    fn list_ai_cleanup_log(
+        &self,
+        conn: &mut SqliteConnection,
+        limit: i64,
+    ) -> SoundomeResult<Vec<AiCleanupLogEntry>>;
 }

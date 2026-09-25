@@ -13,6 +13,10 @@ import type {
   PlaylistTrackDto,
   ReferenceDto,
   AddReferenceBody,
+  StructuralFindingDto,
+  DuplicateEntityType,
+  DuplicateGroupDto,
+  DedupIgnoreDto,
 } from './types';
 
 const BASE = '/api';
@@ -740,3 +744,70 @@ export async function getVersion(): Promise<string> {
   return data.version;
 }
 
+// ── Data Quality ─────────────────────────────────────────────────────────────
+
+export async function getStructuralFindings(): Promise<StructuralFindingDto[]> {
+  const res = await fetch(`${BASE}/data-quality/audit/structural`);
+  if (!res.ok) throw new Error(`Failed to fetch structural findings: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getDuplicateGroups(
+  entityType: DuplicateEntityType,
+): Promise<DuplicateGroupDto[]> {
+  const res = await fetch(`${BASE}/data-quality/duplicates/${entityType}`);
+  if (!res.ok) throw new Error(`Failed to fetch ${entityType} duplicates: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getIgnoredDuplicates(
+  entityType: DuplicateEntityType,
+): Promise<DedupIgnoreDto[]> {
+  const res = await fetch(`${BASE}/data-quality/duplicates/${entityType}/ignored`);
+  if (!res.ok) throw new Error(`Failed to fetch ignored ${entityType} pairs: ${res.statusText}`);
+  return res.json();
+}
+
+export async function ignoreDuplicatePair(
+  entityType: DuplicateEntityType,
+  idA: number,
+  idB: number,
+): Promise<void> {
+  const res = await fetch(`${BASE}/data-quality/duplicates/${entityType}/ignore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id_a: idA, id_b: idB }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
+export async function restoreIgnoredDuplicate(
+  entityType: DuplicateEntityType,
+  idA: number,
+  idB: number,
+): Promise<void> {
+  const res = await fetch(
+    `${BASE}/data-quality/duplicates/${entityType}/ignore/${idA}/${idB}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
+export async function mergeTracks(sourceIds: number[], targetId: number): Promise<LibraryTrackDto> {
+  const res = await fetch(`${BASE}/tracks/merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_ids: sourceIds, target_id: targetId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
