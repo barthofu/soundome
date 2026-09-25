@@ -101,6 +101,8 @@
     if (task.task_type === 'SyncPlaylist') return 'Sync playlist';
     if (task.task_type === 'SyncArtist') return 'Sync artist';
     if (task.task_type === 'SyncAlbum') return 'Sync album';
+    if (task.task_type === 'ReferenceAudit') return 'Remote reference audit';
+    if (task.task_type === 'IngestDir') return 'Ingest directory';
     return 'Download track';
   }
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress. Phases 1–4 implemented (see [Implementation status](#implementation-status)).
+In progress. Phases 1–5 implemented (see [Implementation status](#implementation-status)).
 Tracked in GitHub issue [#28](https://github.com/barthofu/soundome/issues/28).
 Phases 1+2 shipped via PR [#29](https://github.com/barthofu/soundome/pull/29).
 
@@ -89,8 +89,10 @@ Data Quality
 
 ### Data model
 
-Three new tables, added across three migrations
-(`packages/database/migrations/2026-09-17-000000..000002_*`):
+Three new tables, initially added across three migrations
+(`packages/database/migrations/2026-09-17-000000..000002_*`). Phase 5 adds a
+follow-up migration to scope remote-audit cache uniqueness by entity type:
+`2026-09-25-000000_scope_reference_audit_cache_key`.
 
 ```sql
 -- dedup_ignore: manual "not a duplicate" list for the review queue.
@@ -112,10 +114,10 @@ CREATE TABLE reference_audit_cache (
     reference_id INTEGER NOT NULL,
     remote_name TEXT,
     similarity_score REAL,
-    status TEXT NOT NULL,             -- 'ok' | 'mismatch' | 'unreachable' | 'unsupported'
+    status TEXT NOT NULL,             -- 'ok' | 'mismatch' | 'unreachable' | 'unsupported' | 'dismissed' | 'missing'
     checked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX idx_reference_audit_cache_reference ON reference_audit_cache (reference_id);
+CREATE UNIQUE INDEX idx_reference_audit_cache_reference ON reference_audit_cache (entity_type, reference_id);
 CREATE INDEX idx_reference_audit_cache_entity ON reference_audit_cache (entity_type, entity_id);
 
 -- ai_cleanup_log: change log for the SoundCloud AI metadata cleanup step.
@@ -160,6 +162,7 @@ POST   /api/data-quality/audit/remote/run
 GET    /api/data-quality/audit/remote
 POST   /api/data-quality/audit/remote/:cache_id/apply
 POST   /api/data-quality/audit/remote/:cache_id/dismiss
+POST   /api/data-quality/audit/remote/:cache_id/delete-reference
 
 GET    /api/data-quality/duplicates/artists
 GET    /api/data-quality/duplicates/albums
@@ -200,6 +203,46 @@ Pure reads, no network calls, safe to run on every page load
 | `MultiplePlatformReferences` (B) | The same entity has two references of the same `(platform, ref_type)` with different `external_id`s. | Usually a botched merge or a reference attached to the wrong entity. |
 | `PlatformUrlMismatch` (C) | A reference's `external_url` resolves (via the existing `Platform::from_url`) to a different platform than the one declared on the reference. | Catches manually-entered or malformed references. |
 | `TrackMissingSourceReference` (D) | A track has no `Source` reference at all. | Should never happen through the normal download pipeline; a strong signal of a prior bug or manual DB edit. |
+
+## Remote reference audit (manual only)
+
+`POST /api/data-quality/audit/remote/run` creates a `ReferenceAudit` task and
+enqueues it on the existing serial `TaskExecutor`. No audit is started on page
+load or by a scheduler. A second run is rejected while one is pending/running.
+
+The worker checks entity references of type `Source`, `Provider`, and
+`Metadata` against the provider record and caches one result per
+`(entity_type, reference_id)`. That composite key is important because the
+artist, album, and track reference tables each have independent integer ID
+sequences. The follow-up migration
+`2026-09-25-000000_scope_reference_audit_cache_key` replaces the original
+global `reference_id` unique index with this composite uniqueness constraint.
+
+Supported remote lookups:
+
+- Spotify: artists, albums, and tracks, using stored URLs or constructing a
+  canonical URL from a stored Spotify ID.
+- SoundCloud: artists and tracks when a resolvable permalink URL is present.
+- YouTube Music: artists, albums, and tracks using stored URLs or supported
+  channel/album/playlist/video IDs (albums can be queried directly by ID when
+  an older stored album permalink is malformed).
+- YouTube: tracks.
+- MusicBrainz: artist, release, and recording IDs via its JSON web service,
+  using the shared proxy-aware HTTP client and a minimum one-second gap
+  between MusicBrainz requests.
+- Bandcamp and unsupported entity/platform combinations are cached as
+  `unsupported`; provider/network failures become `unreachable`.
+- Artists, albums, and tracks without any `Metadata` reference are cached as
+  `missing`, so they can be reviewed as data-quality gaps even though there
+  is no remote reference to query.
+
+The `Smart` string similarity score is compared to `0.8`: scores at/above the
+threshold are `ok`, lower scores are `mismatch`. Results include the current
+local value and reference URL in the UI, assembled at read time so renames do
+not make cached local names stale. Actions let the user apply the remote
+name/title (and mark it `ok`), dismiss the result while retaining it as
+`dismissed`, or delete the reference and its audit cache row. Re-running the
+audit refreshes dismissed results.
 
 ## Duplicate review queue (Immich-style)
 
@@ -281,9 +324,9 @@ suggestion), the new queue:
   row id survives. Playlist memberships, existing genre join rows, and
   durable metadata references are preserved; inferior audio files are
   deleted best-effort after the database transaction.
-- ⬜ **Phase 5** — Remote reference audit. Not started. The
-  `reference_audit_cache` table and `ReferenceAuditResult` model already
-  exist (phase 1) but no route or provider-querying logic exists yet.
+- ✅ **Phase 5** — Manual remote reference audit, run as a serialized
+  background task; provider queries, cached result views, and apply/dismiss/
+  delete-reference actions are available under Reference Audit → Remote.
 - ⬜ **Phase 6** — Cleanup tab (orphans, playlist consistency, AI cleanup log,
   cover/icon relocation). Not started. The `ai_cleanup_log` table and
   `AiCleanupLogEntry` model already exist (phase 1) but nothing writes to it

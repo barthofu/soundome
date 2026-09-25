@@ -380,9 +380,9 @@ impl DataQualityRepository for DieselDataQualityRepository {
             similarity_score: result.similarity_score.map(|score| score as f32),
             status: result.status.as_str().to_string(),
         };
-        // `reference_id` is uniquely indexed: REPLACE INTO re-runs of the same
-        // reference simply refresh the cached row instead of accumulating stale
-        // duplicates.
+        // `(entity_type, reference_id)` is unique because the separate artist,
+        // album, and track reference tables have independent ID sequences.
+        // REPLACE refreshes the cached row for the same actual reference.
         diesel::replace_into(schema::reference_audit_cache::table)
             .values(&new_entry)
             .execute(conn)
@@ -420,6 +420,43 @@ impl DataQualityRepository for DieselDataQualityRepository {
                 checked_at: Some(r.checked_at),
             })
             .collect())
+    }
+
+    fn set_reference_audit_status(
+        &self,
+        conn: &mut SqliteConnection,
+        audit_id: i32,
+        status: ReferenceAuditStatus,
+        similarity_score: Option<f64>,
+    ) -> SoundomeResult<()> {
+        diesel::update(
+            schema::reference_audit_cache::table
+                .filter(schema::reference_audit_cache::id.eq(audit_id)),
+        )
+        .set((
+            schema::reference_audit_cache::status.eq(status.as_str()),
+            schema::reference_audit_cache::similarity_score
+                .eq(similarity_score.map(|score| score as f32)),
+        ))
+        .execute(conn)
+        .map_err(map_error)?;
+        Ok(())
+    }
+
+    fn delete_reference_audit(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: DataQualityEntityType,
+        reference_id: i32,
+    ) -> SoundomeResult<()> {
+        diesel::delete(
+            schema::reference_audit_cache::table
+                .filter(schema::reference_audit_cache::entity_type.eq(entity_type.as_str()))
+                .filter(schema::reference_audit_cache::reference_id.eq(reference_id)),
+        )
+        .execute(conn)
+        .map_err(map_error)?;
+        Ok(())
     }
 
     fn create_ai_cleanup_log(

@@ -3,21 +3,29 @@
   import {
     getDuplicateGroups,
     getIgnoredDuplicates,
+    getRemoteReferenceAudit,
     getStructuralFindings,
+    startRemoteReferenceAudit,
     ignoreDuplicatePair,
     mergeAlbums,
     mergeArtists,
     mergeTracks,
+    applyRemoteAuditName,
+    dismissRemoteAuditResult,
+    deleteAuditedReference,
     restoreIgnoredDuplicate,
   } from '../lib/api';
   import type {
     DedupIgnoreDto,
     DuplicateEntityType,
     DuplicateGroupDto,
+    ReferenceAuditViewDto,
     StructuralFindingDto,
   } from '../lib/types';
 
   type Section = 'duplicates' | 'references';
+  type ReferenceTab = 'structural' | 'remote';
+  type RemoteStatusFilter = ReferenceAuditViewDto['status'] | 'all';
   const entityTabs: { value: DuplicateEntityType; label: string }[] = [
     { value: 'artists', label: 'Artists' },
     { value: 'albums', label: 'Albums' },
@@ -25,14 +33,24 @@
   ];
 
   let section: Section = $state('duplicates');
+  let referenceTab: ReferenceTab = $state('structural');
   let entityType: DuplicateEntityType = $state('artists');
   let groups: DuplicateGroupDto[] = $state([]);
   let ignored: DedupIgnoreDto[] = $state([]);
   let findings: StructuralFindingDto[] = $state([]);
+  let remoteResults: ReferenceAuditViewDto[] = $state([]);
   let loading = $state(false);
   let findingsLoading = $state(false);
+  let remoteLoading = $state(false);
+  let remoteStarting = $state(false);
   let error: string | null = $state(null);
   let findingError: string | null = $state(null);
+  let remoteError: string | null = $state(null);
+  let remoteTaskId: number | null = $state(null);
+  let remoteStatusFilter: RemoteStatusFilter = $state('mismatch');
+  let remoteSearch = $state('');
+  let remotePlatformFilter = $state('all');
+  let remoteEntityFilter: 'all' | 'artist' | 'album' | 'track' = $state('all');
   let operationError: string | null = $state(null);
   let activeGroup = $state<string | null>(null);
   let targetByGroup: Record<string, number> = $state({});
@@ -110,6 +128,102 @@
       if (requestId === findingRequestId) findingsLoading = false;
     }
   }
+
+  async function loadRemoteResults() {
+    remoteLoading = true;
+    remoteError = null;
+    try {
+      remoteResults = await getRemoteReferenceAudit();
+    } catch (e) {
+      remoteError = e instanceof Error ? e.message : String(e);
+    } finally {
+      remoteLoading = false;
+    }
+  }
+
+  async function selectReferenceTab(next: ReferenceTab) {
+    referenceTab = next;
+    if (next === 'remote') await loadRemoteResults();
+    else await loadFindings();
+  }
+
+  async function runRemoteAudit() {
+    remoteStarting = true;
+    remoteError = null;
+    try {
+      const task = await startRemoteReferenceAudit();
+      remoteTaskId = task.task_id;
+      await loadRemoteResults();
+    } catch (e) {
+      remoteError = e instanceof Error ? e.message : String(e);
+    } finally {
+      remoteStarting = false;
+    }
+  }
+
+  async function applyRemoteName(result: ReferenceAuditViewDto) {
+    if (!result.remote_name || !confirm(`Apply "${result.remote_name}" to "${result.local_name}"?`)) return;
+    try {
+      await applyRemoteAuditName(result.id);
+      await loadRemoteResults();
+    } catch (e) {
+      remoteError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function dismissRemoteResult(result: ReferenceAuditViewDto) {
+    try {
+      await dismissRemoteAuditResult(result.id);
+      await loadRemoteResults();
+    } catch (e) {
+      remoteError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function removeAuditedReference(result: ReferenceAuditViewDto) {
+    if (!confirm(`Delete the ${result.platform ?? 'unknown platform'} reference from "${result.local_name}"? This cannot be undone.`)) return;
+    try {
+      await deleteAuditedReference(result.id);
+      await loadRemoteResults();
+    } catch (e) {
+      remoteError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  function auditStatusLabel(status: ReferenceAuditViewDto['status']): string {
+    return {
+      ok: 'Matches',
+      mismatch: 'Name mismatch',
+      unreachable: 'Unreachable',
+      unsupported: 'Unsupported',
+      dismissed: 'Dismissed',
+      missing: 'Missing metadata',
+    }[status] ?? status;
+  }
+
+  let remoteIssues = $derived(remoteResults.filter(result => result.status === 'mismatch'));
+  let remoteMatchesCount = $derived(remoteResults.filter(result => result.status === 'ok').length);
+  let remoteDismissedCount = $derived(remoteResults.filter(result => result.status === 'dismissed').length);
+  let remoteUnreachableCount = $derived(remoteResults.filter(result => result.status === 'unreachable').length);
+  let remoteUnsupportedCount = $derived(remoteResults.filter(result => result.status === 'unsupported').length);
+  let remoteMissingCount = $derived(remoteResults.filter(result => result.status === 'missing').length);
+  let remoteVisibleResults = $derived.by(() => {
+    const search = remoteSearch.trim().toLowerCase();
+    return remoteResults
+      .filter(result => remoteStatusFilter === 'all' || result.status === remoteStatusFilter)
+      .filter(result => remotePlatformFilter === 'all' || result.platform === remotePlatformFilter)
+      .filter(result => remoteEntityFilter === 'all' || result.entity_type === remoteEntityFilter)
+      .filter(result => {
+        if (!search) return true;
+        return [result.local_name, result.remote_name, result.external_id, result.external_url]
+          .some(value => value?.toLowerCase().includes(search));
+      })
+      .sort((a, b) => {
+        const scoreA = a.similarity_score ?? Number.POSITIVE_INFINITY;
+        const scoreB = b.similarity_score ?? Number.POSITIVE_INFINITY;
+        return scoreA - scoreB || a.local_name.localeCompare(b.local_name);
+      });
+  });
 
   async function selectEntityType(next: DuplicateEntityType) {
     entityType = next;
@@ -249,7 +363,7 @@
 
   <nav class="section-tabs" aria-label="Data quality sections">
     <button class:active={section === 'duplicates'} onclick={() => { section = 'duplicates'; }}>Duplicates</button>
-    <button class:active={section === 'references'} onclick={() => { section = 'references'; loadFindings(); }}>Reference audit</button>
+    <button class:active={section === 'references'} onclick={() => { section = 'references'; void selectReferenceTab(referenceTab); }}>Reference audit</button>
   </nav>
 
   {#if section === 'duplicates'}
@@ -364,6 +478,12 @@
       {/if}
     </details>
   {:else}
+    <div class="entity-tabs" aria-label="Reference audit mode">
+      <button class:active={referenceTab === 'structural'} onclick={() => selectReferenceTab('structural')}>Structural</button>
+      <button class:active={referenceTab === 'remote'} onclick={() => selectReferenceTab('remote')}>Remote</button>
+    </div>
+
+    {#if referenceTab === 'structural'}
     <div class="toolbar reference-toolbar">
       <button class="btn-refresh" onclick={loadFindings} disabled={findingsLoading}>
         {findingsLoading ? 'Scanning…' : 'Re-scan'}
@@ -398,6 +518,87 @@
         {/each}
       </div>
     {/if}
+    {:else}
+      <div class="toolbar reference-toolbar">
+        <button class="btn-merge" onclick={runRemoteAudit} disabled={remoteStarting}>
+          {remoteStarting ? 'Starting…' : 'Run remote audit'}
+        </button>
+        <button class="btn-refresh" onclick={loadRemoteResults} disabled={remoteLoading}>
+          {remoteLoading ? 'Refreshing…' : 'Refresh results'}
+        </button>
+      </div>
+      <div class="audit-summary">
+        <span class="summary-title">Filter:</span>
+        <button class="summary-item mismatch" class:active={remoteStatusFilter === 'mismatch'} onclick={() => { remoteStatusFilter = 'mismatch'; }}>Mismatch ({remoteIssues.length})</button>
+        <button class="summary-item unreachable" class:active={remoteStatusFilter === 'unreachable'} onclick={() => { remoteStatusFilter = 'unreachable'; }}>Unreachable ({remoteUnreachableCount})</button>
+        <button class="summary-item unsupported" class:active={remoteStatusFilter === 'unsupported'} onclick={() => { remoteStatusFilter = 'unsupported'; }}>Unsupported ({remoteUnsupportedCount})</button>
+        <button class="summary-item missing" class:active={remoteStatusFilter === 'missing'} onclick={() => { remoteStatusFilter = 'missing'; }}>Missing metadata ({remoteMissingCount})</button>
+        <button class="summary-item verified" class:active={remoteStatusFilter === 'ok'} onclick={() => { remoteStatusFilter = 'ok'; }}>Matches ({remoteMatchesCount})</button>
+        <button class="summary-item dismissed" class:active={remoteStatusFilter === 'dismissed'} onclick={() => { remoteStatusFilter = 'dismissed'; }}>Dismissed ({remoteDismissedCount})</button>
+        <button class="summary-item all-filter" class:active={remoteStatusFilter === 'all'} onclick={() => { remoteStatusFilter = 'all'; }}>All ({remoteResults.length})</button>
+      </div>
+      <div class="remote-filters">
+        <input class="remote-search" placeholder="Search local name, remote name, URL or ID…" bind:value={remoteSearch} />
+        <select bind:value={remotePlatformFilter} aria-label="Filter by platform">
+          <option value="all">All platforms</option>
+          {#each [...new Set(remoteResults.map(result => result.platform).filter((platform): platform is string => platform != null))].sort() as platform}
+            <option value={platform}>{platform}</option>
+          {/each}
+        </select>
+        <select bind:value={remoteEntityFilter} aria-label="Filter by item type">
+          <option value="all">All item types</option>
+          <option value="artist">Artists</option>
+          <option value="album">Albums</option>
+          <option value="track">Tracks</option>
+        </select>
+      </div>
+      <p class="helper">This sends manual requests to supported providers. Results are cached; this view never starts an audit automatically.</p>
+      {#if remoteTaskId != null}
+        <p class="task-notice">Remote audit queued as task #{remoteTaskId}. Track its progress on the Tasks page, then refresh these results.</p>
+      {/if}
+      {#if remoteError}
+        <p class="status error">{remoteError}</p>
+      {:else if remoteLoading}
+        <p class="status">Loading cached remote audit results…</p>
+      {:else if remoteResults.length === 0}
+        <p class="status">No remote audit results yet. Use “Run remote audit” to query the providers.</p>
+      {:else if remoteVisibleResults.length === 0}
+        <p class="status ok">No result matches the current filters.</p>
+      {:else}
+        <div class="findings">
+          {#each remoteVisibleResults as result (result.id)}
+            <article class="finding-card remote-result status-{result.status}">
+              <div class="finding-header">
+                <span class="finding-kind">{result.entity_type} · {result.local_name}</span>
+                <span class="audit-status">{auditStatusLabel(result.status)}</span>
+                {#if result.platform}<span class="finding-platform">{result.platform}</span>{/if}
+                {#if result.ref_type}<span class="finding-platform">{result.ref_type}</span>{/if}
+              </div>
+              <div class="remote-comparison">
+                <span><strong>Local:</strong> {result.local_name}</span>
+                <span><strong>Remote:</strong> {result.remote_name ?? '—'}</span>
+                {#if result.similarity_score != null}<span><strong>Similarity:</strong> {Math.round(result.similarity_score * 100)}%</span>{/if}
+              </div>
+              {#if result.external_url}
+                <a class="audit-url" href={result.external_url} target="_blank" rel="noreferrer">Open reference ↗</a>
+              {/if}
+              {#if result.checked_at}<div class="candidate-meta">Checked {result.checked_at}</div>{/if}
+              <div class="group-actions audit-actions">
+                {#if result.status === 'mismatch' && result.remote_name}
+                  <button class="btn-merge" onclick={() => applyRemoteName(result)}>Apply remote name</button>
+                {/if}
+                {#if result.status !== 'dismissed'}
+                  <button class="btn-ignore" onclick={() => dismissRemoteResult(result)}>Dismiss</button>
+                {/if}
+                {#if result.platform != null && result.ref_type != null}
+                  <button class="btn-delete-reference" onclick={() => removeAuditedReference(result)}>Delete reference</button>
+                {/if}
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    {/if}
   {/if}
 </div>
 
@@ -426,6 +627,10 @@
   .btn-exclude { margin-top: 0.6rem; color: var(--muted); }
   .btn-merge { background: var(--accent); border-color: var(--accent); color: white; font-weight: 650; }
   .btn-merge:hover:not(:disabled) { filter: brightness(1.1); }
+  .btn-delete-reference { padding: 0.35rem 0.8rem; border: 1px solid color-mix(in srgb, #e05252 55%, var(--border)); border-radius: 6px; background: transparent; color: #e05252; cursor: pointer; font: inherit; font-size: 0.82rem; }
+  .btn-delete-reference:hover { background: color-mix(in srgb, #e05252 10%, transparent); }
+  .btn-toggle-verified { padding: 0.35rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 0.82rem; }
+  .btn-toggle-verified:hover,.btn-toggle-verified.active { background: var(--surface-2); color: var(--text); }
   .count { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
   .status { padding: 1rem 0; color: var(--muted); }
   .status.error { color: #e05252; }
@@ -458,11 +663,33 @@
   .finding-card.kind-conflicting_reference { border-left: 3px solid #e05252; }
   .finding-card.kind-multiple_platform_references,.finding-card.kind-platform_url_mismatch { border-left: 3px solid #f59e0b; }
   .finding-card.kind-track_missing_source_reference { border-left: 3px solid #6b7280; }
+  .remote-result.status-mismatch { border-left: 3px solid #e05252; }
+  .remote-result.status-ok { border-left: 3px solid #22c55e; }
+  .remote-result.status-unreachable,.remote-result.status-unsupported { border-left: 3px solid #f59e0b; }
+  .remote-result.status-dismissed { border-left: 3px solid #6b7280; opacity: 0.75; }
   .finding-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
   .finding-kind { font-weight: 700; font-size: 0.85rem; }
+  .audit-status { border-radius: 999px; background: var(--surface-2); padding: 0.1rem 0.5rem; color: var(--muted); font-size: 0.7rem; }
   .finding-platform { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); background: var(--surface-2); border-radius: 4px; padding: 0.1rem 0.4rem; }
   .finding-message { margin: 0 0 0.5rem; font-size: 0.85rem; }
   .finding-entities { display: flex; flex-wrap: wrap; gap: 0.4rem; }
   .entity-chip { font-size: 0.75rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.6rem; color: var(--muted); }
-  @media (max-width: 640px) { .data-quality { padding: 1rem; } .entity-tabs { flex-wrap: wrap; } .toolbar-actions { margin-left: 0; } .group-header { align-items: start; flex-direction: column; } }
+  .remote-comparison { display: grid; gap: 0.3rem; font-size: 0.82rem; overflow-wrap: anywhere; }
+  .audit-url { display: inline-block; margin-top: 0.45rem; font-size: 0.75rem; color: var(--accent); }
+  .task-notice { padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.8rem; }
+  .audit-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; margin: 0.25rem 0 0.25rem; }
+  .summary-title { font-weight: 700; font-size: 0.85rem; margin-right: 0.2rem; }
+  .summary-item { border: 1px solid transparent; border-radius: 999px; padding: 0.12rem 0.55rem; font-size: 0.72rem; background: var(--surface-2); color: var(--muted); cursor: pointer; font: inherit; }
+  .summary-item:hover,.summary-item.active { border-color: var(--border); color: var(--text); }
+  .summary-item.mismatch { color: #e05252; }
+  .summary-item.unreachable,.summary-item.unsupported { color: #f59e0b; }
+  .summary-item.missing { color: #a78bfa; }
+  .summary-item.verified { color: #22c55e; }
+  .summary-item.dismissed { color: var(--muted); }
+  .summary-item.all-filter { color: var(--text); }
+  .remote-filters { display: grid; grid-template-columns: minmax(220px, 1fr) 170px 150px; gap: 0.55rem; margin: 0.65rem 0 0.9rem; }
+  .remote-search,.remote-filters select { min-width: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); padding: 0.42rem 0.6rem; font: inherit; font-size: 0.8rem; }
+  .remote-search:focus,.remote-filters select:focus { outline: 1px solid var(--accent); }
+  .audit-actions { justify-content: flex-start; margin-top: 0.55rem; border-top: 0; padding: 0; flex-wrap: wrap; }
+  @media (max-width: 640px) { .data-quality { padding: 1rem; } .entity-tabs { flex-wrap: wrap; } .toolbar-actions { margin-left: 0; } .group-header { align-items: start; flex-direction: column; } .remote-filters { grid-template-columns: 1fr; } }
 </style>

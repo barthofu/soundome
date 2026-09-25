@@ -238,24 +238,37 @@ pub async fn retry(
 
     let task_id = task.id.expect("persisted task must have an id");
 
-    // Extract URL from the task payload
-    let url = extract_url_from_payload(&task.payload).ok_or_else(|| {
-        crate::utils::error::Error::Custom(CustomError {
-            status: Status::InternalServerError,
-            code: "InvalidPayload".to_string(),
-            message: format!("Task {} has no url in payload", task_id),
-        })
-    })?;
-
     let cancel_flag = registry.register(task_id);
     match task.task_type {
+        TaskType::ReferenceAudit => executor.enqueue_reference_audit(task_id, cancel_flag),
         TaskType::SyncPlaylist => {
+            let url = extract_url_from_payload(&task.payload).ok_or_else(|| {
+                crate::utils::error::Error::Custom(CustomError {
+                    status: Status::InternalServerError,
+                    code: "InvalidPayload".to_string(),
+                    message: format!("Task {} has no url in payload", task_id),
+                })
+            })?;
             executor.enqueue_playlist_sync(task_id, url, cancel_flag);
         }
         TaskType::SyncArtist => {
+            let url = extract_url_from_payload(&task.payload).ok_or_else(|| {
+                crate::utils::error::Error::Custom(CustomError {
+                    status: Status::InternalServerError,
+                    code: "InvalidPayload".to_string(),
+                    message: format!("Task {} has no url in payload", task_id),
+                })
+            })?;
             executor.enqueue_artist_sync(task_id, url, cancel_flag);
         }
         TaskType::SyncAlbum => {
+            let url = extract_url_from_payload(&task.payload).ok_or_else(|| {
+                crate::utils::error::Error::Custom(CustomError {
+                    status: Status::InternalServerError,
+                    code: "InvalidPayload".to_string(),
+                    message: format!("Task {} has no url in payload", task_id),
+                })
+            })?;
             executor.enqueue_album_sync(task_id, url, cancel_flag);
         }
         _ => {

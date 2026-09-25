@@ -72,7 +72,7 @@ export interface MatchCandidateDto {
 }
 
 export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Cancelled' | 'Cancelling';
-export type TaskType = 'SyncPlaylist' | 'SyncArtist' | 'SyncAlbum' | 'DownloadTrack' | 'IngestDir';
+export type TaskType = 'SyncPlaylist' | 'SyncArtist' | 'SyncAlbum' | 'DownloadTrack' | 'IngestDir' | 'ReferenceAudit';
 
 export interface TaskTrackErrorDto {
   track: string;
@@ -241,4 +241,23 @@ export interface DedupIgnoreDto {
   entity_type: string;
   id_a: number;
   id_b: number;
+}
+
+export type ReferenceAuditStatus = 'ok' | 'mismatch' | 'unreachable' | 'unsupported' | 'dismissed' | 'missing';
+
+export interface ReferenceAuditViewDto {
+  id: number;
+  entity_type: 'artist' | 'album' | 'track';
+  entity_id: number;
+  entity_name: string;
+  reference_id: number;
+  local_name: string;
+  platform: string | null;
+  ref_type: string | null;
+  external_id: string | null;
+  external_url: string | null;
+  remote_name: string | null;
+  similarity_score: number | null;
+  status: ReferenceAuditStatus;
+  checked_at: string | null;
 }
