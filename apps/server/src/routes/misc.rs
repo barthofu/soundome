@@ -16,6 +16,19 @@ pub struct VersionResponse {
     pub version: &'static str,
 }
 
+#[derive(Serialize)]
+pub struct HealthResponse {
+    pub status: &'static str,
+}
+
+/// Lightweight liveness endpoint for reverse proxies and container monitors.
+/// It intentionally does not touch SQLite or external providers: a successful
+/// response means only that the Rocket process is accepting HTTP requests.
+#[get("/health")]
+pub fn health() -> Json<HealthResponse> {
+    Json(HealthResponse { status: "ok" })
+}
+
 /// Returns the current server version.
 #[openapi]
 #[get("/version")]

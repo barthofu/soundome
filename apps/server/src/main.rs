@@ -143,6 +143,9 @@ fn rocket() -> _ {
                         shared::models::TaskType::SyncAlbum => {
                             task_executor.enqueue_album_sync(task_id, url, cancel_flag);
                         }
+                        shared::models::TaskType::ReferenceAudit => {
+                            task_executor.enqueue_reference_audit(task_id, cancel_flag);
+                        }
                         _ => {
                             task_executor.enqueue_playlist_sync(task_id, url, cancel_flag);
                         }
@@ -311,6 +314,11 @@ fn rocket() -> _ {
                 routes::data_quality::get_ignored_duplicates,
                 routes::data_quality::ignore_duplicate,
                 routes::data_quality::restore_ignored_duplicate,
+                routes::data_quality::start_remote_reference_audit,
+                routes::data_quality::get_remote_reference_audit,
+                routes::data_quality::apply_remote_reference_name,
+                routes::data_quality::dismiss_remote_reference_audit,
+                routes::data_quality::delete_audited_reference,
                 routes::validations::get_pending,
                 routes::validations::get_pending_count,
                 routes::validations::get_recent,
@@ -387,7 +395,7 @@ fn rocket() -> _ {
                 routes::images::batch_fetch_album_covers,
             ],
         )
-        .mount("/", routes![routes::metrics::metrics])
+        .mount("/", routes![routes::misc::health, routes::metrics::metrics])
         .mount("/swagger", make_swagger_ui(&get_docs()))
         .mount("/", FileServer::from("data/web"))
 }

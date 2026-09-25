@@ -516,6 +516,21 @@ pub trait DataQualityRepository: Send + Sync {
         conn: &mut SqliteConnection,
         entity_type: Option<DataQualityEntityType>,
     ) -> SoundomeResult<Vec<ReferenceAuditResult>>;
+    /// Update the review state of an existing cached reference result.
+    fn set_reference_audit_status(
+        &self,
+        conn: &mut SqliteConnection,
+        audit_id: i32,
+        status: shared::models::ReferenceAuditStatus,
+        similarity_score: Option<f64>,
+    ) -> SoundomeResult<()>;
+    /// Remove cached data when its owning reference has been deleted.
+    fn delete_reference_audit(
+        &self,
+        conn: &mut SqliteConnection,
+        entity_type: DataQualityEntityType,
+        reference_id: i32,
+    ) -> SoundomeResult<()>;
 
     /// Appends one entry to the AI cleanup change log.
     fn create_ai_cleanup_log(

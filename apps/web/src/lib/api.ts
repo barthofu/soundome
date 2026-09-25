@@ -17,6 +17,7 @@ import type {
   DuplicateEntityType,
   DuplicateGroupDto,
   DedupIgnoreDto,
+  ReferenceAuditViewDto,
 } from './types';
 
 const BASE = '/api';
@@ -810,4 +811,39 @@ export async function mergeTracks(sourceIds: number[], targetId: number): Promis
     throw new Error(err.message ?? res.statusText);
   }
   return res.json();
+}
+
+export async function startRemoteReferenceAudit(): Promise<{ task_id: number }> {
+  const res = await fetch(`${BASE}/data-quality/audit/remote/run`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function getRemoteReferenceAudit(): Promise<ReferenceAuditViewDto[]> {
+  const res = await fetch(`${BASE}/data-quality/audit/remote`);
+  if (!res.ok) throw new Error(`Failed to fetch remote audit results: ${res.statusText}`);
+  return res.json();
+}
+
+async function postRemoteAuditAction(path: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+}
+
+export async function applyRemoteAuditName(auditId: number): Promise<void> {
+  await postRemoteAuditAction(`/data-quality/audit/remote/${auditId}/apply`);
+}
+
+export async function dismissRemoteAuditResult(auditId: number): Promise<void> {
+  await postRemoteAuditAction(`/data-quality/audit/remote/${auditId}/dismiss`);
+}
+
+export async function deleteAuditedReference(auditId: number): Promise<void> {
+  await postRemoteAuditAction(`/data-quality/audit/remote/${auditId}/delete-reference`);
 }

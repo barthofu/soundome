@@ -82,6 +82,8 @@ pub enum TaskType {
     DownloadTrack,
     /// Batch ingest of all audio files found in the configured `ingest_dir`.
     IngestDir,
+    /// User-triggered remote verification of reference names/titles.
+    ReferenceAudit,
 }
 
 impl TaskType {
@@ -93,6 +95,7 @@ impl TaskType {
             "SyncAlbum" => TaskType::SyncAlbum,
             "DownloadTrack" => TaskType::DownloadTrack,
             "IngestDir" => TaskType::IngestDir,
+            "ReferenceAudit" => TaskType::ReferenceAudit,
             _ => TaskType::DownloadTrack,
         }
     }

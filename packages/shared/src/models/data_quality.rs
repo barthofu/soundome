@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use rocket_okapi::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Platform, Reference};
+use super::{Platform, Reference, ReferenceType};
 
 /// The three library entity kinds the Data Quality area operates on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -100,6 +100,10 @@ pub enum ReferenceAuditStatus {
     Unreachable,
     /// This reference's platform/type is not supported by the remote audit yet.
     Unsupported,
+    /// The user reviewed and dismissed this mismatch without changing metadata.
+    Dismissed,
+    /// The entity has no Metadata reference to audit.
+    Missing,
 }
 
 impl ReferenceAuditStatus {
@@ -109,6 +113,8 @@ impl ReferenceAuditStatus {
             ReferenceAuditStatus::Mismatch => "mismatch",
             ReferenceAuditStatus::Unreachable => "unreachable",
             ReferenceAuditStatus::Unsupported => "unsupported",
+            ReferenceAuditStatus::Dismissed => "dismissed",
+            ReferenceAuditStatus::Missing => "missing",
         }
     }
 
@@ -118,6 +124,8 @@ impl ReferenceAuditStatus {
             "mismatch" => ReferenceAuditStatus::Mismatch,
             "unreachable" => ReferenceAuditStatus::Unreachable,
             "unsupported" => ReferenceAuditStatus::Unsupported,
+            "dismissed" => ReferenceAuditStatus::Dismissed,
+            "missing" => ReferenceAuditStatus::Missing,
             _ => ReferenceAuditStatus::Ok,
         }
     }
@@ -133,6 +141,27 @@ pub struct ReferenceAuditResult {
     pub similarity_score: Option<f64>,
     pub status: ReferenceAuditStatus,
     pub checked_at: Option<NaiveDateTime>,
+}
+
+/// Remote audit result enriched with the current local entity/reference values
+/// for display. It is computed at read time so renames and reference edits do
+/// not leave stale local values in the cache.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ReferenceAuditView {
+    pub id: i32,
+    pub entity_type: DataQualityEntityType,
+    pub entity_id: i32,
+    pub entity_name: String,
+    pub reference_id: i32,
+    pub local_name: String,
+    pub platform: Option<Platform>,
+    pub ref_type: Option<ReferenceType>,
+    pub external_id: Option<String>,
+    pub external_url: Option<String>,
+    pub remote_name: Option<String>,
+    pub similarity_score: Option<f64>,
+    pub status: ReferenceAuditStatus,
+    pub checked_at: Option<String>,
 }
 
 // ================================================================================================

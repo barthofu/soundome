@@ -60,6 +60,10 @@ pub enum QueuedJob {
         task_id: i32,
         ingest_dir: PathBuf,
     },
+    ReferenceAudit {
+        task_id: i32,
+        cancel_flag: Arc<AtomicBool>,
+    },
     /// Synchronous single-track download. The result is sent back through
     /// `responder`. No DB task row is used for this variant since the HTTP
     /// caller blocks on the response.
@@ -133,6 +137,14 @@ impl TaskExecutor {
         self.send(QueuedJob::IngestDir {
             task_id,
             ingest_dir,
+        });
+    }
+
+    /// Enqueue a user-triggered remote reference audit. Non-blocking.
+    pub fn enqueue_reference_audit(&self, task_id: i32, cancel_flag: Arc<AtomicBool>) {
+        self.send(QueuedJob::ReferenceAudit {
+            task_id,
+            cancel_flag,
         });
     }
 
@@ -222,6 +234,17 @@ async fn run_job(
             let result = services
                 .download_service
                 .ingest_local_dir(conn, &ingest_dir, task_id)
+                .await;
+            finalize_task(services, registry, conn, task_id, result);
+        }
+        QueuedJob::ReferenceAudit {
+            task_id,
+            cancel_flag,
+        } => {
+            mark_running(services, conn, task_id);
+            let result = services
+                .data_quality_service
+                .run_remote_reference_audit(conn, task_id, cancel_flag.as_ref())
                 .await;
             finalize_task(services, registry, conn, task_id, result);
         }

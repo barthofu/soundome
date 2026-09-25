@@ -12,7 +12,7 @@ CREATE TABLE reference_audit_cache (
     reference_id INTEGER NOT NULL,
     remote_name TEXT,
     similarity_score REAL,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL, -- 'ok' | 'mismatch' | 'unreachable' | 'unsupported' | 'dismissed' | 'missing'
     checked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

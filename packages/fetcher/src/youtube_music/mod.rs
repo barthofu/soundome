@@ -133,6 +133,19 @@ impl YoutubeMusic {
         captures.get(1).map(|m| m.as_str().to_string())
     }
 
+    /// Resolve an album directly by its YouTube Music album/playlist id.
+    /// This is also used by metadata-reference audits when an existing stored
+    /// URL is malformed but the durable external id is still usable.
+    pub async fn get_album_from_id(&self, album_id: &str) -> SoundomeResult<Album> {
+        let album = self
+            .client
+            .query()
+            .music_album(album_id.to_string())
+            .await
+            .map_err(|_| Error::NotFound(format!("Youtube Music album id {}", album_id)))?;
+        Ok(mappers::convert_album(&album))
+    }
+
     /// Extracts the id from a youtube music playlist url (e.g: https://music.youtube.com/watch?v=YvI_FNrczzQ&list=RDCLAK5uy_mHkFNBTuR8DZUj61H5XY2onS7nRujVFx8 -> xxxxxxx)
     fn get_playlist_id_from_url(&self, url: &str) -> Option<String> {
         let re = Regex::new(Self::PLAYLIST_REGEX).ok()?;
@@ -312,15 +325,7 @@ impl Source for YoutubeMusic {
         let album_id = self
             .get_album_id_from_url(url)
             .ok_or(Error::InvalidUrl(url.to_string()))?;
-        let album = self
-            .client
-            .query()
-            .music_album(album_id)
-            .await
-            .map_err(|_| {
-                Error::NotFound(format!("Youtube Music album from {}", url).to_string())
-            })?;
-        Ok(mappers::convert_album(&album))
+        self.get_album_from_id(&album_id).await
     }
 
     async fn get_albums_from_query(&self, search: &str) -> SoundomeResult<Vec<Album>> {

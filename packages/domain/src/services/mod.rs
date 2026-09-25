@@ -59,6 +59,7 @@ impl ServiceLayer {
             repositories.artist.clone(),
             repositories.album.clone(),
             repositories.track.clone(),
+            task_service.clone(),
         ));
 
         // Services

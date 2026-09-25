@@ -142,6 +142,18 @@ impl Fetcher {
                 .ok(),
         }
     }
+
+    /// Resolve a YouTube Music album by its durable id. Album `external_url`
+    /// values imported by older mapper versions may not be valid album URLs,
+    /// while their external id remains sufficient for the provider lookup.
+    pub async fn get_youtube_music_album_from_id(&self, id: &str) -> SoundomeResult<Album> {
+        match &self.youtube_music {
+            Some(youtube_music) => youtube_music.get_album_from_id(id).await,
+            None => Err(Error::ProviderUnavailable(
+                Platform::YoutubeMusic.to_string(),
+            )),
+        }
+    }
 }
 
 #[async_trait]

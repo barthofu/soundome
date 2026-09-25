@@ -117,6 +117,27 @@ impl TaskService {
         self.task_repo.create(conn, &task)
     }
 
+    /// Create a pending task for a manually-triggered remote reference audit.
+    pub fn create_reference_audit(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> shared::types::SoundomeResult<Task> {
+        let task = Task {
+            id: None,
+            task_type: TaskType::ReferenceAudit,
+            status: TaskStatus::Pending,
+            payload: serde_json::json!({ "kind": "remote_reference_audit" }).to_string(),
+            label: Some("Remote reference audit".to_string()),
+            progress: 0,
+            total: None,
+            error: None,
+            stats: None,
+            created_at: None,
+            updated_at: None,
+        };
+        self.task_repo.create(conn, &task)
+    }
+
     pub fn set_running(
         &self,
         conn: &mut SqliteConnection,

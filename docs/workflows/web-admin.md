@@ -78,7 +78,18 @@ Dedicated review area, separate from Library.
 - Structural checks (no network calls): conflicting references, multiple IDs
   for the same entity/platform/reference type, platform/URL mismatches, and
   tracks missing a `Source` reference.
-- Remote provider verification is planned separately and is not available yet.
+- **Remote** checks run only when the user clicks **Run remote audit**. The
+  audit runs as a serialized background task and caches results. It checks
+  supported Spotify, SoundCloud, YouTube Music, YouTube (tracks), and
+  MusicBrainz references; unsupported references and unreachable providers
+  are reported separately.
+- Mismatches can be resolved by applying the remote name/title, dismissing the
+  finding, or deleting the reference. Dismissed results remain visible until a
+  later manual audit refreshes them.
+- The Remote tab shows only actionable results by default (`mismatch`,
+  `unreachable`, and `unsupported`) and summarizes the counts. Verified
+  matches and dismissed results are available through **Show verified** when
+  historical details are needed.
 
 **Tracks tab**
 
@@ -220,6 +231,11 @@ All routes are documented interactively at `/swagger`.
 | `POST` | `/api/data-quality/duplicates/:entity_type/ignore` | Mark an entity pair as not a duplicate |
 | `DELETE` | `/api/data-quality/duplicates/:entity_type/ignore/:id_a/:id_b` | Restore an ignored pair to duplicate suggestions |
 | `GET` | `/api/data-quality/audit/structural` | Find structural reference anomalies |
+| `POST` | `/api/data-quality/audit/remote/run` | Enqueue a manual remote reference audit |
+| `GET` | `/api/data-quality/audit/remote` | List cached remote audit results with current local names/reference URLs |
+| `POST` | `/api/data-quality/audit/remote/:cache_id/apply` | Apply a remote name/title to the local entity |
+| `POST` | `/api/data-quality/audit/remote/:cache_id/dismiss` | Dismiss a cached audit result |
+| `POST` | `/api/data-quality/audit/remote/:cache_id/delete-reference` | Delete the entity reference and its cached result |
 | `GET` | `/api/playlists` | List all playlists |
 | `GET` | `/api/validations` | List tracks pending validation |
 | `PATCH` | `/api/validations/:id` | Approve and finalize a pending track |
