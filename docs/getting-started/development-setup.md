@@ -46,7 +46,7 @@ pnpm dev
 
 This starts:
 
-- the Rocket server on `http://localhost:8000`
+- the Rocket server on `http://localhost:8777`
 - the Vite frontend on `http://localhost:5173`
 
 ## Useful commands

@@ -38,7 +38,7 @@ Overrides for the Rocket HTTP server binding. When omitted, the values from `Roc
 | Key | Type | Default | Description | Environment variable |
 |---|---|---|---|---|
 | `server.host` | string | `"127.0.0.1"` | IP address or hostname to bind. Use `"0.0.0.0"` to listen on all interfaces. | `SOUNDOME__SERVER__HOST` |
-| `server.port` | integer | `8000` | TCP port the server listens on. | `SOUNDOME__SERVER__PORT` |
+| `server.port` | integer | `8777` | TCP port the server listens on. | `SOUNDOME__SERVER__PORT` |
 
 ---
 
@@ -195,4 +195,3 @@ See [../operations/playlist-m3u8-export.md](../operations/playlist-m3u8-export.m
 - Do not commit secrets such as Spotify credentials or OpenRouter API keys.
 - Prefer environment variable overrides (e.g. in `.env`) for secrets in containerized or CI environments.
 - If proxy behavior looks inconsistent, verify both `config.toml` and the environment variables visible to the process.
-

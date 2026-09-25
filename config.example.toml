@@ -34,7 +34,7 @@
 
 # TCP port the server listens on.
 # ENV: SOUNDOME__SERVER__PORT
-# port = 8000
+# port = 8777
 
 
 # =============================================================================

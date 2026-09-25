@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 use api::ApiClient;
 
-const DEFAULT_API_URL: &str = "http://localhost:8000";
+const DEFAULT_API_URL: &str = "http://localhost:8777";
 
 /// Soundome CLI — interact with your local Soundome library via the API.
 #[derive(Parser)]

@@ -130,6 +130,6 @@ FROM base AS runner
 
     USER soundome
 
-    EXPOSE 8000
+    EXPOSE 8777
 
     CMD ["./soundome-server"]

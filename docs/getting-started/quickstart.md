@@ -22,7 +22,7 @@ pnpm dev
 
 This starts two processes in parallel:
 
-- **Rocket API server** on `http://localhost:8000`
+- **Rocket API server** on `http://localhost:8777`
 - **Vite development frontend** on `http://localhost:5173`
 
 Open `http://localhost:5173` in your browser.

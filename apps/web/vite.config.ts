@@ -62,7 +62,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^http:\/\/localhost:8000\/api/i,
+            urlPattern: /^http:\/\/localhost:8777\/api/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'local-api-cache',
@@ -87,7 +87,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': 'http://localhost:8777',
     },
   },
 })

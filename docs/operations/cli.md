@@ -23,7 +23,7 @@ The binary is placed at `target/debug/cli` or `target/release/cli`.
 |---|---|
 | `--api-url <url>` | Server base URL, passed explicitly per invocation. |
 | `SOUNDOME_API_URL` | Environment variable — overrides the default when set. |
-| default | `http://localhost:8000` |
+| default | `http://localhost:8777` |
 
 The `.env` file at the repository root is loaded automatically when present (via `dotenvy`). You can set `SOUNDOME_API_URL` there for local development.
 
@@ -153,7 +153,7 @@ soundome library playlist download 3 --output /tmp/export --sync
 soundome library playlist download 3 --manifest /tmp/export/report.json
 
 # Point at a remote server
-soundome --api-url http://192.168.1.10:8000 library playlist download 3
+soundome --api-url http://192.168.1.10:8777 library playlist download 3
 ```
 
 ## How track download works
