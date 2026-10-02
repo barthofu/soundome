@@ -24,7 +24,9 @@
     "soundome_reject_validation": "ask",
     "soundome_delete_*": "ask",
     "soundome_merge_*": "ask",
-    "soundome_cancel_task": "ask"
+    "soundome_cancel_task": "ask",
+    "soundome_data_quality_delete_audited_reference": "ask",
+    "soundome_data_quality_cleanup_orphans": "ask"
   },
   "plugin": [
     "openrtk"

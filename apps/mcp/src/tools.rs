@@ -60,6 +60,9 @@ fn pid(name: &'static str, desc: &'static str) -> Param {
         required: true,
     }
 }
+fn pstr(name: &'static str, desc: &'static str) -> Param {
+    Param { name, ty: Ty::Str, desc, loc: Loc::Path, required: true }
+}
 fn qp(name: &'static str, ty: Ty, desc: &'static str) -> Param {
     Param {
         name,
@@ -245,6 +248,34 @@ pub fn catalog() -> Vec<Tool> {
             false,
         ),
         http("reject_validation", "Reject a pending track and delete it with its staged file.", M::DELETE, "/validations/{id}", vec![pid("id", "Pending track ID")], true),
+        // ---- Data quality ----
+        http("data_quality_get_structural_findings", "Structural data-quality findings (inconsistent or malformed library entities).", M::GET, "/data-quality/audit/structural", vec![], false),
+        http("data_quality_get_duplicate_groups", "Groups of likely duplicate entities, excluding pairs marked as not-duplicate. Use merge_* to resolve.", M::GET, "/data-quality/duplicates/{entity_type}", vec![pstr("entity_type", "`artists`, `albums` or `tracks`")], false),
+        http("data_quality_get_ignored_duplicates", "Pairs previously marked as not-duplicate.", M::GET, "/data-quality/duplicates/{entity_type}/ignored", vec![pstr("entity_type", "`artists`, `albums` or `tracks`")], false),
+        http(
+            "data_quality_ignore_duplicate", "Mark a pair of entities as confirmed not-duplicate.", M::POST, "/data-quality/duplicates/{entity_type}/ignore",
+            vec![
+                pstr("entity_type", "`artists`, `albums` or `tracks`"),
+                bp("id_a", Ty::Int, "First entity ID").req(),
+                bp("id_b", Ty::Int, "Second entity ID (must differ from id_a)").req(),
+            ],
+            false,
+        ),
+        http(
+            "data_quality_restore_ignored_duplicate", "Undo a not-duplicate decision for a pair.", M::DELETE, "/data-quality/duplicates/{entity_type}/ignore/{id_a}/{id_b}",
+            vec![pstr("entity_type", "`artists`, `albums` or `tracks`"), pid("id_a", "First entity ID"), pid("id_b", "Second entity ID")],
+            false,
+        ),
+        http("data_quality_start_remote_audit", "Start the manual remote-reference audit as a background task (returns a task to follow with get_task).", M::POST, "/data-quality/audit/remote/run", vec![], false),
+        http("data_quality_get_remote_audit", "Remote-reference audit results (local vs provider names).", M::GET, "/data-quality/audit/remote", vec![], false),
+        http("data_quality_apply_remote_audit_name", "Apply the provider's remote name/title to the local entity.", M::POST, "/data-quality/audit/remote/{audit_id}/apply", vec![pid("audit_id", "Audit entry ID")], false),
+        http("data_quality_dismiss_remote_audit", "Dismiss an audit result (kept in history).", M::POST, "/data-quality/audit/remote/{audit_id}/dismiss", vec![pid("audit_id", "Audit entry ID")], false),
+        http("data_quality_delete_audited_reference", "Delete the audited reference from the library and drop its cached audit result.", M::POST, "/data-quality/audit/remote/{audit_id}/delete-reference", vec![pid("audit_id", "Audit entry ID")], true),
+        http("data_quality_get_orphans", "Artists and albums not linked to any track.", M::GET, "/data-quality/orphans", vec![], false),
+        http("data_quality_cleanup_orphans", "Delete all currently orphaned artists and albums.", M::POST, "/data-quality/orphans/cleanup", vec![], true),
+        http("data_quality_get_playlist_issues", "Playlists with missing or duplicate track positions.", M::GET, "/data-quality/playlists/issues", vec![], false),
+        http("data_quality_renumber_playlist", "Restore a deterministic zero-based position sequence for a playlist.", M::POST, "/data-quality/playlists/{playlist_id}/renumber", vec![pid("playlist_id", "Playlist ID")], false),
+        http("data_quality_get_ai_cleanup_log", "Most recent SoundCloud AI metadata cleanup changes.", M::GET, "/data-quality/ai-cleanup-log", vec![qp("limit", Ty::Int, "Max entries (default 50, max 200)")], false),
         // ---- Import & tasks ----
         http(
             "import_url",
@@ -320,8 +351,12 @@ impl Tool {
             check_type(p, value)?;
             match p.loc {
                 Loc::Path => {
-                    let id = value.as_i64().unwrap_or_default();
-                    path = path.replace(&format!("{{{}}}", p.name), &id.to_string());
+                    // Path segments are either integers or short slugs (no URL injection).
+                    let segment = scalar_to_string(value);
+                    if !segment.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+                        return Err(format!("argument `{}` contains invalid characters", p.name));
+                    }
+                    path = path.replace(&format!("{{{}}}", p.name), &segment);
                 }
                 Loc::Query => query.push((p.name.to_string(), scalar_to_string(value))),
                 Loc::Body => {
