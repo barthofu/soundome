@@ -10,7 +10,8 @@ members = [
     "packages/downloader",
     "packages/fetcher", "packages/domain",
     "packages/tagger", "apps/cli",
-    "packages/config", "packages/ai", "packages/organizer"]
+    "packages/config", "packages/ai", "packages/organizer",
+    "apps/mcp"]
 
 [workspace.dependencies]
 tracing = "0.1.41"

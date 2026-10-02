@@ -5,6 +5,7 @@ This section covers operational concerns for running and extending Soundome in r
 ## Main documents
 
 - [cli.md](cli.md)
+- [mcp.md](mcp.md)
 - [youtube-search-configuration.md](youtube-search-configuration.md)
 - [proxy-configuration.md](proxy-configuration.md)
 - [proxy-usage-example.md](proxy-usage-example.md)
