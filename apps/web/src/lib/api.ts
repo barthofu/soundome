@@ -18,6 +18,10 @@ import type {
   DuplicateGroupDto,
   DedupIgnoreDto,
   ReferenceAuditViewDto,
+  OrphanCleanupResultDto,
+  OrphanedEntityDto,
+  PlaylistConsistencyIssueDto,
+  AiCleanupLogDto,
 } from './types';
 
 const BASE = '/api';
@@ -846,4 +850,35 @@ export async function dismissRemoteAuditResult(auditId: number): Promise<void> {
 
 export async function deleteAuditedReference(auditId: number): Promise<void> {
   await postRemoteAuditAction(`/data-quality/audit/remote/${auditId}/delete-reference`);
+}
+
+export async function getOrphans(): Promise<OrphanedEntityDto[]> {
+  const res = await fetch(`${BASE}/data-quality/orphans`);
+  if (!res.ok) throw new Error(`Failed to fetch orphans: ${res.statusText}`);
+  return res.json();
+}
+
+export async function cleanupOrphans(): Promise<OrphanCleanupResultDto> {
+  const res = await fetch(`${BASE}/data-quality/orphans/cleanup`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? res.statusText);
+  }
+  return res.json();
+}
+
+export async function getPlaylistConsistencyIssues(): Promise<PlaylistConsistencyIssueDto[]> {
+  const res = await fetch(`${BASE}/data-quality/playlists/issues`);
+  if (!res.ok) throw new Error(`Failed to fetch playlist issues: ${res.statusText}`);
+  return res.json();
+}
+
+export async function renumberPlaylist(id: number): Promise<void> {
+  await postRemoteAuditAction(`/data-quality/playlists/${id}/renumber`);
+}
+
+export async function getAiCleanupLog(limit = 50): Promise<AiCleanupLogDto[]> {
+  const res = await fetch(`${BASE}/data-quality/ai-cleanup-log?limit=${limit}`);
+  if (!res.ok) throw new Error(`Failed to fetch AI cleanup log: ${res.statusText}`);
+  return res.json();
 }

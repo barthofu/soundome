@@ -14,15 +14,16 @@ use shared::{
     http::HttpClientBuilder,
     models::{
         AiCleanupLogEntry, Album, Artist, DataQualityEntityType, DedupIgnoreEntry,
-        DuplicateCandidate, DuplicateGroup, Platform, Reference, ReferenceAuditResult,
-        ReferenceAuditStatus, ReferenceAuditView, ReferenceType, StructuralFinding, Track,
+        DuplicateCandidate, DuplicateGroup, OrphanCleanupResult, OrphanedEntity, Platform,
+        PlaylistConsistencyIssue, Reference, ReferenceAuditResult, ReferenceAuditStatus,
+        ReferenceAuditView, ReferenceType, StructuralFinding, Track,
     },
     types::SoundomeResult,
     utils::string::{string_similarity, SimilarityAlgorithm},
 };
 
 use crate::ports::repositories::{
-    AlbumRepository, ArtistRepository, DataQualityRepository, TrackRepository,
+    AlbumRepository, ArtistRepository, DataQualityRepository, PlaylistRepository, TrackRepository,
 };
 use crate::services::resources::task_service::TaskService;
 
@@ -48,6 +49,7 @@ pub struct DataQualityService {
     artist_repo: Arc<dyn ArtistRepository + Send + Sync>,
     album_repo: Arc<dyn AlbumRepository + Send + Sync>,
     track_repo: Arc<dyn TrackRepository + Send + Sync>,
+    playlist_repo: Arc<dyn PlaylistRepository + Send + Sync>,
     task_service: Arc<TaskService>,
 }
 
@@ -57,6 +59,7 @@ impl DataQualityService {
         artist_repo: Arc<dyn ArtistRepository + Send + Sync>,
         album_repo: Arc<dyn AlbumRepository + Send + Sync>,
         track_repo: Arc<dyn TrackRepository + Send + Sync>,
+        playlist_repo: Arc<dyn PlaylistRepository + Send + Sync>,
         task_service: Arc<TaskService>,
     ) -> Self {
         Self {
@@ -64,6 +67,7 @@ impl DataQualityService {
             artist_repo,
             album_repo,
             track_repo,
+            playlist_repo,
             task_service,
         }
     }
@@ -390,35 +394,35 @@ impl DataQualityService {
                 )
                 .await;
                 match result {
-                Ok(remote_name) if remote_name.trim().is_empty() => {
-                    (None, None, ReferenceAuditStatus::Unreachable)
-                }
-                Ok(remote_name) => {
-                    let score = string_similarity(
-                        &job.local_name,
-                        &remote_name,
-                        SimilarityAlgorithm::Smart,
-                    );
-                    let status = if score >= REMOTE_AUDIT_MATCH_THRESHOLD {
-                        ReferenceAuditStatus::Ok
-                    } else {
-                        ReferenceAuditStatus::Mismatch
-                    };
-                    (Some(remote_name), Some(score), status)
-                }
-                Err(Error::NotImplemented(_) | Error::InvalidUrl(_)) => {
-                    (None, None, ReferenceAuditStatus::Unsupported)
-                }
-                Err(error) => {
-                    tracing::warn!(
-                        entity_type = job.entity_type.as_str(),
-                        entity_id = job.entity_id,
-                        reference_id = job.reference.id,
-                        %error,
-                        "Remote reference audit could not resolve a reference"
-                    );
-                    (None, None, ReferenceAuditStatus::Unreachable)
-                }
+                    Ok(remote_name) if remote_name.trim().is_empty() => {
+                        (None, None, ReferenceAuditStatus::Unreachable)
+                    }
+                    Ok(remote_name) => {
+                        let score = string_similarity(
+                            &job.local_name,
+                            &remote_name,
+                            SimilarityAlgorithm::Smart,
+                        );
+                        let status = if score >= REMOTE_AUDIT_MATCH_THRESHOLD {
+                            ReferenceAuditStatus::Ok
+                        } else {
+                            ReferenceAuditStatus::Mismatch
+                        };
+                        (Some(remote_name), Some(score), status)
+                    }
+                    Err(Error::NotImplemented(_) | Error::InvalidUrl(_)) => {
+                        (None, None, ReferenceAuditStatus::Unsupported)
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            entity_type = job.entity_type.as_str(),
+                            entity_id = job.entity_id,
+                            reference_id = job.reference.id,
+                            %error,
+                            "Remote reference audit could not resolve a reference"
+                        );
+                        (None, None, ReferenceAuditStatus::Unreachable)
+                    }
                 }
             };
 
@@ -640,6 +644,77 @@ impl DataQualityService {
         limit: i64,
     ) -> SoundomeResult<Vec<AiCleanupLogEntry>> {
         self.repo.list_ai_cleanup_log(conn, limit)
+    }
+
+    /// Lists artists and albums that have no linked tracks. This deliberately
+    /// leaves tracks alone: a track without a playlist is valid library data.
+    pub fn list_orphans(&self, conn: &mut SqliteConnection) -> SoundomeResult<Vec<OrphanedEntity>> {
+        let mut orphans = Vec::new();
+        for album in self.album_repo.get_all(conn)? {
+            let Some(id) = album.id else { continue };
+            if self.album_repo.count_tracks(conn, id)? == 0 {
+                orphans.push(OrphanedEntity {
+                    entity_type: DataQualityEntityType::Album,
+                    id,
+                    name: album.title,
+                });
+            }
+        }
+        for artist in self.artist_repo.get_all(conn)? {
+            let Some(id) = artist.id else { continue };
+            if self.artist_repo.count_tracks(conn, id)? == 0 {
+                orphans.push(OrphanedEntity {
+                    entity_type: DataQualityEntityType::Artist,
+                    id,
+                    name: artist.name,
+                });
+            }
+        }
+        Ok(orphans)
+    }
+
+    /// Deletes orphaned albums first, then re-evaluates and deletes orphaned
+    /// artists in one transaction. The order preserves the normal relationship
+    /// cleanup semantics when an album was the last relation of an artist.
+    pub fn cleanup_orphans(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<OrphanCleanupResult> {
+        conn.transaction(|tx| {
+            let mut albums_deleted = 0;
+            for orphan in self.list_orphans(tx)? {
+                if orphan.entity_type == DataQualityEntityType::Album {
+                    self.album_repo.delete(tx, orphan.id)?;
+                    albums_deleted += 1;
+                }
+            }
+            let mut artists_deleted = 0;
+            for orphan in self.list_orphans(tx)? {
+                if orphan.entity_type == DataQualityEntityType::Artist {
+                    self.artist_repo.delete(tx, orphan.id)?;
+                    artists_deleted += 1;
+                }
+            }
+            Ok(OrphanCleanupResult {
+                artists_deleted,
+                albums_deleted,
+            })
+        })
+    }
+
+    pub fn playlist_consistency_issues(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Vec<PlaylistConsistencyIssue>> {
+        self.playlist_repo.find_position_issues(conn)
+    }
+
+    pub fn renumber_playlist(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+    ) -> SoundomeResult<()> {
+        conn.transaction(|tx| self.playlist_repo.renumber_positions(tx, playlist_id))
     }
 }
 

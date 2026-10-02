@@ -7,7 +7,7 @@ use std::{
 use config::Config;
 use diesel::SqliteConnection;
 use fetcher::{curate_source_url, Fetcher, Source};
-use shared::models::ReferenceType;
+use shared::models::{AiCleanupLogEntry, ReferenceType};
 use shared::{
     errors::Error,
     models::{Album, AlbumType, Artist, Platform, Playlist, Reference, TaskTrackValidation, Track},
@@ -32,6 +32,7 @@ pub struct DownloadService {
     artist_service: Arc<ArtistService>,
     playlist_service: Arc<PlaylistService>,
     task_service: Arc<TaskService>,
+    data_quality_service: Arc<super::data_quality_service::DataQualityService>,
 }
 
 // TODO: manage "to validate" tracks
@@ -42,6 +43,7 @@ impl DownloadService {
         artist_service: Arc<ArtistService>,
         playlist_service: Arc<PlaylistService>,
         task_service: Arc<TaskService>,
+        data_quality_service: Arc<super::data_quality_service::DataQualityService>,
     ) -> Self {
         Self {
             track_service,
@@ -49,6 +51,7 @@ impl DownloadService {
             artist_service,
             playlist_service,
             task_service,
+            data_quality_service,
         }
     }
 
@@ -1150,6 +1153,20 @@ impl DownloadService {
             }
         };
 
+        let before_cleanup: Vec<(String, Vec<String>)> = tracks
+            .iter()
+            .map(|track| {
+                (
+                    track.title.clone(),
+                    track
+                        .artists
+                        .iter()
+                        .map(|artist| artist.name.clone())
+                        .collect(),
+                )
+            })
+            .collect();
+
         if let Err(e) = fetcher
             .clean_tracks_metadata(
                 &mut tracks.iter_mut().collect::<Vec<_>>(),
@@ -1158,6 +1175,43 @@ impl DownloadService {
             .await
         {
             tracing::warn!("Failed to clean tracks title and artist name: {}", e);
+        }
+
+        // The fetcher only mutates SoundCloud metadata today. Record every
+        // effective diff after cleanup without altering the import workflow;
+        // tracks are not persisted yet, so `track_id` intentionally remains
+        // null. Names removed by the cleanup are retained as rejected artists.
+        for ((before_title, before_artists), track) in before_cleanup.into_iter().zip(tracks.iter())
+        {
+            let after_artists: Vec<String> = track
+                .artists
+                .iter()
+                .map(|artist| artist.name.clone())
+                .collect();
+            if before_title != track.title || before_artists != after_artists {
+                let rejected_artists = before_artists
+                    .iter()
+                    .filter(|artist| !after_artists.contains(artist))
+                    .cloned()
+                    .collect();
+                let entry = AiCleanupLogEntry {
+                    id: None,
+                    track_id: None,
+                    platform: track.get_source_platform(),
+                    source_external_id: track
+                        .get_source()
+                        .and_then(|reference| reference.external_id.clone()),
+                    before_title,
+                    before_artists,
+                    after_title: track.title.clone(),
+                    after_artists,
+                    rejected_artists,
+                    created_at: None,
+                };
+                if let Err(error) = self.data_quality_service.log_ai_cleanup(conn, &entry) {
+                    tracing::warn!(%error, "Failed to persist AI metadata cleanup log entry");
+                }
+            }
         }
 
         if task_id.is_some() {

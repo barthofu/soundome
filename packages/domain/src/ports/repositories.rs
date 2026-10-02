@@ -375,6 +375,17 @@ pub trait PlaylistRepository: Send + Sync {
         conn: &mut SqliteConnection,
         query: PlaylistQuery,
     ) -> SoundomeResult<Page<Playlist>>;
+    /// Lists playlists with missing or duplicate junction-table positions.
+    fn find_position_issues(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Vec<shared::models::PlaylistConsistencyIssue>>;
+    /// Rewrites one playlist's positions into a deterministic, zero-based sequence.
+    fn renumber_positions(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+    ) -> SoundomeResult<()>;
 }
 
 // ================================================================================================
