@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress. Phases 1–5 implemented (see [Implementation status](#implementation-status)).
+Implemented. Phases 1–6 are available (see [Implementation status](#implementation-status)).
 Tracked in GitHub issue [#28](https://github.com/barthofu/soundome/issues/28).
 Phases 1+2 shipped via PR [#29](https://github.com/barthofu/soundome/pull/29).
 
@@ -327,11 +327,11 @@ suggestion), the new queue:
 - ✅ **Phase 5** — Manual remote reference audit, run as a serialized
   background task; provider queries, cached result views, and apply/dismiss/
   delete-reference actions are available under Reference Audit → Remote.
-- ⬜ **Phase 6** — Cleanup tab (orphans, playlist consistency, AI cleanup log,
-  cover/icon relocation). Not started. The `ai_cleanup_log` table and
-  `AiCleanupLogEntry` model already exist (phase 1) but nothing writes to it
-  yet — the hook into `clean_tracks_metadata_with_progress` is still to be
-  added.
+- ✅ **Phase 6** — Cleanup tab: orphan artists/albums can be reviewed and
+  deleted transactionally; playlists with missing or duplicate positions can
+  be renumbered deterministically; effective batch AI-cleanup metadata diffs
+  are appended to `ai_cleanup_log`; and the existing cover/icon batch-fetch
+  actions now live in Cleanup. The image endpoints themselves are unchanged.
 
 ## Known risks / open follow-ups
 

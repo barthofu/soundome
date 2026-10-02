@@ -183,6 +183,36 @@ pub struct AiCleanupLogEntry {
 }
 
 // ================================================================================================
+// Cleanup
+// ================================================================================================
+
+/// An artist or album that is no longer linked to a library track.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct OrphanedEntity {
+    pub entity_type: DataQualityEntityType,
+    pub id: i32,
+    pub name: String,
+}
+
+/// The outcome of deleting the currently orphaned artists and albums.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct OrphanCleanupResult {
+    pub artists_deleted: usize,
+    pub albums_deleted: usize,
+}
+
+/// A playlist whose junction-row positions cannot be used as one unambiguous
+/// ordering. Positions are zero-based, matching the source adapters.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PlaylistConsistencyIssue {
+    pub playlist_id: i32,
+    pub playlist_name: String,
+    pub track_count: usize,
+    pub missing_positions: usize,
+    pub duplicate_positions: Vec<i32>,
+}
+
+// ================================================================================================
 // Duplicate review queue
 // ================================================================================================
 

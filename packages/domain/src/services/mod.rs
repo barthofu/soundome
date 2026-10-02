@@ -59,6 +59,7 @@ impl ServiceLayer {
             repositories.artist.clone(),
             repositories.album.clone(),
             repositories.track.clone(),
+            repositories.playlist.clone(),
             task_service.clone(),
         ));
 
@@ -69,6 +70,7 @@ impl ServiceLayer {
             artist_service.clone(),
             playlist_service.clone(),
             task_service.clone(),
+            data_quality_service.clone(),
         ));
 
         let scan_service = Arc::new(scan_service::ScanService::new(repositories.track.clone()));

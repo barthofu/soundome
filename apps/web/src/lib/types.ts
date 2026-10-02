@@ -261,3 +261,35 @@ export interface ReferenceAuditViewDto {
   status: ReferenceAuditStatus;
   checked_at: string | null;
 }
+
+export interface OrphanedEntityDto {
+  entity_type: 'artist' | 'album';
+  id: number;
+  name: string;
+}
+
+export interface OrphanCleanupResultDto {
+  artists_deleted: number;
+  albums_deleted: number;
+}
+
+export interface PlaylistConsistencyIssueDto {
+  playlist_id: number;
+  playlist_name: string;
+  track_count: number;
+  missing_positions: number;
+  duplicate_positions: number[];
+}
+
+export interface AiCleanupLogDto {
+  id: number;
+  track_id: number | null;
+  platform: string;
+  source_external_id: string | null;
+  before_title: string;
+  before_artists: string[];
+  after_title: string;
+  after_artists: string[];
+  rejected_artists: string[];
+  created_at: string | null;
+}

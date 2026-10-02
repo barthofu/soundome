@@ -7,7 +7,8 @@ use rocket_okapi::openapi;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared::models::{
-    DataQualityEntityType, DedupIgnoreEntry, DuplicateGroup, Platform, ReferenceAuditView,
+    AiCleanupLogEntry, DataQualityEntityType, DedupIgnoreEntry, DuplicateGroup,
+    OrphanCleanupResult, OrphanedEntity, Platform, PlaylistConsistencyIssue, ReferenceAuditView,
     StructuralFinding, StructuralFindingEntity, StructuralFindingKind, TaskStatus, TaskType,
 };
 
@@ -62,6 +63,37 @@ pub struct DedupIgnoreDto {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct RemoteAuditTaskDto {
     pub task_id: i32,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct AiCleanupLogDto {
+    pub id: i32,
+    pub track_id: Option<i32>,
+    pub platform: String,
+    pub source_external_id: Option<String>,
+    pub before_title: String,
+    pub before_artists: Vec<String>,
+    pub after_title: String,
+    pub after_artists: Vec<String>,
+    pub rejected_artists: Vec<String>,
+    pub created_at: Option<String>,
+}
+
+impl From<AiCleanupLogEntry> for AiCleanupLogDto {
+    fn from(entry: AiCleanupLogEntry) -> Self {
+        Self {
+            id: entry.id.unwrap_or_default(),
+            track_id: entry.track_id,
+            platform: entry.platform.as_ref().to_string(),
+            source_external_id: entry.source_external_id,
+            before_title: entry.before_title,
+            before_artists: entry.before_artists,
+            after_title: entry.after_title,
+            after_artists: entry.after_artists,
+            rejected_artists: entry.rejected_artists,
+            created_at: entry.created_at.map(|created_at| created_at.to_string()),
+        }
+    }
 }
 
 impl From<DedupIgnoreEntry> for DedupIgnoreDto {
@@ -372,6 +404,91 @@ pub async fn delete_audited_reference(
     })
     .await
     .map(|_| Json(Success { success: true }))
+    .map_err(internal_error)
+}
+
+/// Lists artists and albums that are not linked to any track.
+#[openapi]
+#[get("/data-quality/orphans")]
+pub async fn get_orphans(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<OrphanedEntity>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.data_quality_service.list_orphans(conn))
+        .await
+        .map(Json)
+        .map_err(internal_error)
+}
+
+/// Deletes the artists and albums that are currently unlinked from every track.
+#[openapi]
+#[post("/data-quality/orphans/cleanup")]
+pub async fn cleanup_orphans(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<OrphanCleanupResult>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| services.data_quality_service.cleanup_orphans(conn))
+        .await
+        .map(Json)
+        .map_err(internal_error)
+}
+
+/// Lists playlists with missing or duplicate track positions.
+#[openapi]
+#[get("/data-quality/playlists/issues")]
+pub async fn get_playlist_issues(
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<PlaylistConsistencyIssue>>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| {
+        services
+            .data_quality_service
+            .playlist_consistency_issues(conn)
+    })
+    .await
+    .map(Json)
+    .map_err(internal_error)
+}
+
+/// Restores a deterministic zero-based position sequence for a playlist.
+#[openapi]
+#[post("/data-quality/playlists/<playlist_id>/renumber")]
+pub async fn renumber_playlist(
+    playlist_id: i32,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Success>, crate::utils::error::Error> {
+    let services = Arc::clone(services);
+    db.run(move |conn| {
+        services
+            .data_quality_service
+            .renumber_playlist(conn, playlist_id)
+    })
+    .await
+    .map(|_| Json(Success { success: true }))
+    .map_err(internal_error)
+}
+
+/// Returns the most recent SoundCloud AI metadata cleanup changes.
+#[openapi]
+#[get("/data-quality/ai-cleanup-log?<limit>")]
+pub async fn get_ai_cleanup_log(
+    limit: Option<i64>,
+    db: Db,
+    services: &rocket::State<Arc<ServiceLayer>>,
+) -> Result<Json<Vec<AiCleanupLogDto>>, crate::utils::error::Error> {
+    let limit = limit.unwrap_or(50).clamp(1, 200);
+    let services = Arc::clone(services);
+    db.run(move |conn| {
+        services
+            .data_quality_service
+            .list_ai_cleanup_log(conn, limit)
+    })
+    .await
+    .map(|entries| Json(entries.into_iter().map(Into::into).collect()))
     .map_err(internal_error)
 }
 

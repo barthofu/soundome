@@ -75,41 +75,6 @@
     {/each}
   </div>
 
-  {#if (lib.tab === 'artists' || lib.tab === 'albums') && (lib.batchFetchingArtists || lib.batchFetchingAlbums || lib.batchFetchResult)}
-    <div class="batch-tools">
-      {#if lib.tab === 'artists'}
-        <button
-          class="btn-batch"
-          onclick={() => lib.batchFetchArtistIconsAction()}
-          disabled={lib.batchFetchingArtists}
-        >
-          {#if lib.batchFetchingArtists}
-            ⏳ Fetching icons…
-          {:else}
-            🖼️ Fetch all artist photos from references
-          {/if}
-        </button>
-      {:else if lib.tab === 'albums'}
-        <button
-          class="btn-batch"
-          onclick={() => lib.batchFetchAlbumCoversAction()}
-          disabled={lib.batchFetchingAlbums}
-        >
-          {#if lib.batchFetchingAlbums}
-            ⏳ Fetching covers…
-          {:else}
-            🖼️ Fetch all album covers from references
-          {/if}
-        </button>
-      {/if}
-      {#if lib.batchFetchResult}
-        <span class="batch-result">
-          {lib.batchFetchResult.count} fetched · {lib.batchFetchResult.skipped} not found
-        </span>
-      {/if}
-    </div>
-  {/if}
-
   {#if lib.drillArtist || lib.drillAlbum || lib.drillArtistId || lib.drillAlbumId}
     <nav class="breadcrumb">
       <button class="crumb-btn" onclick={lib.backToRoot}>

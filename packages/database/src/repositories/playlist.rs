@@ -1,8 +1,13 @@
+use std::collections::HashMap;
+
 use domain::ports::repositories::{Page, PlaylistQuery, PlaylistRepository};
 
 use diesel::prelude::*;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection};
-use shared::{models::Playlist, types::SoundomeResult};
+use shared::{
+    models::{Playlist, PlaylistConsistencyIssue},
+    types::SoundomeResult,
+};
 
 use crate::{
     entities::{
@@ -218,5 +223,73 @@ impl PlaylistRepository for DieselPlaylistRepository {
             .map(PlaylistEntity::convert_to_domain)
             .collect();
         Ok(Page { items, total })
+    }
+
+    fn find_position_issues(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> SoundomeResult<Vec<PlaylistConsistencyIssue>> {
+        let playlists: Vec<PlaylistEntity> = schema::playlist::table
+            .order(schema::playlist::name.asc())
+            .load(conn)
+            .map_err(map_error)?;
+        let mut issues = Vec::new();
+        for playlist in playlists {
+            let positions: Vec<Option<i32>> = schema::playlist_tracks::table
+                .filter(schema::playlist_tracks::playlist_id.eq(playlist.id))
+                .select(schema::playlist_tracks::position)
+                .load(conn)
+                .map_err(map_error)?;
+            let missing_positions = positions
+                .iter()
+                .filter(|position| position.is_none())
+                .count();
+            let mut counts = HashMap::new();
+            for position in positions.iter().flatten() {
+                *counts.entry(*position).or_insert(0_usize) += 1;
+            }
+            let mut duplicate_positions: Vec<i32> = counts
+                .into_iter()
+                .filter_map(|(position, count)| (count > 1).then_some(position))
+                .collect();
+            duplicate_positions.sort_unstable();
+            if missing_positions > 0 || !duplicate_positions.is_empty() {
+                issues.push(PlaylistConsistencyIssue {
+                    playlist_id: playlist.id,
+                    playlist_name: playlist.name,
+                    track_count: positions.len(),
+                    missing_positions,
+                    duplicate_positions,
+                });
+            }
+        }
+        Ok(issues)
+    }
+
+    fn renumber_positions(
+        &self,
+        conn: &mut SqliteConnection,
+        playlist_id: i32,
+    ) -> SoundomeResult<()> {
+        let track_ids: Vec<i32> = schema::playlist_tracks::table
+            .filter(schema::playlist_tracks::playlist_id.eq(playlist_id))
+            .order((
+                schema::playlist_tracks::position.asc(),
+                schema::playlist_tracks::track_id.asc(),
+            ))
+            .select(schema::playlist_tracks::track_id)
+            .load(conn)
+            .map_err(map_error)?;
+        for (position, track_id) in track_ids.into_iter().enumerate() {
+            diesel::update(
+                schema::playlist_tracks::table
+                    .filter(schema::playlist_tracks::playlist_id.eq(playlist_id))
+                    .filter(schema::playlist_tracks::track_id.eq(track_id)),
+            )
+            .set(schema::playlist_tracks::position.eq(position as i32))
+            .execute(conn)
+            .map_err(map_error)?;
+        }
+        Ok(())
     }
 }

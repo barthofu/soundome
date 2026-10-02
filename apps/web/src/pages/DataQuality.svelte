@@ -14,6 +14,13 @@
     dismissRemoteAuditResult,
     deleteAuditedReference,
     restoreIgnoredDuplicate,
+    batchFetchAlbumCovers,
+    batchFetchArtistIcons,
+    cleanupOrphans,
+    getAiCleanupLog,
+    getOrphans,
+    getPlaylistConsistencyIssues,
+    renumberPlaylist,
   } from '../lib/api';
   import type {
     DedupIgnoreDto,
@@ -21,9 +28,12 @@
     DuplicateGroupDto,
     ReferenceAuditViewDto,
     StructuralFindingDto,
+    AiCleanupLogDto,
+    OrphanedEntityDto,
+    PlaylistConsistencyIssueDto,
   } from '../lib/types';
 
-  type Section = 'duplicates' | 'references';
+  type Section = 'duplicates' | 'references' | 'cleanup';
   type ReferenceTab = 'structural' | 'remote';
   type RemoteStatusFilter = ReferenceAuditViewDto['status'] | 'all';
   const entityTabs: { value: DuplicateEntityType; label: string }[] = [
@@ -52,6 +62,15 @@
   let remotePlatformFilter = $state('all');
   let remoteEntityFilter: 'all' | 'artist' | 'album' | 'track' = $state('all');
   let operationError: string | null = $state(null);
+  let orphans: OrphanedEntityDto[] = $state([]);
+  let playlistIssues: PlaylistConsistencyIssueDto[] = $state([]);
+  let cleanupLog: AiCleanupLogDto[] = $state([]);
+  let cleanupLoading = $state(false);
+  let cleanupError: string | null = $state(null);
+  let cleanupMessage: string | null = $state(null);
+  let cleanupWorking = $state(false);
+  let iconsFetching = $state(false);
+  let coversFetching = $state(false);
   let activeGroup = $state<string | null>(null);
   let targetByGroup: Record<string, number> = $state({});
   let duplicateRequestId = 0;
@@ -145,6 +164,70 @@
     referenceTab = next;
     if (next === 'remote') await loadRemoteResults();
     else await loadFindings();
+  }
+
+  async function loadCleanup() {
+    cleanupLoading = true;
+    cleanupError = null;
+    try {
+      [orphans, playlistIssues, cleanupLog] = await Promise.all([
+        getOrphans(), getPlaylistConsistencyIssues(), getAiCleanupLog(),
+      ]);
+    } catch (e) {
+      cleanupError = e instanceof Error ? e.message : String(e);
+    } finally {
+      cleanupLoading = false;
+    }
+  }
+
+  async function selectSection(next: Section) {
+    section = next;
+    if (next === 'cleanup') await loadCleanup();
+    else if (next === 'references') await selectReferenceTab(referenceTab);
+  }
+
+  async function removeOrphans() {
+    if (orphans.length === 0 || !confirm(`Delete ${orphans.length} orphaned artist/album record(s)? This cannot be undone.`)) return;
+    cleanupWorking = true;
+    cleanupError = null;
+    try {
+      const result = await cleanupOrphans();
+      cleanupMessage = `Deleted ${result.artists_deleted} artist(s) and ${result.albums_deleted} album(s).`;
+      await loadCleanup();
+    } catch (e) {
+      cleanupError = e instanceof Error ? e.message : String(e);
+    } finally {
+      cleanupWorking = false;
+    }
+  }
+
+  async function fixPlaylist(issue: PlaylistConsistencyIssueDto) {
+    cleanupWorking = true;
+    cleanupError = null;
+    try {
+      await renumberPlaylist(issue.playlist_id);
+      cleanupMessage = `Renumbered “${issue.playlist_name}”.`;
+      await loadCleanup();
+    } catch (e) {
+      cleanupError = e instanceof Error ? e.message : String(e);
+    } finally {
+      cleanupWorking = false;
+    }
+  }
+
+  async function fetchImages(kind: 'icons' | 'covers') {
+    if (kind === 'icons') iconsFetching = true;
+    else coversFetching = true;
+    cleanupError = null;
+    try {
+      const result = kind === 'icons' ? await batchFetchArtistIcons() : await batchFetchAlbumCovers();
+      cleanupMessage = `${result.count} fetched · ${result.skipped} not found.`;
+    } catch (e) {
+      cleanupError = e instanceof Error ? e.message : String(e);
+    } finally {
+      if (kind === 'icons') iconsFetching = false;
+      else coversFetching = false;
+    }
   }
 
   async function runRemoteAudit() {
@@ -362,8 +445,9 @@
   </div>
 
   <nav class="section-tabs" aria-label="Data quality sections">
-    <button class:active={section === 'duplicates'} onclick={() => { section = 'duplicates'; }}>Duplicates</button>
-    <button class:active={section === 'references'} onclick={() => { section = 'references'; void selectReferenceTab(referenceTab); }}>Reference audit</button>
+    <button class:active={section === 'duplicates'} onclick={() => selectSection('duplicates')}>Duplicates</button>
+    <button class:active={section === 'references'} onclick={() => selectSection('references')}>Reference audit</button>
+    <button class:active={section === 'cleanup'} onclick={() => selectSection('cleanup')}>Cleanup</button>
   </nav>
 
   {#if section === 'duplicates'}
@@ -477,7 +561,7 @@
         </div>
       {/if}
     </details>
-  {:else}
+  {:else if section === 'references'}
     <div class="entity-tabs" aria-label="Reference audit mode">
       <button class:active={referenceTab === 'structural'} onclick={() => selectReferenceTab('structural')}>Structural</button>
       <button class:active={referenceTab === 'remote'} onclick={() => selectReferenceTab('remote')}>Remote</button>
@@ -599,6 +683,43 @@
         </div>
       {/if}
     {/if}
+  {:else}
+    <div class="toolbar cleanup-toolbar">
+      <button class="btn-refresh" onclick={loadCleanup} disabled={cleanupLoading}>{cleanupLoading ? 'Refreshing…' : 'Refresh cleanup data'}</button>
+    </div>
+    {#if cleanupError}<p class="status error">{cleanupError}</p>{/if}
+    {#if cleanupMessage}<p class="status ok">{cleanupMessage}</p>{/if}
+    {#if cleanupLoading}
+      <p class="status">Loading cleanup data…</p>
+    {:else}
+      <section class="cleanup-card">
+        <h2>Orphans <span>{orphans.length}</span></h2>
+        <p>Artists and albums with no linked tracks.</p>
+        {#if orphans.length > 0}<div class="chip-list">{#each orphans as orphan (orphan.entity_type + orphan.id)}<span class="entity-chip">{orphan.entity_type} #{orphan.id} — {orphan.name}</span>{/each}</div>{/if}
+        <button class="btn-delete-reference" onclick={removeOrphans} disabled={cleanupWorking || orphans.length === 0}>Delete all orphans</button>
+      </section>
+      <section class="cleanup-card">
+        <h2>Playlist consistency <span>{playlistIssues.length}</span></h2>
+        <p>Missing or duplicate positions are repaired into a deterministic zero-based order.</p>
+        {#if playlistIssues.length === 0}<p class="status ok">No playlist position issues found.</p>{/if}
+        {#each playlistIssues as issue (issue.playlist_id)}
+          <div class="cleanup-row"><span><strong>{issue.playlist_name}</strong> · {issue.track_count} tracks · {issue.missing_positions} missing · duplicates: {issue.duplicate_positions.join(', ') || 'none'}</span><button class="btn-merge" onclick={() => fixPlaylist(issue)} disabled={cleanupWorking}>Renumber</button></div>
+        {/each}
+      </section>
+      <section class="cleanup-card">
+        <h2>AI cleanup log <span>{cleanupLog.length}</span></h2>
+        <p>Metadata changes captured during SoundCloud AI cleanup.</p>
+        {#if cleanupLog.length === 0}<p class="status">No cleanup changes recorded yet.</p>{/if}
+        {#each cleanupLog as entry (entry.id)}
+          <div class="log-row"><strong>{entry.before_title}</strong> → <strong>{entry.after_title}</strong><br /><span>{entry.before_artists.join(', ') || '—'} → {entry.after_artists.join(', ') || '—'} · {entry.created_at ?? 'pending timestamp'}</span></div>
+        {/each}
+      </section>
+      <section class="cleanup-card">
+        <h2>Covers &amp; icons</h2>
+        <p>Fetch missing images from existing references. This retains the established best-effort behavior.</p>
+        <div class="group-actions"><button class="btn-refresh" onclick={() => fetchImages('icons')} disabled={iconsFetching}>{iconsFetching ? 'Fetching icons…' : 'Fetch artist icons'}</button><button class="btn-refresh" onclick={() => fetchImages('covers')} disabled={coversFetching}>{coversFetching ? 'Fetching covers…' : 'Fetch album covers'}</button></div>
+      </section>
+    {/if}
   {/if}
 </div>
 
@@ -677,6 +798,8 @@
   .remote-comparison { display: grid; gap: 0.3rem; font-size: 0.82rem; overflow-wrap: anywhere; }
   .audit-url { display: inline-block; margin-top: 0.45rem; font-size: 0.75rem; color: var(--accent); }
   .task-notice { padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.8rem; }
+  .cleanup-card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 0.9rem 1rem; margin-bottom: 0.75rem; }
+  .cleanup-card h2 { font-size: 0.95rem; margin: 0 0 0.3rem; }.cleanup-card h2 span { color: var(--muted); font-weight: 500; }.cleanup-card p { color: var(--muted); font-size: 0.8rem; margin: 0 0 0.65rem; }.chip-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.65rem; }.cleanup-row,.log-row { padding: 0.6rem 0; border-top: 1px solid var(--border); font-size: 0.8rem; }.cleanup-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }.log-row span { color: var(--muted); font-size: 0.75rem; }
   .audit-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; margin: 0.25rem 0 0.25rem; }
   .summary-title { font-weight: 700; font-size: 0.85rem; margin-right: 0.2rem; }
   .summary-item { border: 1px solid transparent; border-radius: 999px; padding: 0.12rem 0.55rem; font-size: 0.72rem; background: var(--surface-2); color: var(--muted); cursor: pointer; font: inherit; }
