@@ -13,6 +13,7 @@ Rust monorepo for a personal music library manager — centralizes, downloads, e
 
 - `apps/server` — Rocket API, OpenAPI, static file serving
 - `apps/cli` — CLI entry point (minimal)
+- `apps/mcp` — MCP server (stdio + HTTP) wrapping the HTTP API for LLM clients
 - `packages/domain` — services & orchestration (especially `DownloadService`)
 - `packages/fetcher` — source adapters (Spotify, YT Music, SoundCloud)
 - `packages/downloader` — audio providers (YouTube, YT Music, SoundCloud)

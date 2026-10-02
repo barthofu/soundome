@@ -10,7 +10,21 @@
         "--mcp"
       ],
       "enabled": true
+    },
+    "soundome": {
+      "type": "local",
+      "command": [
+        "/home/bartho/workspaces/soundome/target/release/soundome-mcp",
+        "--api-url", "http://localhost:8777"
+      ],
+      "enabled": true
     }
+  },
+  "permission": {
+    "soundome_reject_validation": "ask",
+    "soundome_delete_*": "ask",
+    "soundome_merge_*": "ask",
+    "soundome_cancel_task": "ask"
   },
   "plugin": [
     "openrtk"
