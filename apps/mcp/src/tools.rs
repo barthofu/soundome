@@ -61,7 +61,13 @@ fn pid(name: &'static str, desc: &'static str) -> Param {
     }
 }
 fn pstr(name: &'static str, desc: &'static str) -> Param {
-    Param { name, ty: Ty::Str, desc, loc: Loc::Path, required: true }
+    Param {
+        name,
+        ty: Ty::Str,
+        desc,
+        loc: Loc::Path,
+        required: true,
+    }
 }
 fn qp(name: &'static str, ty: Ty, desc: &'static str) -> Param {
     Param {
@@ -353,7 +359,10 @@ impl Tool {
                 Loc::Path => {
                     // Path segments are either integers or short slugs (no URL injection).
                     let segment = scalar_to_string(value);
-                    if !segment.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+                    if !segment
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+                    {
                         return Err(format!("argument `{}` contains invalid characters", p.name));
                     }
                     path = path.replace(&format!("{{{}}}", p.name), &segment);
