@@ -932,51 +932,92 @@ impl DownloadService {
             }
         }
 
-        // 3. Resolve the audio file path: use the staged file if present, otherwise
-        //    download from the provider URL supplied by the user (DRM fallback).
-        let file_path = if let Some(staged) = track.file_path.clone() {
+        // 3. Resolve the audio file path. A pending validation normally retains
+        //    its staged file, but it may have been removed since the row was
+        //    created. In that case reuse the persisted Provider reference to
+        //    recover the audio; a user-supplied URL takes precedence (DRM flow).
+        let staged_file = track.file_path.clone().filter(|path| path.is_file());
+        let file_path = if let Some(staged) = staged_file {
             staged
         } else {
-            let provider_url = patch.provider_url.as_ref().ok_or_else(|| {
-                Error::Custom(format!(
-                    "track {} has no staged file and no provider_url was provided",
-                    id
-                ))
-            })?;
+            if let Some(staged_path) = track.file_path.as_ref() {
+                tracing::warn!(
+                    track_id = id,
+                    path = %staged_path.display(),
+                    "Staged validation audio is missing; attempting provider recovery"
+                );
+            }
+
+            let user_provider_url = patch
+                .provider_url
+                .as_deref()
+                .filter(|url| !url.trim().is_empty());
+            let provider_ref = if let Some(provider_url) = user_provider_url {
+                let provider_platform = if provider_url.contains("music.youtube.com") {
+                    Platform::YoutubeMusic
+                } else {
+                    Platform::Youtube
+                };
+
+                Reference {
+                    id: None,
+                    ref_type: ReferenceType::Provider,
+                    platform: provider_platform,
+                    external_id: None,
+                    external_url: Some(provider_url.to_string()),
+                }
+            } else if let Some(provider_ref) = track.get_provider().filter(|reference| {
+                reference
+                    .external_url
+                    .as_deref()
+                    .is_some_and(|url| !url.trim().is_empty())
+            }) {
+                provider_ref
+            } else {
+                let missing_path = track
+                    .file_path
+                    .as_ref()
+                    .map(|path| format!(" at {:?}", path));
+                let message = format!(
+                    "track {} has no usable staged audio{} or saved Provider reference; provide a YouTube or YouTube Music provider_url",
+                    id,
+                    missing_path.unwrap_or_default()
+                );
+                tracing::error!(track_id = id, "{}", message);
+                return Err(Error::Custom(message));
+            };
 
             tracing::info!(
-                "No staged file for track {} — downloading from provider: {}",
-                id,
-                provider_url
+                track_id = id,
+                platform = %provider_ref.platform,
+                url = ?provider_ref.external_url,
+                "Downloading replacement validation audio to staging"
             );
-
-            let provider_platform = if provider_url.contains("music.youtube.com") {
-                Platform::YoutubeMusic
-            } else {
-                Platform::Youtube
-            };
-
-            let provider_ref = Reference {
-                id: None,
-                ref_type: ReferenceType::Provider,
-                platform: provider_platform,
-                external_id: None,
-                external_url: Some(provider_url.clone()),
-            };
-            track.references.push(provider_ref.clone());
 
             let source_ref = track
                 .get_source()
                 .ok_or_else(|| Error::Custom(format!("track {} has no source reference", id)))?;
 
             let staging_dir = PathBuf::from(&Config::get().general.temp_download_dir);
-            downloader::download(
+            let downloaded = downloader::download(
                 &source_ref,
                 &provider_ref,
                 &sanitize_filename(&track.title),
                 staging_dir,
             )
-            .await?
+            .await?;
+
+            // Provider identifies the effective audio path. Persist a deliberate
+            // user override as a replacement, while an implicit recovery keeps
+            // the existing reference unchanged.
+            if user_provider_url.is_some() {
+                track
+                    .references
+                    .retain(|reference| reference.ref_type != ReferenceType::Provider);
+                track.references.push(provider_ref);
+            }
+
+            downloaded
         };
         track.file_path = Some(file_path.clone());
         self.process_track_file(&mut track, &file_path).await?;

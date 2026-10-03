@@ -14,6 +14,7 @@
 
   let editing = $state(false);
   let busy = $state(false);
+  let actionError: string | null = $state(null);
 
   // Match candidates state
   let showMatches = $state(false);
@@ -30,6 +31,7 @@
   let editTrackNumber = $state('');
   let editDiscNumber = $state('');
   let editLabel = $state('');
+  let editProviderUrl = $state('');
 
   // Initialize edit fields from track and react to track changes
   $effect(() => {
@@ -41,6 +43,7 @@
     editTrackNumber = track.track_number?.toString() ?? '';
     editDiscNumber = track.disc_number?.toString() ?? '';
     editLabel = track.label ?? '';
+    editProviderUrl = '';
   });
 
   let cardEl: HTMLElement | undefined = $state();
@@ -76,12 +79,14 @@
     editTrackNumber = track.track_number?.toString() ?? '';
     editDiscNumber = track.disc_number?.toString() ?? '';
     editLabel = track.label ?? '';
+    editProviderUrl = '';
     editing = true;
   }
 
   async function handleApprove() {
     if (!onApprove) return;
     busy = true;
+    actionError = null;
     try {
       const patch: PatchValidationBody = {};
       if (editing) {
@@ -109,8 +114,13 @@
 
         const lb = editLabel.trim();
         if (lb !== (track.label ?? '')) patch.label = lb || undefined;
+
+        const providerUrl = editProviderUrl.trim();
+        if (providerUrl) patch.provider_url = providerUrl;
       }
       await onApprove(track.id, patch);
+    } catch (e: unknown) {
+      actionError = e instanceof Error ? e.message : String(e);
     } finally {
       busy = false;
     }
@@ -119,8 +129,11 @@
   async function handleReject() {
     if (!onReject) return;
     busy = true;
+    actionError = null;
     try {
       await onReject(track.id);
+    } catch (e: unknown) {
+      actionError = e instanceof Error ? e.message : String(e);
     } finally {
       busy = false;
     }
@@ -151,6 +164,7 @@
   async function selectCandidate(candidate: MatchCandidateDto) {
     if (!onApprove) return;
     busy = true;
+    actionError = null;
     try {
       const patch: PatchValidationBody = {};
 
@@ -174,6 +188,8 @@
       }
 
       await onApprove(track.id, patch);
+    } catch (e: unknown) {
+      actionError = e instanceof Error ? e.message : String(e);
     } finally {
       busy = false;
     }
@@ -258,11 +274,22 @@
              <input id="edit-disc-number" bind:value={editDiscNumber} placeholder="1" type="number" min="1" />
            </div>
          </div>
-         <div class="field">
-           <label for="edit-label">Label</label>
-           <input id="edit-label" bind:value={editLabel} placeholder="Label" />
-         </div>
-       </div>
+          <div class="field">
+            <label for="edit-label">Label</label>
+            <input id="edit-label" bind:value={editLabel} placeholder="Label" />
+          </div>
+          <div class="field">
+            <label for="edit-provider-url">
+              Fallback YouTube / YouTube Music URL (if staged audio is missing)
+            </label>
+            <input
+              id="edit-provider-url"
+              bind:value={editProviderUrl}
+              placeholder="https://www.youtube.com/watch?v=…"
+              type="url"
+            />
+          </div>
+        </div>
     {:else}
       <div class="info">
         <div class="row main">
@@ -339,6 +366,10 @@
           {/if}
         </div>
       </div>
+    {/if}
+
+    {#if actionError}
+      <p class="action-error matches-error" role="alert">{actionError}</p>
     {/if}
 
     {#if showMatches}
@@ -647,6 +678,11 @@
 
   .matches-error {
     color: var(--error);
+  }
+
+  .action-error {
+    font-size: 0.8rem;
+    margin: 0;
   }
 
   .matches-count {

@@ -37,9 +37,15 @@ Click a candidate to populate the form with its values, then review and approve.
 
 For tracks with reason `soundcloud_drm_protected`, there is no staged audio file yet. Click **Show YouTube candidates** to search YouTube Music and YouTube for matching audio. A list of results appears; click one to select it as the download source.
 
-Alternatively, paste any YouTube or YouTube Music URL into the provider URL field manually.
+Alternatively, open **Edit** and paste any YouTube or YouTube Music URL into
+the fallback URL field manually.
 
 Once a source is selected, clicking **Approve** downloads the audio from that URL, tags it with the metadata in the form, moves it to the library, and clears the validation flag.
+
+If a previously staged file is no longer present, approval automatically retries
+the download from the track's saved `Provider` reference when available. If no
+usable provider reference remains, the validation stays pending and the error
+asks for a replacement URL; provide one in the **Edit** form and approve again.
 
 ### Approving a track
 

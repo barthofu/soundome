@@ -130,7 +130,7 @@ Each card shows:
 
 | Action | Behavior |
 |---|---|
-| **Edit** | Open inline metadata form (fields: title, artists, album, genre, date, track #, disc #, label) |
+| **Edit** | Open inline metadata form (fields: title, artists, album, genre, date, track #, disc #, label, optional fallback YouTube / YouTube Music URL if staged audio is missing) |
 | **Show matches** | Fetch alternative metadata candidates from providers (shown when reason is `metadata_partial_match`) |
 | **Select** (on a candidate) | Apply that candidate's metadata directly and approve |
 | **Approve** | Apply any edits, tag the staged file, move it to the library, clear the validation flag |
