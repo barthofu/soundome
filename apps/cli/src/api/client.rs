@@ -1,11 +1,21 @@
 use std::path::Path;
 
 use reqwest::Client;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use tokio::io::AsyncWriteExt;
 
 use super::models::{
     AlbumDto, ArtistDto, IngestResult, PlaylistDto, PlaylistTrackDto, ScanReport, TrackDto,
 };
+
+const PAGE_SIZE: i64 = 500;
+
+#[derive(Deserialize)]
+struct PageResponse<T> {
+    items: Vec<T>,
+    total: i64,
+}
 
 pub struct ApiClient {
     client: Client,
@@ -21,9 +31,7 @@ impl ApiClient {
     }
 
     pub async fn get_playlists(&self) -> anyhow::Result<Vec<PlaylistDto>> {
-        let url = format!("{}/api/playlists", self.base_url);
-        let playlists = self.client.get(&url).send().await?.json().await?;
-        Ok(playlists)
+        self.get_all_pages("/api/playlists").await
     }
 
     pub async fn get_playlist_tracks(&self, id: i32) -> anyhow::Result<Vec<PlaylistTrackDto>> {
@@ -33,21 +41,46 @@ impl ApiClient {
     }
 
     pub async fn get_artists(&self) -> anyhow::Result<Vec<ArtistDto>> {
-        let url = format!("{}/api/artists", self.base_url);
-        let artists = self.client.get(&url).send().await?.json().await?;
-        Ok(artists)
+        self.get_all_pages("/api/artists").await
     }
 
     pub async fn get_albums(&self) -> anyhow::Result<Vec<AlbumDto>> {
-        let url = format!("{}/api/albums", self.base_url);
-        let albums = self.client.get(&url).send().await?.json().await?;
-        Ok(albums)
+        self.get_all_pages("/api/albums").await
     }
 
     pub async fn get_tracks(&self) -> anyhow::Result<Vec<TrackDto>> {
-        let url = format!("{}/api/tracks", self.base_url);
-        let tracks = self.client.get(&url).send().await?.json().await?;
-        Ok(tracks)
+        self.get_all_pages("/api/tracks").await
+    }
+
+    /// Fetch every page from a paginated library-list endpoint.
+    async fn get_all_pages<T>(&self, path: &str) -> anyhow::Result<Vec<T>>
+    where
+        T: DeserializeOwned,
+    {
+        let url = format!("{}{}", self.base_url, path);
+        let mut page = 1i64;
+        let mut items = Vec::new();
+
+        loop {
+            let response = self
+                .client
+                .get(&url)
+                .query(&[("page", page), ("page_size", PAGE_SIZE)])
+                .send()
+                .await?
+                .error_for_status()?;
+            let result: PageResponse<T> = response.json().await?;
+            let total = result.total;
+            let page_items = result.items;
+            let page_len = page_items.len();
+            items.extend(page_items);
+
+            if items.len() as i64 >= total || page_len == 0 {
+                return Ok(items);
+            }
+
+            page += 1;
+        }
     }
 
     /// Stream `GET /api/tracks/:id/download` into `dest`, calling `on_chunk(bytes)`
