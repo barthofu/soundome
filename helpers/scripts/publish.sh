@@ -72,14 +72,6 @@ if [[ "$BRANCH" != "main" ]]; then
     err "must be on the 'main' branch (currently on '$BRANCH')."
 fi
 
-# ── run tests ─────────────────────────────────────────────────────────────────
-
-say "Running tests…"
-if ! cargo test -q --workspace --exclude openrouter_api; then
-    err "tests failed. Fix the failures and try again."
-fi
-ok "All tests passed"
-
 # ── resolve paths and tag ─────────────────────────────────────────────────────
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -98,6 +90,14 @@ case "$TARGET" in
         CRATE_NAME="soundome-cli"
         ;;
 esac
+
+# ── run tests ─────────────────────────────────────────────────────────────────
+
+say "Running tests…"
+if ! cargo test -q -p "$CRATE_NAME" --exclude openrouter_api --workspace; then
+    err "tests failed. Fix the failures and try again."
+fi
+ok "All tests passed"
 
 # ── bump versions ─────────────────────────────────────────────────────────────
 

@@ -84,11 +84,11 @@ jobs:
 
       - name: Build (cross)
         if: matrix.use_cross
-        run: cross build --release --bin ${{ env.BIN_NAME }} --target ${{ matrix.target }}
+        run: cross build --release -p soundome-cli --bin ${{ env.BIN_NAME }} --target ${{ matrix.target }}
 
       - name: Build (cargo)
         if: ${{ !matrix.use_cross }}
-        run: cargo build --release --bin ${{ env.BIN_NAME }} --target ${{ matrix.target }}
+        run: cargo build --release -p soundome-cli --bin ${{ env.BIN_NAME }} --target ${{ matrix.target }}
 
       - name: Package binary
         shell: bash
