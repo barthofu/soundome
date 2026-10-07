@@ -12,7 +12,9 @@ set -eu
 
 REPO="barthofu/soundome"
 BIN_NAME="soundome"
+RELEASE_BIN_NAME="soundome-cli"
 RELEASES_URL="https://github.com/${REPO}/releases"
+GITHUB_API_URL="https://api.github.com/repos/${REPO}"
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,12 +59,27 @@ resolve_version() {
     fi
 
     need curl
+    need python3
 
-    # GitHub returns the resolved latest-release URL; extract the tag from it.
-    LATEST_URL=$(curl -sSIo /dev/null -w '%{url_effective}' "${RELEASES_URL}/latest" 2>/dev/null)
-    TAG="${LATEST_URL##*/}"          # e.g. v1.2.0-cli
-    VERSION="${TAG#v}"               # strip leading v
-    VERSION="${VERSION%-cli}"        # strip trailing -cli
+    RELEASES_JSON=$(curl -fsSL \
+        -H 'Accept: application/vnd.github+json' \
+        -H 'User-Agent: soundome-installer' \
+        "${GITHUB_API_URL}/releases?per_page=100") \
+        || err "could not retrieve releases from GitHub"
+
+    # Releases are returned newest-first; ignore server releases and prereleases.
+    VERSION=$(printf '%s' "$RELEASES_JSON" | python3 -c '
+import json
+import re
+import sys
+
+releases = json.load(sys.stdin)
+for release in releases:
+    match = re.fullmatch(r"v(.+)-cli", release.get("tag_name", ""))
+    if match and not release.get("draft") and not release.get("prerelease"):
+        print(match.group(1))
+        break
+' 2>/dev/null) || err "could not parse CLI releases from GitHub"
 
     [ -n "$VERSION" ] || err "could not resolve latest version from GitHub"
     echo "$VERSION"
@@ -90,7 +107,9 @@ main() {
     INSTALL_DIR="$(resolve_install_dir)"
 
     TAG="v${VERSION}-cli"
-    DOWNLOAD_URL="${RELEASES_URL}/download/${TAG}/${BIN_NAME}-${TARGET}"
+    ASSET="${RELEASE_BIN_NAME}-${TARGET}"
+    DOWNLOAD_URL="${RELEASES_URL}/download/${TAG}/${ASSET}"
+    CHECKSUM_URL="${RELEASES_URL}/download/${TAG}/checksums.txt"
 
     say "Installing ${BIN_NAME} ${VERSION} (${TARGET})"
     say "  → ${INSTALL_DIR}/${BIN_NAME}"
@@ -98,16 +117,36 @@ main() {
     # Create install dir if necessary
     mkdir -p "$INSTALL_DIR"
 
-    TMP="$(mktemp)"
-    # shellcheck disable=SC2064
-    trap "rm -f '$TMP'" EXIT
+    TMP_DIR="$(mktemp -d)" || err "could not create a temporary directory"
+    trap 'rm -rf "$TMP_DIR"' EXIT
+    trap 'exit 1' HUP INT TERM
+    BINARY_TMP="${TMP_DIR}/${ASSET}"
+    CHECKSUMS_TMP="${TMP_DIR}/checksums.txt"
+    EXPECTED_CHECKSUM="${TMP_DIR}/expected-checksum.txt"
 
-    say "Downloading…"
-    curl -sSL --fail "$DOWNLOAD_URL" -o "$TMP" \
-        || err "download failed — check that version ${VERSION} has a release for ${TARGET}:\n  ${DOWNLOAD_URL}"
+    say "Downloading binary and checksums…"
+    curl -fsSL "$DOWNLOAD_URL" -o "$BINARY_TMP" \
+        || err "download failed for ${TAG} (${TARGET}): ${DOWNLOAD_URL}"
+    curl -fsSL "$CHECKSUM_URL" -o "$CHECKSUMS_TMP" \
+        || err "could not download release checksums: ${CHECKSUM_URL}"
 
-    chmod +x "$TMP"
-    mv "$TMP" "${INSTALL_DIR}/${BIN_NAME}"
+    awk -v asset="$ASSET" '$2 == asset { print; count++ } END { if (count != 1) exit 1 }' \
+        "$CHECKSUMS_TMP" > "$EXPECTED_CHECKSUM" \
+        || err "checksums do not contain exactly one entry for ${ASSET}"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "$TMP_DIR" && sha256sum --check "$EXPECTED_CHECKSUM" >/dev/null) \
+            || err "SHA-256 checksum verification failed for ${ASSET}"
+    elif command -v shasum >/dev/null 2>&1; then
+        (cd "$TMP_DIR" && shasum -a 256 --check "$EXPECTED_CHECKSUM" >/dev/null) \
+            || err "SHA-256 checksum verification failed for ${ASSET}"
+    else
+        err "required checksum tool not found (need sha256sum or shasum)"
+    fi
+    ok "SHA-256 checksum verified"
+
+    chmod +x "$BINARY_TMP"
+    mv "$BINARY_TMP" "${INSTALL_DIR}/${BIN_NAME}"
 
     ok "${BIN_NAME} ${VERSION} installed to ${INSTALL_DIR}/${BIN_NAME}"
 

@@ -5,17 +5,34 @@ The Soundome CLI is a command-line client for the Soundome API. It does not conn
 ## Requirements
 
 - The Soundome server must be running and reachable.
-- No additional local setup is needed beyond building the binary.
+- The prebuilt installer supports Linux (x86-64 and ARM64) and macOS (Intel and Apple Silicon).
+- Installing the latest release requires `curl`, Python 3, and either `sha256sum` or `shasum` for checksum verification. Selecting an explicit version skips the Python 3 requirement.
+
+## Install a release
+
+The installer downloads the matching binary from GitHub Releases, verifies its SHA-256 checksum, and installs the `soundome` command into `~/.local/bin` (or `/usr/local/bin` when run as root):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/barthofu/soundome/main/helpers/scripts/install.sh | sh
+```
+
+To install a specific CLI release, set `SOUNDOME_VERSION` (without the `v` prefix):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/barthofu/soundome/main/helpers/scripts/install.sh | SOUNDOME_VERSION=1.0.0 sh
+```
+
+Set `INSTALL_DIR` to choose another destination. The installer can also be downloaded and reviewed before running. Releases are published for the targets above; Windows is not currently supported by the installer.
 
 ## Build
 
 ```bash
-cargo build -p cli
+cargo build -p soundome-cli
 # or for a release binary
-cargo build -p cli --release
+cargo build -p soundome-cli --release
 ```
 
-The binary is placed at `target/debug/cli` or `target/release/cli`.
+The source-build binary is named `soundome-cli` and is placed at `target/debug/soundome-cli` or `target/release/soundome-cli`. The release installer renames it to the user-facing `soundome` command.
 
 ## Configuration
 

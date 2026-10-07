@@ -95,7 +95,7 @@ case "$TARGET" in
     cli)
         TAG="v${VERSION}-cli"
         CARGO_TOML="${REPO_ROOT}/apps/cli/Cargo.toml"
-        CRATE_NAME="cli"
+        CRATE_NAME="soundome-cli"
         ;;
 esac
 

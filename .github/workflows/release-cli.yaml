@@ -9,7 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BIN_NAME: soundome
+  BIN_NAME: soundome-cli
 
 jobs:
   # ------------------------------------------------------------------ #
