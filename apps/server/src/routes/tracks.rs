@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{path::{Path, PathBuf}, sync::Arc};
 
+use config::Config;
 use domain::ports::repositories::{SortDir, TrackQuery, TrackSortBy};
 use domain::services::ServiceLayer;
 use rocket::fs::NamedFile;
@@ -188,6 +189,40 @@ pub struct MergeTracksBody {
 // ================================================================================================
 // Routes
 // ================================================================================================
+
+fn resolve_track_file_path(file_path: PathBuf, library_root: &Path) -> PathBuf {
+    if file_path.is_absolute() {
+        file_path
+    } else {
+        library_root.join(file_path)
+    }
+}
+
+#[cfg(test)]
+mod download_file_path_tests {
+    use super::resolve_track_file_path;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn resolves_relative_track_paths_from_the_library_root() {
+        let library_root = Path::new("/music/library");
+
+        assert_eq!(
+            resolve_track_file_path(PathBuf::from("./Artist/Album/Track.mp3"), library_root),
+            PathBuf::from("/music/library/Artist/Album/Track.mp3")
+        );
+    }
+
+    #[test]
+    fn preserves_absolute_track_paths() {
+        let absolute_path = PathBuf::from("/music/library/Artist/Album/Track.mp3");
+
+        assert_eq!(
+            resolve_track_file_path(absolute_path.clone(), Path::new("/other/library")),
+            absolute_path
+        );
+    }
+}
 
 #[openapi]
 #[get("/tracks?<page>&<page_size>&<q>&<sort_by>&<sort_dir>&<filter>")]
@@ -491,6 +526,11 @@ pub async fn download_file(
             message: "Track has no local file".to_string(),
         })
     })?;
+    // Some tracks are deliberately stored relative to the library root (for
+    // example after metadata-driven file reorganization). Resolve those paths
+    // against the configured root instead of the server's current directory.
+    let library_root = PathBuf::from(&Config::get().general.base_library_dir);
+    let file_path = resolve_track_file_path(file_path, &library_root);
 
     NamedFile::open(&file_path).await.map_err(|_| {
         crate::utils::error::Error::Custom(CustomError {
