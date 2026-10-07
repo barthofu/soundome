@@ -2,7 +2,7 @@ use std::path::Path;
 
 use diesel::{
     r2d2::{ConnectionManager, Pool},
-    Connection, SqliteConnection,
+    Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
@@ -56,7 +56,49 @@ pub fn init_database(database_url: &str) -> Result<(), Box<dyn std::error::Error
         .map_err(|e| format!("Failed to run database migrations: {}", e))?;
 
     tracing::info!("Database migrations completed successfully");
+
+    let normalized_paths = normalize_existing_track_file_paths(&mut conn)
+        .map_err(|e| format!("Failed to normalize stored track paths: {}", e))?;
+    if normalized_paths > 0 {
+        tracing::info!(
+            "Normalized {} stored track file path(s) relative to the configured audio roots",
+            normalized_paths
+        );
+    }
+
     Ok(())
+}
+
+/// Convert legacy absolute (or root-prefixed relative) track paths to paths
+/// relative to the configured library or staging root. This is idempotent and
+/// only updates database values; it never moves or removes audio files.
+fn normalize_existing_track_file_paths(
+    conn: &mut SqliteConnection,
+) -> Result<usize, diesel::result::Error> {
+    conn.transaction::<usize, diesel::result::Error, _>(|conn| {
+        let tracks = schema::track::table.load::<entities::TrackEntity>(conn)?;
+        let mut normalized_count = 0;
+
+        for track in tracks {
+            let Some(stored_path) = track.file_path else {
+                continue;
+            };
+            let normalized_path = shared::utils::fs::track_file_path_for_storage_from_config(
+                Path::new(&stored_path),
+                track.needs_validation,
+            );
+            let normalized_path = normalized_path.to_string_lossy().into_owned();
+
+            if normalized_path != stored_path {
+                diesel::update(schema::track::table.filter(schema::track::id.eq(track.id)))
+                    .set(schema::track::file_path.eq(Some(normalized_path)))
+                    .execute(conn)?;
+                normalized_count += 1;
+            }
+        }
+
+        Ok(normalized_count)
+    })
 }
 
 pub fn init_connection(database_url: &str) -> SqliteConnection {

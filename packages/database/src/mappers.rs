@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use shared::models::{Album, AlbumType, Platform};
 
@@ -21,9 +21,17 @@ impl TrackEntity {
         artists: Vec<ArtistEntity>,
         references: Vec<TrackRefEntity>,
     ) -> shared::models::Track {
+        let needs_validation = track_entity.needs_validation;
+        let file_path = track_entity.file_path.map(|path| {
+            shared::utils::fs::resolve_track_file_path_from_config(
+                Path::new(&path),
+                needs_validation,
+            )
+        });
+
         shared::models::Track {
             id: Some(track_entity.id),
-            needs_validation: track_entity.needs_validation,
+            needs_validation,
             validation_reason: track_entity.validation_reason,
             soundome_id: track_entity.soundome_id,
             title: track_entity.title,
@@ -34,7 +42,7 @@ impl TrackEntity {
             date: track_entity.date,
             genre: track_entity.genre,
             cover: track_entity.cover,
-            file_path: track_entity.file_path.map(PathBuf::from),
+            file_path,
             album: album.map(|a| AlbumEntity::convert_to_domain(a, vec![], vec![])),
             artists: artists
                 .into_iter()
@@ -60,10 +68,14 @@ impl NewTrackEntity {
             date: track.date.clone(),
             genre: track.genre.clone(),
             cover: track.cover.clone(),
-            file_path: track
-                .file_path
-                .clone()
-                .map(|p| p.to_string_lossy().to_string()),
+            file_path: track.file_path.as_deref().map(|path| {
+                shared::utils::fs::track_file_path_for_storage_from_config(
+                    path,
+                    track.needs_validation,
+                )
+                .to_string_lossy()
+                .to_string()
+            }),
             needs_validation: track.needs_validation,
             validation_reason: track.validation_reason.clone(),
             soundome_id: track.soundome_id.clone(),
@@ -83,10 +95,14 @@ impl UpdateTrackEntity {
             date: track.date.clone(),
             genre: track.genre.clone(),
             cover: track.cover.clone(),
-            file_path: track
-                .file_path
-                .clone()
-                .map(|p| p.to_string_lossy().to_string()),
+            file_path: track.file_path.as_deref().map(|path| {
+                shared::utils::fs::track_file_path_for_storage_from_config(
+                    path,
+                    track.needs_validation,
+                )
+                .to_string_lossy()
+                .to_string()
+            }),
             needs_validation: Some(track.needs_validation),
             validation_reason: track.validation_reason.clone(),
             soundome_id: track.soundome_id.clone(),

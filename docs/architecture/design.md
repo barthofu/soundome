@@ -36,6 +36,12 @@ The `ReferenceType` split is one of the core design decisions:
 
 This distinction matters during deduplication. When a better audio source replaces an existing track, Soundome should replace `Source` and `Provider` as needed while preserving useful metadata identifiers.
 
+## Track file-path persistence
+
+Track file paths are stored relative to one of the configured audio roots: finalized library files are relative to `general.base_library_dir`, while pending staged files are relative to `general.temp_download_dir`. When a track is loaded, Soundome prefers the staging root while `needs_validation` is true and the library root otherwise; if the file is not found there, it tries the other root. This fallback supports cases such as a finalized library file later flagged for validation.
+
+Absolute paths from older database rows are still accepted. On database initialization, paths that are under either configured root are normalized to the corresponding relative form. Paths outside both roots are retained for compatibility. Finalizing a staged track moves it into the library, so its next persistence uses a library-relative path.
+
 ## Server and web application
 
 The Rocket server currently mounts API routes under `/api`, Swagger under `/swagger`, and serves the built SPA at `/`.

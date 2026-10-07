@@ -61,7 +61,7 @@ The track disappears from the Validations tab and appears in your library.
 
 ### Rejecting a track
 
-Click **Reject** to permanently delete the database row and the staged audio file. Use this when a track was downloaded by mistake or is a duplicate you do not want.
+Click **Reject** to permanently delete the database row and its staged audio file. Soundome removes audio only when its resolved path is under `general.temp_download_dir`; if a validation flag was placed on a file that remains in the library (for example, a scan-detected tag conflict), the library audio is preserved.
 
 ## Keyboard shortcuts
 

@@ -1734,16 +1734,6 @@ impl DownloadService {
             let base_library_dir = Config::get().general.base_library_dir.clone();
             organizer::move_track_file(new_track, &base_library_dir)?;
 
-            // Normalize the file_path back to relative for storage in DB
-            // The file_path is now absolute, so make it relative to base_library_dir
-            if let Some(abs_path) = &new_track.file_path {
-                let base_path = std::path::PathBuf::from(&base_library_dir);
-                if let Ok(rel_path) = abs_path.strip_prefix(&base_path) {
-                    let rel_path_str = format!("./{}", rel_path.to_string_lossy());
-                    new_track.file_path = Some(std::path::PathBuf::from(rel_path_str));
-                    tracing::debug!("Normalized path to relative: {:?}", new_track.file_path);
-                }
-            }
             Ok(true)
         } else {
             tracing::debug!("File location unchanged, no reorganization needed");

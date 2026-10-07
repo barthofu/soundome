@@ -1,5 +1,6 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, path::Path, sync::Arc};
 
+use config::Config;
 use diesel::{Connection, SqliteConnection};
 use shared::{
     errors::Error,
@@ -134,15 +135,23 @@ impl TrackService {
         }
 
         if let Some(file_path) = track.file_path {
-            match std::fs::remove_file(&file_path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => {
-                    return Err(Error::Custom(format!(
-                        "Failed to delete staged audio file {:?}: {}",
-                        file_path, error
-                    )));
+            let staging_root = Path::new(&Config::get().general.temp_download_dir);
+            if shared::utils::fs::path_is_within_root(&file_path, staging_root) {
+                match std::fs::remove_file(&file_path) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => {
+                        return Err(Error::Custom(format!(
+                            "Failed to delete staged audio file {:?}: {}",
+                            file_path, error
+                        )));
+                    }
                 }
+            } else {
+                tracing::debug!(
+                    path = %file_path.display(),
+                    "Preserving validation audio outside the staging directory"
+                );
             }
         }
 
@@ -554,6 +563,16 @@ impl TrackService {
         let mut removed = HashSet::new();
         for path in losing_paths {
             if !removed.insert(path.clone()) {
+                continue;
+            }
+            if !shared::utils::fs::path_is_within_root(
+                &path,
+                Path::new(&Config::get().general.base_library_dir),
+            ) {
+                tracing::warn!(
+                    ?path,
+                    "Skipping duplicate cleanup outside the configured library root"
+                );
                 continue;
             }
             match std::fs::remove_file(&path) {
