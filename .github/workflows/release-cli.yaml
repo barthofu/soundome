@@ -29,21 +29,31 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             use_cross: true
+            exe_suffix: ""
 
           # Linux arm64 — fully static musl binary
           - os: ubuntu-latest
             target: aarch64-unknown-linux-musl
             use_cross: true
+            exe_suffix: ""
 
           # macOS Intel
           - os: macos-13
             target: x86_64-apple-darwin
             use_cross: false
+            exe_suffix: ""
 
           # macOS Apple Silicon
           - os: macos-latest
             target: aarch64-apple-darwin
             use_cross: false
+            exe_suffix: ""
+
+          # Windows x86-64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+            exe_suffix: .exe
 
     steps:
       - uses: actions/checkout@v4
@@ -83,8 +93,8 @@ jobs:
       - name: Package binary
         shell: bash
         run: |
-          ASSET="${{ env.BIN_NAME }}-${{ matrix.target }}"
-          cp "target/${{ matrix.target }}/release/${{ env.BIN_NAME }}" "$ASSET"
+          ASSET="${{ env.BIN_NAME }}-${{ matrix.target }}${{ matrix.exe_suffix }}"
+          cp "target/${{ matrix.target }}/release/${{ env.BIN_NAME }}${{ matrix.exe_suffix }}" "$ASSET"
           echo "ASSET=$ASSET" >> "$GITHUB_ENV"
 
       - name: Upload artifact

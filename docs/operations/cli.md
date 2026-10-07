@@ -5,8 +5,8 @@ The Soundome CLI is a command-line client for the Soundome API. It does not conn
 ## Requirements
 
 - The Soundome server must be running and reachable.
-- The prebuilt installer supports Linux (x86-64 and ARM64) and macOS (Intel and Apple Silicon).
-- Installing the latest release requires `curl`, Python 3, and either `sha256sum` or `shasum` for checksum verification. Selecting an explicit version skips the Python 3 requirement.
+- Prebuilt releases are available for Linux (x86-64 and ARM64), macOS (Intel and Apple Silicon), and Windows (x86-64). The one-line installer currently supports Linux and macOS only.
+- The one-line installer requires `curl` and either `sha256sum` or `shasum`; resolving the latest CLI release also requires Python 3. Selecting an explicit version skips that Python 3 requirement.
 
 ## Install a release
 
@@ -22,7 +22,7 @@ To install a specific CLI release, set `SOUNDOME_VERSION` (without the `v` prefi
 curl -fsSL https://raw.githubusercontent.com/barthofu/soundome/main/helpers/scripts/install.sh | SOUNDOME_VERSION=1.0.0 sh
 ```
 
-Set `INSTALL_DIR` to choose another destination. The installer can also be downloaded and reviewed before running. Releases are published for the targets above; Windows is not currently supported by the installer.
+Set `INSTALL_DIR` to choose another destination. The installer can also be downloaded and reviewed before running. On Windows, download the `soundome-cli-x86_64-pc-windows-msvc.exe` asset from the desired CLI release on GitHub and run it directly.
 
 ## Build
 
