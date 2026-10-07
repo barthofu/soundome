@@ -10,4 +10,4 @@ doctest = false
 tracing = { workspace = true }
 
 config = "0.15.7"
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { workspace = true }

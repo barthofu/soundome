@@ -9,15 +9,11 @@ config = { path = "../config" }
 
 tracing = { workspace = true }
 
-audiotags = "0.5.0"
+audiotags = { workspace = true }
 id3 = "1.16.2"
 metaflac = "0.2.8"
 mp4ameta = "0.11.0"
-chrono = "0.4.39"
+chrono = { workspace = true }
 musicbrainz_rs = "0.9.0"
 bandcamp = "0.3.4"
-rspotify = { version = "0.16.1", default-features = false, features = [
-  "env-file",
-  "client-ureq",
-  "ureq-rustls-tls",
-] }
+rspotify = { workspace = true }

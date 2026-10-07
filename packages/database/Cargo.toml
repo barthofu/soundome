@@ -9,13 +9,13 @@ domain = { path = "../domain" }
 
 tracing = { workspace = true }
 
-diesel = { version = "2.2.7", features = ["sqlite", "r2d2", "chrono"] }
+diesel = { workspace = true, features = ["sqlite", "r2d2", "chrono"] }
 diesel_migrations = { version = "2.2.0", features = ["sqlite"] }
-libsqlite3-sys = { version = "0.31.0", features = ["bundled"] }
+libsqlite3-sys = { workspace = true }
 chrono = { version = "0.4", features = ["serde"] }
-rocket = { version = "0.5.1", features = ["json"] }
-rocket_okapi = { version = "0.9.0", features = ["swagger"] }
-okapi = { version = "0.7.0" }
-schemars = "0.8.21"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.138"
+rocket = { workspace = true }
+rocket_okapi = { workspace = true }
+okapi = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
