@@ -119,10 +119,10 @@ Output:
 
 ### `library playlist download`
 
-Download the local tracks of a playlist to a directory via HTTP streaming.
+Download the local tracks of a playlist to a directory via HTTP streaming. Re-running the command on the same playlist **synchronises** the directory instead of downloading everything again.
 
 ```bash
-soundome library playlist download <playlist> [--output <dir>] [--flat] [--sync] [--manifest <path>]
+soundome library playlist download <playlist> [--output <dir>] [--flat] [--force] [--with-playlist-id] [--with-track-number] [--manifest <path>]
 ```
 
 | Argument / flag | Description |
@@ -130,12 +130,22 @@ soundome library playlist download <playlist> [--output <dir>] [--flat] [--sync]
 | `<playlist>` | Numeric playlist ID or a partial name (case-insensitive). If several playlists match the name, an interactive picker is shown. |
 | `--output <dir>` | Destination directory. Created automatically if it does not exist. Defaults to the current directory. |
 | `--flat` | Write files directly into the output directory, without creating a playlist sub-directory. |
-| `--sync` | Skip tracks whose destination file already exists. |
-| `--manifest <path>` | Write a JSON manifest at a custom path. Default: `<target>/manifest.json`. |
+| `--force` | Re-download every track, even when a local copy exists. Files of removed tracks are still cleaned up. |
+| `--with-playlist-id` | Prefix the playlist directory with the zero-padded playlist ID (`0001 - Name`). Previously the default. |
+| `--with-track-number` | Prefix file names with the zero-padded playlist position (`01 - Artist - Title`). Previously the default. |
+| `--manifest <path>` | Read/write the JSON manifest at a custom path. Default: `<target>/manifest.json`. |
+| `--sync` | Deprecated no-op (hidden): synchronisation is now the default behaviour. |
 
 #### Default layout (without `--flat`)
 
-The command always writes a JSON manifest containing summary and per-track status (`downloaded`, `skipped`, `failed`).
+```
+<output>/
+  <PlaylistName>/
+    manifest.json
+    <Artist> - <Title>.<ext>
+```
+
+With `--with-playlist-id` and `--with-track-number`:
 
 ```
 <output>/
@@ -143,28 +153,47 @@ The command always writes a JSON manifest containing summary and per-track statu
     <Order> - <Artist> - <Title>.<ext>
 ```
 
+`<Order>` is a zero-padded index based on playlist order (`01`, `02`, ...). When two tracks resolve to the same file name, the later one gets a ` (2)`, ` (3)`… suffix.
+
 #### Flat layout (`--flat`)
 
 ```
 <output>/
-  <Order> - <Artist> - <Title>.<ext>
+  <Artist> - <Title>.<ext>
 ```
 
-`<Order>` is a zero-padded index based on playlist order (`01`, `02`, ...).
+#### Synchronisation
 
-When a track has no local file on the server, or the server returns a non-2xx response, it is skipped with a warning. The rest of the playlist continues.
+The command always writes a JSON manifest containing a summary and per-track status (`downloaded`, `skipped`, `failed`) along with each file name. On the next run, the previous manifest (same playlist ID) is used to:
+
+- keep tracks that are already present locally (`skipped`);
+- rename kept files when their expected name changed (e.g. new position with `--with-track-number`);
+- rewrite the track-number tags of kept files whose playlist position or the playlist length changed;
+- download tracks that are new, missing on disk, or failed previously;
+- delete files of tracks that were removed from the playlist. Only files recorded in the manifest are ever deleted.
+
+Without a manifest (first run, or legacy export), a file already present at the expected location is adopted instead of being re-downloaded.
+
+Downloads are written to a `<file>.part` temporary file and moved into place once complete, so an interrupted run never leaves a truncated file behind.
+
+Changing `--with-playlist-id` or `--flat` changes the target directory, so the previous manifest is not found and the playlist is downloaded again into the new directory (the old directory is left untouched).
+
+When a track has no local file on the server, or the server returns a non-2xx response, it is reported as `failed` with a warning. The rest of the playlist continues.
 
 #### Examples
 
 ```bash
-# Download by numeric ID into ~/music/tekno
+# Download (or synchronise) by numeric ID into ~/music/tekno
 soundome library playlist download 1 --output ~/music/tekno
 
 # Download by partial name, flat layout
 soundome library playlist download "late night" --output /tmp/export --flat
 
-# Sync mode: only missing files are downloaded
-soundome library playlist download 3 --output /tmp/export --sync
+# Legacy naming: ID-prefixed directory and numbered files
+soundome library playlist download 3 --output /tmp/export --with-playlist-id --with-track-number
+
+# Re-download everything
+soundome library playlist download 3 --output /tmp/export --force
 
 # Custom manifest path
 soundome library playlist download 3 --manifest /tmp/export/report.json
@@ -184,12 +213,12 @@ The CLI calls:
 
 Track downloads are streamed chunk by chunk to disk, with a byte-level progress bar.
 
-After a track is saved, the CLI rewrites the track-number metadata so that `track_number` matches the playlist position (and sets the total track count to the playlist length).
+After a track is saved, the CLI rewrites the track-number metadata so that `track_number` matches the playlist position (and sets the total track count to the playlist length). During a sync, kept files are re-tagged only when their position or the playlist length changed.
 
 Tracks that are not yet finalized (no `file_path` in the database) or whose audio file is missing on the server are reported as skipped.
 
 ## Current limitations
 
 - Search is client-side filtering after API fetch (no server-side pagination yet).
-- `--sync` currently checks destination file existence only (no checksum/version comparison).
+- Sync relies on the manifest and file existence only (no checksum/version comparison): a track whose audio was replaced on the server is not re-downloaded unless `--force` is used.
 - Authentication is not implemented — the server is assumed to be trusted.

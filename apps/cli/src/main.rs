@@ -113,8 +113,23 @@ enum PlaylistCommands {
         #[arg(long, default_value_t = false)]
         flat: bool,
 
-        /// Only download new files (skip files already present at destination).
+        /// Re-download every track, even if a local copy already exists.
+        /// By default the command synchronises with the previous run (manifest).
         #[arg(long, default_value_t = false)]
+        force: bool,
+
+        /// Prefix the playlist directory with its zero-padded ID (`0001 - Name`).
+        #[arg(long, default_value_t = false)]
+        with_playlist_id: bool,
+
+        /// Prefix file names with their zero-padded playlist position (`01 - Artist - Title`).
+        #[arg(long, default_value_t = false)]
+        with_track_number: bool,
+
+        /// Deprecated: synchronisation is now the default behaviour. Kept as a no-op
+        /// for backward compatibility.
+        // TODO: remove once scripts have migrated away from `--sync`.
+        #[arg(long, default_value_t = false, hide = true)]
         sync: bool,
 
         /// Optional manifest output path (default: <target>/manifest.json).
@@ -179,16 +194,23 @@ async fn main() -> anyhow::Result<()> {
                     playlist,
                     output,
                     flat,
-                    sync,
+                    force,
+                    with_playlist_id,
+                    with_track_number,
+                    sync: _,
                     manifest,
                 } => {
                     commands::library::playlist::download(
                         &client,
                         &playlist,
                         &output,
-                        flat,
-                        sync,
-                        manifest.as_deref(),
+                        commands::library::playlist::DownloadOptions {
+                            flat,
+                            force,
+                            with_playlist_id,
+                            with_track_number,
+                            manifest_path: manifest.as_deref(),
+                        },
                     )
                     .await?;
                 }
